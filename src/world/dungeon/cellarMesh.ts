@@ -102,12 +102,12 @@ function breach(k: MeshKit, p: Prop): BuildingMesh[] {
 }
 
 const STONE: Tint = [176, 160, 136], OLD: Tint = [150, 146, 136], EARTH: Tint = [120, 96, 72];
-const OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64], ROPE: Tint = [150, 128, 92];
+export const OAK: Tint = [120, 90, 62], DARK_OAK: Tint = [84, 62, 44], IRON: Tint = [60, 60, 64], ROPE: Tint = [150, 128, 92];
 /** Tints on the cellar's own textures (they carry their colour; these only age them). */
 const WASH: Tint = [236, 228, 210], FLAGS: Tint = [204, 200, 194], OLD_FLAGS: Tint = [188, 186, 180], BRICK: Tint = [214, 200, 188];
 const RAFTERS: Tint = [168, 146, 124], DIRT: Tint = [176, 160, 140];
 /** The cave's rock (world/dungeon/caveRock.ts draws the same). */
-const CAVE_ROCK: Tint = [168, 160, 148];
+export const CAVE_ROCK: Tint = [168, 160, 148];
 
 /** A wall's look: its layer, tint, and how damp its foot is (0 dry .. 1 wet). */
 interface WallLook { readonly mat: number; readonly tint: Tint; readonly damp: number }
@@ -279,7 +279,8 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
 
   // Door frames on every opening; door pieces for the doors with a state.
   const doors: DoorPiece[] = [];
-  for (const pl of L.links) pl.doors.forEach((door, end) => {
+  // (A formed cave's shut ways are its own locks, world/cave/lockMesh.ts: the story's links have no place in it.)
+  for (const pl of c.formed ? [] : L.links) pl.doors.forEach((door, end) => {
     if (end === 1 && pl.path.length === 0) return;
     const o = { pl, end: end as 0 | 1 };
     const k = door.dir, [ax, az, bx, bz] = sideEdge(door.x, door.z, k, CELL);
@@ -386,12 +387,12 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
   }
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
-  const keys = L.links.filter((pl) => pl.link.kind === 'locked' && pl.link.key !== undefined).map((pl) => ({ room: pl.link.key!, mesh: keyMesh(keySpot(L, pl.link.key!), deriveSeed(c.decision.seed, 'key', pl.link.id)) }));
+  const keys = (c.formed ? [] : L.links).filter((pl) => pl.link.kind === 'locked' && pl.link.key !== undefined).map((pl) => ({ room: pl.link.key!, mesh: keyMesh(keySpot(L, pl.link.key!), deriveSeed(c.decision.seed, 'key', pl.link.id)) }));
   return { shell: shell.mesh(), props: propKit.mesh(), doors, lids, keys, seal };
 }
 
 /** An old iron key with a brass bow, lying on the floor at `at`, turned by its seed (a hand long: seen from a few steps). */
-function keyMesh(at: readonly [number, number, number], seed: number): BuildingMesh {
+export function keyMesh(at: readonly [number, number, number], seed: number): BuildingMesh {
   const k = new MeshKit(), rng = new Rng(seed), yaw = rng.range(0, 6.28), c = Math.cos(yaw), s = Math.sin(yaw);
   const [x, y, z] = at, BRASS: Tint = [214, 170, 92], DARK_IRON: Tint = [92, 88, 84];
   // Along the key (u): the bow's ring of four bars, the shaft, the bit.

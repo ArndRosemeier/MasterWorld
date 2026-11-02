@@ -7,6 +7,7 @@
 import { MinHeap } from '@futuremagic/core';
 import type { Reading } from '../world/cave/reader';
 import { fieldAt, type BrickField } from '../world/dungeon/rockMesh';
+import { shutAir, type CaveLock } from '../world/cave/locks';
 import type { DenGround, P3 } from './dungeonNav';
 
 /** Ways round something in the way: turned off the heading by these (radians), nearest first. */
@@ -57,10 +58,24 @@ export class FormedGround implements DenGround {
   }
 
   /** Does a link from cell a to cell b suit a creature: a walk, a short scramble up, a drop of a few metres. */
-  private goes(a: number, b: number, kind: number): boolean {
+  private creatureGoes(a: number, b: number, kind: number): boolean {
     const dy = this.r.y[b] - this.r.y[a];
-    return kind === 0 || (kind === 1 ? Math.abs(dy) <= UP : dy >= -DOWN);
+    return !this.shutCells.has(b) && (kind === 0 || (kind === 1 ? Math.abs(dy) <= UP : dy >= -DOWN));
   }
+
+  /** The locks standing shut (K6): solid to a body, and the cells they shut are not gone to. */
+  private closed: readonly CaveLock[] = [];
+  private shutCells = new Set<number>();
+
+  /** Set the locks that stand shut now (a lock that opens is left out); the creatures' ways and strides keep out of them. */
+  holdShut(locks: readonly CaveLock[]): void {
+    this.closed = locks;
+    this.shutCells = new Set(locks.flatMap((l) => l.cells));
+    this.near.clear();
+  }
+
+  /** Air at a point (positive in air): the rock's field, and any shut lock's box. */
+  private clearAir(x: number, y: number, z: number): number { return shutAir(fieldAt(this.field, x, y, z, -1), this.closed, x, y, z); }
 
   private point(c: number): P3 { return { x: this.r.x[c], y: this.r.y[c], z: this.r.z[c] }; }
 
@@ -74,7 +89,7 @@ export class FormedGround implements DenGround {
       const a = out[n];
       for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) {
         const b = r.edgeTo[e];
-        if (!this.goes(a, b, r.edgeKind[e]) || seen.has(b) || Math.hypot(r.x[b] - r.x[start], r.z[b] - r.z[start]) > SPREAD || Math.abs(r.y[b] - r.y[start]) > 3) continue;
+        if (!this.creatureGoes(a, b, r.edgeKind[e]) || seen.has(b) || Math.hypot(r.x[b] - r.x[start], r.z[b] - r.z[start]) > SPREAD || Math.abs(r.y[b] - r.y[start]) > 3) continue;
         seen.add(b); out.push(b);
       }
     }
@@ -93,14 +108,13 @@ export class FormedGround implements DenGround {
 
   /** The rock's floor under (x, z), looking down from `y` (up to 6 m), by the field's sign changes. */
   floorAt(x: number, z: number, y: number): number | null {
-    const f = this.field;
-    let top = y, v = fieldAt(f, x, top, z, -1);
+    let top = y, v = this.clearAir(x, top, z);
     // Inside rock: look a little up for the air above it.
-    for (let up = 0; v <= 0 && up < UP + 0.2; up += 0.1) { top = y + up + 0.1; v = fieldAt(f, x, top, z, -1); }
+    for (let up = 0; v <= 0 && up < UP + 0.2; up += 0.1) { top = y + up + 0.1; v = this.clearAir(x, top, z); }
     if (v <= 0) return null;
     let prev = v;
     for (let d = 0.1; d <= 6; d += 0.1) {
-      const w = fieldAt(f, x, top - d, z, -1);
+      const w = this.clearAir(x, top - d, z);
       // The surface is where the distance crosses zero, between the two samples.
       if (w <= 0) return top - d + 0.1 * (1 - prev / (prev - w));
       prev = w;
@@ -119,13 +133,13 @@ export class FormedGround implements DenGround {
     }
   }
 
-  clearance(x: number, y: number, z: number): number { return fieldAt(this.field, x, y + 0.5, z, -1); }
+  clearance(x: number, y: number, z: number): number { return this.clearAir(x, y + 0.5, z); }
 
   sees(ax: number, ay: number, az: number, bx: number, by: number, bz: number, eye = 1.2): boolean {
     const d = Math.hypot(bx - ax, by - ay, bz - az), n = Math.ceil(d / 0.5);
     for (let s = 1; s < n; s++) {
       const t = s / n;
-      if (fieldAt(this.field, ax + (bx - ax) * t, ay + eye + (by - ay) * t, az + (bz - az) * t, -1) < 0.05) return false;
+      if (this.clearAir(ax + (bx - ax) * t, ay + eye + (by - ay) * t, az + (bz - az) * t) < 0.05) return false;
     }
     return true;
   }
@@ -144,7 +158,7 @@ export class FormedGround implements DenGround {
       if (c === b) { found = true; break; }
       const gc = g.get(c)!;
       for (let e = r.edgeStart[c]; e < r.edgeStart[c + 1]; e++) {
-        if (!this.goes(c, r.edgeTo[e], r.edgeKind[e])) continue;
+        if (!this.creatureGoes(c, r.edgeTo[e], r.edgeKind[e])) continue;
         const d = r.edgeTo[e], gd = gc + Math.hypot(r.x[c] - r.x[d], r.y[c] - r.y[d], r.z[c] - r.z[d]);
         if (gd < (g.get(d) ?? Infinity)) { g.set(d, gd); tree.set(d, c); heap.push(gd + toward(d), d); }
       }
@@ -154,7 +168,7 @@ export class FormedGround implements DenGround {
     for (let c = b; c !== a; c = tree.get(c)!) cells.push(c);
     cells.reverse();
     // The point itself if a body fits there; else the nearest ground that is walked to.
-    const fl = this.floorAt(to.x, to.z, to.y + 0.6), fits = fl !== null && this.room(to.x, fl, to.z) >= ROOM * 0.8 && Math.abs(fl - r.y[b]) < UP;
+    const fl = this.floorAt(to.x, to.z, to.y + 0.6), fits = fl !== null && this.bodyRoom(to.x, fl, to.z) >= ROOM * 0.8 && Math.abs(fl - r.y[b]) < UP;
     return this.pulled(from, cells.map((c) => this.point(c)), fits ? to : this.point(b));
   }
 
@@ -178,7 +192,7 @@ export class FormedGround implements DenGround {
     let y = a.y;
     for (let s = 1; s <= n; s++) {
       const t = s / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, fl = this.floorAt(x, z, y + 0.6);
-      if (fl === null || Math.abs(fl - y) > STEP || fieldAt(this.field, x, fl + 0.75, z, -1) < ROOM || fieldAt(this.field, x, fl + 1.3, z, -1) < ROOM) return false;
+      if (fl === null || Math.abs(fl - y) > STEP || this.clearAir(x, fl + 0.75, z) < ROOM || this.clearAir(x, fl + 1.3, z) < ROOM) return false;
       y = fl;
     }
     return Math.abs(y - b.y) < STEP * 1.5;
@@ -195,16 +209,16 @@ export class FormedGround implements DenGround {
   }
 
   /** Room round a body standing with its feet at (x, y, z): the least at its waist and head, metres. */
-  private room(x: number, y: number, z: number): number {
-    return Math.min(fieldAt(this.field, x, y + 0.75, z, -1), fieldAt(this.field, x, y + 1.3, z, -1));
+  private bodyRoom(x: number, y: number, z: number): number {
+    return Math.min(this.clearAir(x, y + 0.75, z), this.clearAir(x, y + 1.3, z));
   }
 
   /** Can a body at (x, z) with its feet at y move by (dx, dz): the floor there within a scramble, room at its waist and head (or no less than where it stands)? */
   private passes(x: number, y: number, z: number, dx: number, dz: number, r: number): boolean {
     const nx = x + dx, nz = z + dz, fl = this.floorAt(nx, nz, y + 0.6);
     if (fl === null || fl - y > UP || y - fl > DOWN) return false;
-    const room = this.room(nx, fl, nz);
-    return room >= r * 0.8 || room >= this.room(x, y, z) - 0.01;
+    const room = this.bodyRoom(nx, fl, nz);
+    return room >= r * 0.8 || room >= this.bodyRoom(x, y, z) - 0.01;
   }
 
   /** The reached ground farthest from `q` within a few tens of metres, by walk links. */
@@ -220,7 +234,7 @@ export class FormedGround implements DenGround {
       if (dc > 24) continue;
       for (let e = r.edgeStart[c]; e < r.edgeStart[c + 1]; e++) {
         const k = r.edgeTo[e];
-        if (this.goes(c, k, r.edgeKind[e]) && !d.has(k)) { d.set(k, dc + Math.hypot(r.x[c] - r.x[k], r.z[c] - r.z[k])); list.push(k); }
+        if (this.creatureGoes(c, k, r.edgeKind[e]) && !d.has(k)) { d.set(k, dc + Math.hypot(r.x[c] - r.x[k], r.z[c] - r.z[k])); list.push(k); }
       }
     }
     return best === a ? [] : this.way(from, this.point(best));

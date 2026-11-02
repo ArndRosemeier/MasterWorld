@@ -371,6 +371,8 @@ export class Township {
     const t = townTalk(this.seed, this.c.setting, this.town, this.residents, log, this.saved.talk, this.world, this.c.hours()).talk;
     // Promises kept before (an older save paid on leaving): nobody speaks of their trouble any more.
     for (const id of keptOf(log)) t.hush(id);
+    // Word gets round the town as its hours pass (talk/rumour.ts).
+    t.gameHours = () => this.c.hours();
     this.talkOf = t;
     this.onTalk?.(t);
     return t;

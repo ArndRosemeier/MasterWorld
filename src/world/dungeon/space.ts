@@ -84,6 +84,12 @@ export class DungeonSpace {
     return o === NONE ? undefined : o;
   }
 
+  /** A link opened (a saved visit restores them; a formed cave also lets its creatures through). */
+  openLink(link: number): void { this.open.add(link); }
+
+  /** Where room `room`'s key lies (x, y, z; the space's frame). */
+  keyAt(room: number): [number, number, number] { return keySpot(this.layout, room); }
+
   /** The grid cell (i, j) a point of the floor plan lies in. */
   cellAt(x: number, z: number): [number, number] {
     return [Math.floor(x / this.scale.cell), Math.floor(z / this.scale.cell)];
