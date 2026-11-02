@@ -1063,6 +1063,13 @@ export interface CreatureDef {
    * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
    */
   readonly wary?: number;
+  /**
+   * How it hunts a shy beast (Arnd 2026-11-02): it creeps up unseen, then one short fast burst; if the burst does not
+   * bring the beast down it gives up and rests. `from`: metres from the prey at which the burst starts if the prey has not
+   * noticed it; `secs`: how long the burst lasts; `burst`: its pace then, as a multiple of the creature's speed;
+   * `seen`: chance (0..1) that the prey notices it when it comes within the prey's flight distance, which starts the burst early.
+   */
+  readonly stalks?: { readonly from: number; readonly secs: number; readonly burst: number; readonly seen: number };
   /** 0..1: how much of its health it loses before it runs (1 never runs). */
   readonly morale: number;
   /** Calls the others of its den when it sees the hero. */

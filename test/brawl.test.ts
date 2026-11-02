@@ -14,8 +14,8 @@ const flat: Land = { height: () => 0, waterDepth: () => 0, blocked: () => false 
 /** A hero far away: they play no part. */
 const far: Quarry = { x: 900, y: 0, z: 900, noise: 0, light: 0, alive: true, guard };
 /** A group of `kind` gathered at (x, 0), spread a little so they do not overlap. */
-function group(kind: string, n: number, x: number, land: Land = flat, z = 0, seed = 3): Den {
-  const d = new Den(new OpenGround(land, [{ x, z, r: 0.01 }]), Array.from({ length: n }, () => ({ creature: kind, room: 0 })), classic.creatures, seed);
+function group(kind: string, n: number, x: number, land: Land = flat, z = 0, seed = 3, defs = classic.creatures): Den {
+  const d = new Den(new OpenGround(land, [{ x, z, r: 0.01 }]), Array.from({ length: n }, () => ({ creature: kind, room: 0 })), defs, seed);
   d.creatures.forEach((c, i) => { c.x = x + (i % 2) * 1.2; c.z = z + Math.floor(i / 2) * 1.2; c.dir = 0; });
   d.feud = (a, b) => opposed(classic, a, b);
   return d;
@@ -36,6 +36,35 @@ test('brawl: a wolf pack hunts the deer it sees, and brings one down', () => {
   const es = play([wolves, deer], 60);
   assert.ok(es.some((e) => e.kind === 'died' && e.who.def.id === 'deer' && e.by?.def.id === 'wolf'), 'a deer fell to a wolf');
   assert.ok(living(wolves).length === 4, 'the wolves are whole enough: the deer cannot stand against them');
+});
+
+/** The classic creatures with the wolf's chance of being seen by its prey set to `seen`. */
+const wolvesSeen = (seen: number) => classic.creatures.map((d) => d.id === 'wolf' ? { ...d, stalks: { ...d.stalks!, seen } } : d);
+/** A pack of three and a herd of three, the herd `gap` m off; healthy deer all. */
+function hunt(seen: number, gap: number, seed: number, secs = 40): { es: DenEvent[]; wolves: Den; deer: Den } {
+  const defs = wolvesSeen(seen), wolves = group('wolf', 3, 0, flat, 0, seed, defs), deer = group('deer', 3, gap, flat, 0, seed, defs);
+  return { es: play([wolves, deer], secs), wolves, deer };
+}
+
+test('brawl: a wolf creeps up on a deer that has not noticed it, then one short burst brings it down', () => {
+  const { es, deer } = hunt(0, 20, 3);
+  assert.ok(es.some((e) => e.kind === 'died' && e.who.def.id === 'deer' && e.by?.def.id === 'wolf'), 'a deer fell to a wolf');
+  assert.ok(living(deer).length < 3);
+});
+
+test('brawl: a deer that notices the wolf is far enough off to outrun the burst: the wolves give up and rest, the herd lives', () => {
+  const { es, wolves, deer } = hunt(1, 20, 3, 20);
+  assert.equal(living(deer).length, 3, 'nobody caught');
+  assert.equal(es.filter((e) => e.kind === 'died').length, 0);
+  assert.ok(wolves.creatures.every((c) => c.state !== 'brawl' && c.stalk === null), 'the hunt is over');
+  assert.ok(wolves.creatures.some((c) => c.winded > 0), 'and they rest');
+});
+
+test('brawl: whether a deer notices a stalking wolf is a seeded chance: the same seed, the same hunt; the seeds differ', () => {
+  const kills = (seed: number) => hunt(0.5, 20, seed).es.filter((e) => e.kind === 'died').length;
+  const a = Array.from({ length: 12 }, (_, i) => kills(i + 1));
+  assert.deepEqual(a, Array.from({ length: 12 }, (_, i) => kills(i + 1)), 'deterministic');
+  assert.ok(a.some((n) => n > 0) && a.some((n) => n === 0), `some hunts end in a kill, some do not: ${a.join(' ')}`);
 });
 
 test('brawl: a wolf and a deer at ease with each other do not exist: only a feud starts a fight (allies and neutrals pass)', () => {
