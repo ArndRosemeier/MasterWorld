@@ -61,6 +61,20 @@ export const creatures: readonly CreatureDef[] = [
     attacks: [{ name: 'bearded axe', damage: [7, 13], kind: 'cut', reach: 1.0, time: 2.3, prowess: 46 }],
     loot: 'hold', tell: 'Iron on stone, and a horn somewhere above the gate.',
   },
+  // The town's own, when raiders come in (D65, R6): its watch, and the able folk who take what they hold to a weak foe. They are
+  // the folk themselves (the town's people are drawn, not these); nobody of them dies of a raid, they are knocked down and get up.
+  {
+    id: 'watchman', name: 'watchman', plural: 'the watch', body: { kind: 'humanoid', race: 'human', height: 1.78, outfit: 'guard', held: 'arming-sword' },
+    health: 42, armour: 3, defence: 30, speed: 5.4, senses: { sight: 40, hearing: 30 }, faction: 'watch', temper: 'hostile', stance: { kind: 'bar', warn: 20, line: 5 }, morale: 1, pack: true, role: 'melee', danger: 12,
+    attacks: [{ name: 'sword', damage: [4, 9], kind: 'cut', reach: 1.0, time: 1.8, prowess: 34 }],
+    tell: 'Boots on the cobbles, and a horn.',
+  },
+  {
+    id: 'townsman', name: 'townsman', plural: 'townsfolk', body: { kind: 'humanoid', race: 'human', height: 1.7, outfit: 'guard', held: 'knife' },
+    health: 26, armour: 0, defence: 16, speed: 5.0, senses: { sight: 40, hearing: 30 }, faction: 'watch', temper: 'hostile', stance: { kind: 'bar', warn: 20, line: 5 }, morale: 1, pack: true, role: 'swarm', danger: 4,
+    attacks: [{ name: 'billhook', damage: [2, 6], kind: 'cut', reach: 1.0, time: 2.0, prowess: 20 }],
+    tell: 'Shouting, and a pitchfork.',
+  },
   // The land around the town (plan 9.3: the world simulation's wild).
   {
     id: 'highwayman', name: 'bandit', plural: 'bandits', body: { kind: 'humanoid', race: 'human', height: 1.8, outfit: 'bandit', held: 'short-sword' },

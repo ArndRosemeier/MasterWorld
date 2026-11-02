@@ -102,6 +102,8 @@ import { Fade } from './app/fade';
 import { stepEncounters, type FightHost } from './app/encounter';
 import { Fallen } from './app/fallen';
 import { WildLand } from './app/wildLand';
+import { TownDefence } from './app/townDefence';
+import type { Land } from './sim/wild';
 import { RegionSites } from './app/regionSites';
 import { Towns } from './app/towns';
 import { ShipsView } from './render/ships';
@@ -902,6 +904,15 @@ export async function start(b: Boot): Promise<void> {
         noteMade(madeBy('wild', d, `${d.encounter} round ${d.town} (${d.members.length})`, hours()));
       }
     }
+    // The land the wild's bands and the town's fighters stand on.
+    const openLand: Land = {
+      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
+      waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
+      // The sea's waves: a shark keeps under them (S9).
+      surface: (x, z) => sea.surfaceAt(x, z),
+      // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
+      blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
+    };
     const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, standing, seed, director, journal, hud: fightHud, fight: fightHost,
       known: (group) => stanceFor({ setting, log, towns: terrain.towns, hours: hours(), group }),
@@ -909,14 +920,14 @@ export async function start(b: Boot): Promise<void> {
       out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
-    }, start, {
-      height: (x, z) => bridgeView.ground(x, z, drawn.footing(x, z)),
-      waterDepth: (x, z) => (bridgeView.deck(x, z) !== null ? 0 : terrain.waterDepth(x, z)),
-      // The sea's waves: a shark keeps under them (S9).
-      surface: (x, z) => sea.surfaceAt(x, z),
-      // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
-      blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
-    }, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
+    }, start, openLand, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
+    // A town's watch and able folk meet raiders that come in; the rest go indoors (D65, R6).
+    const townDefence = wild ? new TownDefence({
+      setting, seed, land: openLand,
+      dens: () => wild.encounters.map((e) => e.delve.den),
+      say: (text, over) => speech.say(text, over),
+      hero: () => ({ x: player.walker.pos.x, y: player.walker.pos.y, z: player.walker.pos.z, noise: 0, light: 0, alive: true, guard: { defence: 0, armour: 0, open: false } }),
+    }) : null;
     // The first people's hold (plan 11.6): its gate and court, its wardens built as the hero comes near.
     const holdSite = log.find((d): d is HoldDecision => d.kind === 'hold') ?? null;
     const holdPeople = holdSite ? setting.peoples.find((p) => p.id === holdSite.people && p.hold) : undefined;
@@ -2232,7 +2243,7 @@ export async function start(b: Boot): Promise<void> {
       if (!start) return [];
       const made = vgmTurn({
         seed, log, towns: terrain.towns, home: start.decision, hours: hours(), purposeOverdue: director.overdue === 'purpose', inside: (id) => !!cellars?.isInside(id),
-        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
+        setting, terrain, avoid: wild?.territories ?? [], near: here()?.town ?? null, wild: wild?.groupsLeft(), beaten: (id) => wild?.bandBeaten(id) ?? false, hero: { x: player.walker.pos.x, z: player.walker.pos.z }, lean: (n) => director.model.lean(n),
         // A story event's band needs the wild to roam in.
         tools: o.tools ?? (wild ? undefined : ['promise']), early: o.early, which: o.which, ...vgmTimed,
       });
@@ -2491,7 +2502,7 @@ export async function start(b: Boot): Promise<void> {
           }
         }
         breathHud.showBreath(breath.share, under, character.gills);
-        stepEncounters(dt, encounters(), { hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
+        stepEncounters(dt, encounters(), { townDens: townDefence?.dens, hero: character, player, hud: fightHud, alone, notes, cues: aloneCues, fallen });
         const lead = leading();
         // A level gained (G3): the ring of light, the chime and the seal engraved; the hands raised only out of a fight.
         const h = player.hero, act = player.stance.action, acting = !!act && !!h && h.clock - act.t0 < act.dur;
@@ -2617,6 +2628,8 @@ export async function start(b: Boot): Promise<void> {
       const cam = view.camera.position;
       part('towns.live');
       const lives = towns.live(dt, { x: cam.x, z: cam.z }, { rain: wx.shown.rain }, journal.open.map((l) => ({ id: l.id, x: l.mark.x, z: l.mark.z })), below() ? null : player.walker.pos);
+      // Raiders in a town: its watch and able folk meet them, the rest go indoors (R6).
+      townDefence?.guard(dt, towns.every.filter((t) => t.living));
       if (folk) folk.lives = lives;
       part('herds');
       stock?.herd(dt, cam, towns.graze(dt, cam.x, cam.z));

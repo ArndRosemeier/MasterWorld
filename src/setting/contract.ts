@@ -776,9 +776,12 @@ export interface StoryEventDef {
    * `spill`: a place promised and never cleared spills its dwellers onto the land near it. `raid`: a wild
    * group (`by`) still living near a town comes down on a farm and drives off animals from its paddock.
    * `take`: a wild group (`by`) takes a settlement of the size `takes` near it; its folk flee, the band
-   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it.
+   * holds it, and the rest of the group lies up in a place asked for (`lair`) near it. `foray` (D65, R6): a wild group (`by`)
+   * comes into the town itself at the game hours `hours`; the town's watch and able folk meet it (sim/townFight.ts).
    */
-  readonly kind: 'spill' | 'raid' | 'take';
+  readonly kind: 'spill' | 'raid' | 'take' | 'foray';
+  /** A foray's: the hours of the day it comes in (from, to; `[21, 4]` is the night). */
+  readonly hours?: readonly [number, number];
   /** A raid's or take's raiders: the setting's wild group (WildDef id) that comes down while any of it lives. */
   readonly by?: string;
   /** A take's: the size of settlement taken (classic: a waystation), within `reach` metres of the raiders' ground. */
@@ -2347,7 +2350,8 @@ function validateFight(m: SettingModule, where: string): string[] {
   }
   for (const e of m.events ?? []) {
     if (!(e.after >= 0) || !(e.cooldown >= 0) || e.count[0] < 1 || e.count[1] < e.count[0]) out.push(`${where}: event "${e.id}" needs after, cooldown and a count`);
-    if ((e.kind === 'raid' || e.kind === 'take') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if ((e.kind === 'raid' || e.kind === 'take' || e.kind === 'foray') && !m.wild.some((w) => w.id === e.by)) out.push(`${where}: ${e.kind} "${e.id}" needs its raiders (a wild group's id in by)`);
+    if (e.kind === 'foray' && (!e.hours || e.hours.some((h) => !(h >= 0 && h < 24)) || !e.fades)) out.push(`${where}: foray "${e.id}" needs its hours of the day and the hours it fades in`);
     if (e.kind === 'take' && (!e.takes || !(e.reach! > 0))) out.push(`${where}: take "${e.id}" needs the settlement it takes and a reach`);
     if (e.lair && !Object.values(m.dungeons).some((l) => l?.form.purposes.includes(e.lair!))) out.push(`${where}: event "${e.id}" asks for a ${e.lair}, which no dungeon kind is for`);
     if (e.fades !== undefined && (!(e.fades > 0) || !e.words.faded)) out.push(`${where}: event "${e.id}" fades: it needs the hours and how it is told (words.faded)`);

@@ -221,6 +221,8 @@ export class TownLife {
   private readonly orders: TownOrder[] = [];
   /** Everyone has fled (a band holds the place, vgm/events.ts take): all are away until it is false again. */
   gone = false;
+  /** People running for their doors from raiders (D65, R6: sim/townFight.ts keeps it): everyone awake in it goes indoors and stays. */
+  readonly alarmed = new Set<number>();
   /** People lost in a place (D62: a lost person, vgm/asks.ts): away from their days until they come home (the dead never do). */
   readonly missing = new Set<number>();
   private readonly market: [number, number];
@@ -354,10 +356,22 @@ export class TownLife {
         if (this.time < a.stay) continue;
         a.stay = undefined;
       }
+      if (this.runs(a) && a.task !== 'order') { this.runForDoor(a); continue; }
       if (a.act === 'walk') this.walk(a, dt);
+      else if (a.hidden && this.alarmed.has(a.person.id)) continue;
       else if (a.seek && this.time < a.until) continue;
       else if (this.time >= a.until || this.taskOf(a) !== a.task) this.choose(a, false);
     }
+  }
+
+  /** Raiders about (R6): they drop what they are doing, mid-walk too, and run for their own door. */
+  private runForDoor(a: Agent): void {
+    const was = a.spot >= 0 && a.act !== 'walk' ? this.spots[a.spot] : null;
+    this.freeSpot(a);
+    const door = this.doorOf(a.person.home), s = this.spots[door];
+    Object.assign(a, { task: 'order', spot: door, seat: 0, next: 'indoors', run: true, faceTo: undefined, seek: undefined, until: this.time + 240, pi: 0, act: 'walk', hidden: false });
+    s.users++;
+    a.path = this.wayTo(a, was, s.x, s.z, s);
   }
 
   /** After skipped time: everyone not held goes straight to what they do now, without walking there. */
@@ -423,6 +437,21 @@ export class TownLife {
     else this.choose(a, false);
   }
 
+  /**
+   * They go to a fight (D65, R6; sim/townFight.ts): out of their day and out of doors, standing where they were; the fight
+   * places them and shows what they do. `disband` sends them back to their day from wherever the fight left them.
+   */
+  muster(a: Agent): void {
+    if (a.post) return;
+    this.station(a, a.x, a.z, a.dir, 'wait');
+    a.held = false;
+  }
+
+  disband(a: Agent): void {
+    a.post = undefined;
+    this.choose(a, false);
+  }
+
   /** Someone keeps watch at (x, z) from now on, facing `dir` (as `Agent.dir`), doing `act`: they stay there and never walk the town. */
   station(a: Agent, x: number, z: number, dir: number, act: ActivityKind = 'wait'): void {
     this.freeSpot(a);
@@ -478,8 +507,11 @@ export class TownLife {
     const day = Math.floor(this.hours / 24);
     if (a.plan.day !== day) a.plan = dayPlan(this.routines, a.person, day);
     const t = taskAt(a.plan, this.hour);
-    return t !== 'sleep' && this.activeOrder() ? 'order' : t;
+    return t !== 'sleep' && (this.activeOrder() || this.runs(a)) ? 'order' : t;
   }
+
+  /** Is this one running for their door from raiders (R6)? Those already indoors stay where they are. */
+  private runs(a: Agent): boolean { return this.alarmed.has(a.person.id) && !a.hidden; }
 
   /** Whether it is dark out (the routines' night hours). */
   get dark(): boolean {
@@ -736,6 +768,9 @@ export class TownLife {
     // hero was sent to find them; a gathering, a feast or a market day does not take them from it.
     const kept = this.kept.get(p.id);
     if (kept !== undefined && this.doorOf(kept) >= 0) return inside(this.doorOf(kept));
+    // Raiders about (R6): the awake run for their doors and stay in till it is over; the watch walks its rounds.
+    if (this.runs(a)) return { ...inside(home), run: true };
+    if (p.watch && task === 'work') return stroll();
     // A market seller keeps their own stall through the working day, at meals and on a market day (the hero buys there).
     if (p.role === 'trader' && (task === 'work' || task === 'meal' || task === 'order')) {
       const stall = this.stallOf(p.id);

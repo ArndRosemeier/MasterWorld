@@ -108,6 +108,12 @@ export class WildLand {
     }
   }
 
+  /** Is the band of event `id` beaten or driven off (its bodies are all dead or beaten, or it is gone)? A band not built yet is not. */
+  bandBeaten(id: string): boolean {
+    const g = this.groups.find((x) => x.territory.id === id);
+    return !g ? this.events.has(id) : !!g.delve?.den.beaten;
+  }
+
   /** The wild's own groups (not the events' bands) and how many of each still live (raiders come from these). */
   groupsLeft(): WildGroup[] {
     return this.groups.filter((g) => !this.events.has(g.territory.id)).map((g) => {
@@ -165,8 +171,8 @@ export class WildLand {
       enclosed: false,
       place: `the ${def?.plural ?? 'creatures'} about here`,
       danger: groupDanger(t.members, h.setting.creatures),
-      // An event's band is a lead: once it is beaten and the hero moves on, the game takes it in.
-      promise: this.events.has(t.id) ? t.id : null,
+      // An event's band is a lead: once it is beaten and the hero moves on, the game takes it in. A foray the town fights off itself is none.
+      promise: this.events.has(t.id) && h.setting.events?.find((x) => x.id === t.kind)?.kind !== 'foray' ? t.id : null,
       quietLine: null,
     };
     const e = new Encounter(arena, delve, creatures, h.hud, h.player, h.notes, h.director, h.setting, h.camera, h.canvas, h.fight);
