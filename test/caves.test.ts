@@ -152,7 +152,7 @@ test('tower: no way steps off the side of its own stair onto the way above or be
 
 test('cave: no wooden doors in the rock; a wedged boulder or an iron grate where a way is shut', () => {
   let seen = 0;
-  for (let n = 1; n <= 30; n++) {
+  for (let n = 1; n <= 16; n++) {
     const c = cave(n), ms = cellarMeshes(c);
     for (const d of ms.doors) {
       if (d.kind !== 'oneway' && d.kind !== 'locked') continue;

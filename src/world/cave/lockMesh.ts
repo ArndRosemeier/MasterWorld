@@ -5,7 +5,7 @@
  * grate swings, the stones topple. Seeded by the cave and the link.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { CAVE_ROCK, DARK_OAK, DOOR_H, IRON, type DoorPiece } from '../dungeon/cellarMesh';
+import { CAVE_ROCK, DOOR_H, IRON, type DoorPiece } from '../dungeon/cellarMesh';
 import { BuildingMat as M, MeshKit, WildMat, scaleTint, varyTint } from '../dungeon/meshKit';
 import type { CaveLock } from './locks';
 
@@ -40,7 +40,7 @@ export function lockPiece(l: CaveLock, seed: number): DoorPiece {
     for (let s = 0; s <= bars; s++) { const u = (s / bars - 0.5) * w; kit.box(x + ux * u, y - 0.1, z + uz * u, 0.05, high + 0.4, 0.05, yaw, M.Slate, IRON); }
     for (const h of [0.35, high * 0.55, high + 0.1]) kit.box(x, y + h, z, w + 0.3, 0.06, 0.06, yaw, M.Slate, IRON);
     kit.box(x + ux * (w / 2 - 0.2) - tx * 0.06, y + 1.05, z + uz * (w / 2 - 0.2) - tz * 0.06, 0.16, 0.14, 0.06, yaw, M.Slate, IRON);
-    kit.box(x - ux * (w / 2 + 0.05), y - 0.1, z - uz * (w / 2 + 0.05), 0.14, high + 0.5, 0.2, yaw, M.Oak, DARK_OAK);
+    kit.box(x - ux * (w / 2 + 0.05), y - 0.1, z - uz * (w / 2 + 0.05), 0.14, high + 0.5, 0.2, yaw, M.Slate, IRON);
   }
   return { link: l.link, kind: l.kind, mesh: kit.mesh(), at: [x, y, z], through: [tx, tz], opens, ...(hinge ? { hinge } : {}) };
 }

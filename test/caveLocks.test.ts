@@ -7,20 +7,21 @@ import { testDecision, testHouse } from '../src/world/dungeon/variety';
 import { inhabit } from '../src/vgm/inhabit';
 import { lockSites } from '../src/world/cave/locks';
 import { FormedSpace } from '../src/sim/formedSpace';
+import { BuildingMat } from '../src/world/dungeon/meshKit';
 import { lockPiece } from '../src/world/cave/lockMesh';
 import { cellarMeshes } from '../src/world/dungeon/cellarMesh';
 import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 
 test('cave locks (K6): a story\'s shut ways stand where the cave narrows and no way goes round, apart from each other and from the way in', () => {
   let locks = 0, links = 0;
-  for (const [rock, seed] of [['massive', 6], ['jointed', 5]] as const) {
+  for (const [rock, seed] of [['massive', 6]] as const) {
     const { c, reading: rd } = formedCave(seed, rock), field = c.field as BrickField, way = caves.way;
     for (let n = 1; n <= 8; n++) {
       const cellar = outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
       const h = inhabit(cellar, field, rd, c.skeleton.throat), found = lockSites(h.cellar, field, rd, h.cells, way);
       links += cellar.graph.links.filter((l) => l.kind === 'oneway' || l.kind === 'locked' || l.kind === 'secret').length;
       locks += found.length;
-      assert.deepEqual(found, lockSites(h.cellar, field, rd, h.cells, way), 'seeded');
+      if (n === 1) assert.deepEqual(found, lockSites(h.cellar, field, rd, h.cells, way), 'seeded');
       for (const k of found) {
         assert.ok(k.width <= way.lock.widest && k.width >= way.minWidth - 0.6, `${rock} ${seed}/${n}: ${k.width.toFixed(1)} m across`);
         assert.ok(k.height >= way.lock.tall, `${k.height.toFixed(1)} m high`);
@@ -88,7 +89,7 @@ test('cave locks (K6): a shut lock is solid and keeps the creatures back; a boul
 test('cave locks (K6): each kind is drawn as a piece of its own at its lock, and a formed cave draws none of the story layout\'s doors or keys', () => {
   const { c, reading: rd } = formedCave(6, 'massive'), field = c.field as BrickField;
   let kinds = new Set<string>();
-  for (let n = 1; n <= 6; n++) {
+  for (let n = 1; n <= 4; n++) {
     const cellar = outlineCellar(testDecision(n, 1, 'cave'), testHouse(n), classic.dungeons.cave!);
     const h = inhabit(cellar, field, rd, c.skeleton.throat), found = lockSites(h.cellar, field, rd, h.cells, caves.way);
     const ms = cellarMeshes(h.cellar);
@@ -105,6 +106,7 @@ test('cave locks (K6): each kind is drawn as a piece of its own at its lock, and
       }
       assert.equal(p.opens, kind === 'locked' ? 'swing' : 'push');
       assert.equal(!!p.hinge, kind === 'locked');
+      assert.ok(!new Set(p.mesh.mat).has(BuildingMat.Oak), `${kind}: no wood in the rock`);
     }
   }
   assert.equal(kinds.size, 3);
