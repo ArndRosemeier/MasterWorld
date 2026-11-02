@@ -16,8 +16,10 @@ export type ActivityKind =
   | 'dance' | 'revel'
   /** Farm work: in the fields by what grows there, with the animals in the paddock, hay and dung in the stable. */
   | 'plough' | 'sow' | 'hoe' | 'reap' | 'tendStock' | 'muckOut'
-  /** Hurt, sitting on the ground (a situation, C10). */
+  /** Hurt, sitting on the ground (a situation, C10; knocked down in a raid, R6). */
   | 'hurt'
+  /** Fighting raiders (R6, sim/townFight.ts): a blow, a guard, a step in. */
+  | 'fight'
   /** Marking the hero's map, held in both hands (the hand-over, D35). */
   | 'mark'
   /** The harbour (S2): working a crane's winch, carrying cargo, mending nets. */

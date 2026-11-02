@@ -106,3 +106,31 @@ test('brawl: no experience and no standing for kills the hero never hurt; a foe 
   assert.ok(paid[0].kind === 'killed' && paid[0].byHero && paid[0].xp > 0);
   assert.ok(fresh.hero.xp > 0);
 });
+
+test('brawl: a den that spares its own (the town folk) has them knocked down, not killed, and they get up again', () => {
+  const wolves = group('wolf', 4, 0), folk = group('townsman', 2, 6);
+  folk.mercy = (c) => c.def.faction === 'watch';
+  const es = play([wolves, folk], 200);
+  assert.ok(es.some((e) => e.kind === 'down' && e.who.def.id === 'townsman' && e.by.def.id === 'wolf'), 'a townsman went down');
+  assert.ok(!es.some((e) => e.kind === 'died' && e.who.def.id === 'townsman'), 'and none of them died');
+  assert.ok(es.some((e) => e.kind === 'up'), 'one got up again');
+  // Struck down by the hero's blow they still die: mercy is for the raiders' blows only.
+  const one = folk.creatures[0];
+  one.state = 'idle';
+  one.health = 5;
+  assert.ok(folk.wound(one, { damage: 50, outcome: 'hit' }, { x: 0, y: 0, z: 0 }).some((e) => e.kind === 'died'));
+});
+
+test('brawl: the watch sent at raiders goes for them unseen, and a tender cuts a fallen one\'s time short', () => {
+  const wolves = group('wolf', 2, 0), watch = group('watchman', 2, 60);
+  watch.mercy = () => true;
+  for (const d of [wolves, watch]) d.neighbours = [wolves, watch].filter((o) => o !== d);
+  for (const c of watch.creatures) watch.engage(c, { c: wolves.creatures[0], den: wolves });
+  play([wolves, watch], 1);
+  assert.ok(watch.creatures.every((c) => c.state === 'brawl'), 'sent');
+  const fell = watch.creatures[0];
+  fell.state = 'down';
+  fell.downFor = 40;
+  watch.tend(fell, 3);
+  assert.equal(fell.downFor, 3);
+});
