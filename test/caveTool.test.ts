@@ -116,9 +116,9 @@ test('cave tool: a hero running along a cliff meets a cave within a few hundred 
   for (let h = 0; h < 8; h++) {
     const a = (h / 8) * Math.PI * 2, way = { x: Math.cos(a), z: Math.sin(a) };
     walks++;
-    // A run out of the town, a roll every 40 m of it, as the Builder's turn asks.
-    for (let k = 0; k < 15; k++) {
-      const hero = { x: t.x + way.x * (500 + k * 40), z: t.z + way.z * (500 + k * 40) };
+    // A run out of the town, a roll every 75 m of it, as the Builder's turn asks.
+    for (let k = 0; k < 8; k++) {
+      const hero = { x: t.x + way.x * (500 + k * 75), z: t.z + way.z * (500 + k * 75) };
       const d = caveFor({ seed: seed + k, log: open, terrain, towns: terrain.towns, hours: 30, setting: classic, home, hero, toward: { x: hero.x + way.x * 400, z: hero.z + way.z * 400 } });
       if (!d?.site) continue;
       assert.ok(siteInCliff(height, d.site), 'its mouth is in a cliff');
