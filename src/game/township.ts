@@ -20,7 +20,7 @@ import { restingAt } from '../vgm/answers';
 import { strayAt } from '../vgm/situations';
 import { onCircle } from '../world/sites';
 import type { Town } from '../world/town';
-import { bardOf, guildHouses, staffGuilds, type GuildHouse } from './guilds';
+import { bardOf, guildHouses, guildSigns, staffGuilds, type GuildHouse } from './guilds';
 import { postsOf, postTrades } from './posts';
 import type { Standing } from './standing';
 import { Market, type MarketSave } from './trade';
@@ -97,6 +97,11 @@ export class Township {
   /** Its guild houses (D49; none in a town too small for any guild). */
   get guilds(): readonly GuildHouse[] {
     return (this.housesOf ??= guildHouses(this.town.plan, this.town.decision.size ?? 'town', this.c.setting, this.retreats));
+  }
+
+  /** The shields over its doors by building id: the guild houses', and the harbour master's hall (the same set the town is drawn with, near and in the open house). */
+  get signs(): Map<number, [number, number, number]> {
+    return guildSigns(this.guilds, this.town.plan, this.c.setting);
   }
 
   /** The teachers' places out on the land that belong to this town (C3: the warden's tower). */
