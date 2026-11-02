@@ -22,7 +22,7 @@ export const VOLCANO_CELL = 2800;
 export const VOLCANO = {
   base: [620, 760] as const,
   height: [230, 310] as const,
-  rim: [85, 115] as const,
+  rim: [130, 175] as const,
   depth: [30, 40] as const,
   /** Cells that get one: share of the cells wholly in volcanic country. */
   chance: 0.6,
@@ -31,8 +31,8 @@ export const VOLCANO = {
   /** How much of the rim's height the saddle (the lowest point, where the lava spills) is cut (m). */
   saddle: 6.5,
   /** The lava's channel on the flank: half width at the head and at the toe (m), and how deep it is cut (m). */
-  channel: [3.2, 7.5] as const,
-  cut: 1.4,
+  channel: [5, 11] as const,
+  cut: 1.8,
 };
 
 export type VolcanoState = 'erupting' | 'lake' | 'steaming';
@@ -251,7 +251,7 @@ export function coneAt(v: Volcano, r: number, th: number, e: number): number {
   // The crater: a bowl with steep walls and a flat floor, and a crest round its rim, cut down at the saddle.
   h -= v.depth * smoothstep(v.rimR * 1.04, v.rimR * 0.4, r);
   const saddle = bump(Math.abs(turn(th, v.phi0)) / 0.4);
-  h += 4.5 * bump(Math.abs(r - v.rimR) / 26) * (1 - (1 + VOLCANO.saddle / 4.5) * saddle * 0.97);
+  h += 4.5 * bump(Math.abs(r - v.rimR) / (v.rimR * 0.26)) * (1 - (1 + VOLCANO.saddle / 4.5) * saddle * 0.97);
   // The flows' channels (and a little spatter mound at the head of each flank vent).
   for (let k = 0; k < v.flows.length; k++) {
     const f = v.flows[k];
