@@ -225,6 +225,9 @@ export class VolcanoView {
       }
       for (let i = 0; i < RR; i++) for (let k = 0; k < RA; k++) {
         const a = base + i * RA + k, b = base + i * RA + ((k + 1) % RA), c = base + (i + 1) * RA + ((k + 1) % RA), d = base + (i + 1) * RA + k;
+        // Not over an edge: where the ground falls away more steeply than 43 degrees between the rings, a sheet would hang out in the air.
+        const ys = [a, b, c, d].map((q) => pos[q * 3 + 1]);
+        if (Math.max(...ys) - Math.min(...ys) > 0.95 * (R / RR)) continue;
         idx.push(a, b, c, a, c, d);
       }
     }
