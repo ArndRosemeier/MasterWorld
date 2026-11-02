@@ -27,11 +27,13 @@ export function postTrades(setting: Pick<SettingModule, 'shops' | 'guilds'>): Se
 /**
  * Who holds a post, by person id: the building they keep to while awake and sleep in. A master of a service trade
  * (any of the town's, not only the first of the trade: a hand lending a hand at the harbour master's has the trade
- * too but serves nothing) keeps the building they work; the bard keeps the inn.
+ * too but serves nothing) keeps the building they work; the temple's keeper the temple; the bard the inn.
  */
 export function postsOf(plan: TownPlan, people: readonly Person[], trades: ReadonlySet<string>): Map<number, number> {
   const out = new Map<number, number>();
   for (const p of people) if (p.role === 'trade' && p.work >= 0 && trades.has(p.trade)) out.set(p.id, p.work);
+  // The temple's keeper (a fallen hero wakes at the temple) keeps the temple, and sleeps there (sim/townLife.ts).
+  for (const p of people) if (p.role === 'keeper' && p.work >= 0) out.set(p.id, p.work);
   const bard = bardOf(people, plan), inn = bard && plan.buildings[bard.work];
   if (bard && inn && inn.kind === 'inn') out.set(bard.id, inn.id);
   return out;
