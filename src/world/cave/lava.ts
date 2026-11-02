@@ -10,7 +10,7 @@
 import { Noise, Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import type { RockBlock } from './block';
-import type { CondPoint, Conduit, Skeleton, Void } from './skeleton';
+import { mouthOf, type CondPoint, type Conduit, type Skeleton, type Void } from './skeleton';
 
 /** Metres between a tube's points. */
 const STEP = 3;
@@ -102,8 +102,7 @@ export function formLava(block: RockBlock, caves: CavesDef, scale: number, since
     // Its mouth: on out along the way it was heading, level, as a solution cave's spring mouth does.
     if (t.mouth || way) {
       const p = t.points[t.points.length - 1], yaw = t.yaw[t.yaw.length - 1];
-      const out = (d: number): CondPoint => ({ ...p, x: p.x + Math.cos(yaw) * d, z: p.z + Math.sin(yaw) * d });
-      conduits.push({ kind: 'mouth', points: OUT.map(out), level, active: false });
+      conduits.push(mouthOf(p, yaw, OUT, level));
       length += OUT[OUT.length - 1];
     }
   };

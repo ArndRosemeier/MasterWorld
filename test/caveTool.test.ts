@@ -60,9 +60,12 @@ test('caves: a share stand empty, sights with nobody in them; asked-for dwellers
 
 test('cave tool (K6): the formed cave is asked for by the country at its mouth: its rock, a size the story needs, shares the land allows', () => {
   const caves = classic.caves!;
-  // Country without a solution cave holds none (the old cave stands there); karst holds one of its three rocks.
-  assert.equal(caveSpecFor(caves, 'moor', { seed: 5 }, 6), null);
-  assert.equal(caveSpecFor(caves, 'badlands', { seed: 5 }, 6), null);
+  // Moor and badlands hold mines (all built); karst holds one of its three rocks.
+  for (const kind of ['moor', 'badlands']) {
+    const m = caveSpecFor(caves, kind, { seed: 5 }, 6)!;
+    assert.equal(m.rock, 'hard-rock');
+    assert.deepEqual(m.shares, { built: 1, water: 0, lava: 0 });
+  }
   const rocks = new Set<string>(), sizes = new Set<string>();
   for (let seed = 1; seed < 80; seed++) {
     const a = caveSpecFor(caves, 'karst', { seed, danger: 3 }, 6)!, again = caveSpecFor(caves, 'karst', { seed, danger: 3 }, 6)!;

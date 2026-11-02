@@ -209,6 +209,29 @@ export interface CaveLavaDef {
   readonly skylights: { readonly most: number; readonly apart: number; readonly thin: number };
 }
 
+/** Mines (K8): people followed the ore. A square-cut adit from the hillside to a vein, drifts along it on levels, crosscuts, stopes where the ore was taken and inclines between the levels. */
+export interface CaveMineDef {
+  /** A drift's half-width and half-height, metres (people cut a way as wide as a cart needs: 1.4 to 1.9 m either side). */
+  readonly halfWidth: readonly [number, number];
+  readonly halfHeight: readonly [number, number];
+  /** How far a drift's walls are cut square: 0 an ellipse, 1 a box with rounded corners. */
+  readonly square: number;
+  /** Levels (floors of drifts), least and most, and the height between two of them (m). */
+  readonly levels: readonly [number, number];
+  readonly gap: number;
+  /** How far the adit runs under the hill at least (m) and the rock left over its roof (m). */
+  readonly adit: number;
+  readonly roof: number;
+  /** Crosscuts (side drifts off a drift to the other side of the vein), least and most per level, and their length (m). */
+  readonly crosscuts: readonly [number, number];
+  readonly crosscutLength: readonly [number, number];
+  /** Stopes (the ore taken out as a tall chamber over a drift): most per level and their size (strike half-length, m). */
+  readonly stopes: number;
+  readonly stopeLength: readonly [number, number];
+  /** How steeply an incline between two levels climbs (rise per metre). */
+  readonly incline: number;
+}
+
 /** One rock setting of a solution cave: the three patterns the water leaves (branchwork, network maze, braids) come from these numbers. */
 export interface CaveRockDef {
   readonly id: string;
@@ -277,6 +300,8 @@ export interface CaveRockDef {
   };
   /** Lava tubes (K7): a rock with this is opened by a lava flow draining from under its crust (world/cave/lava.ts), not by water. */
   readonly lava?: CaveLavaDef;
+  /** Mines (K8): a rock with this is dug by people following its ore (world/cave/mine.ts); it has no water and no dripstone. */
+  readonly mine?: CaveMineDef;
   /** Collapse: where passages cross or span too wide, the ceiling falls (a big uneven void and a rubble heap under it). */
   readonly collapse: {
     /** Chance at a junction of big passages. */
@@ -2190,6 +2215,11 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
       const l = r.lava;
       range(l.halfWidth, `${w} lava tube half width`, 1.2); range(l.halfHeight, `${w} lava tube half height`, 1.5); range(l.gradient, `${w} lava gradient`); range(l.length, `${w} lava length`, 0.1); range(l.branches, `${w} lava branches`); range(l.branchLength, `${w} lava branch length`, 8);
       if (!(l.roof >= 2 && l.wander >= 0 && l.wander <= 1 && l.skylights.most >= 0 && l.skylights.apart > 0 && l.skylights.thin > 0)) out.push(`${where}: ${w} lava needs a roof of 2 m or more, a wander in 0..1 and skylights`);
+    }
+    if (r.mine) {
+      const m = r.mine;
+      range(m.halfWidth, `${w} mine drift half width`, 1.1); range(m.halfHeight, `${w} mine drift half height`, 1.45); range(m.levels, `${w} mine levels`, 1); range(m.crosscuts, `${w} mine crosscuts`); range(m.crosscutLength, `${w} mine crosscut length`, 6); range(m.stopeLength, `${w} mine stope length`, 3);
+      if (!(m.square >= 0 && m.square <= 1 && m.gap >= 6 && m.adit >= 10 && m.roof >= 2 && m.stopes >= 0 && m.incline > 0 && m.incline <= 0.5)) out.push(`${where}: ${w} mine needs a square in 0..1, a level gap of 6 m or more, an adit of 10 m or more, a roof of 2 m or more and an incline in 0..0.5`);
     }
     if (!(r.collapse.junction >= 0 && r.collapse.junction <= 1 && r.collapse.span > 0 && r.collapse.most >= 0)) out.push(`${where}: ${w} collapse is malformed`);
   }

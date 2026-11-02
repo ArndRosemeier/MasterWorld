@@ -55,7 +55,8 @@ test('caves: the rock block is seeded and pure', () => {
 });
 
 test('caves: the land\'s kind holds the rock, and the shares are mostly pure', () => {
-  assert.equal(rockFor(caves, 'moor', 1), null, 'moor holds no solution cave');
+  assert.equal(rockFor(caves, 'moor', 1)!.id, 'hard-rock', 'moor holds no solution cave, only mines');
+  assert.equal(rockFor(caves, 'nowhere-at-all', 1), null, 'a kind with no entry and no * holds none');
   assert.ok(rockFor(caves, 'karst', 1), 'karst does');
   const seen = new Set<string>();
   let pure = 0, lava = 0;
