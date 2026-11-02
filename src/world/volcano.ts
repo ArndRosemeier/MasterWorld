@@ -4,7 +4,7 @@
  * flank in a channel, with other flows from vents on the flank), a `lake` (the lava stands well below the rim) or `steaming`
  * (no lava: fumaroles and sulphur crusts). Sulphur and steam stand round the vents in every state.
  *
- * The cone is a landform of its own size (reach about 600 m, bigger than a landform cell holds): one volcano per
+ * The cone is a landform of its own size (reach about 800 m, bigger than a landform cell holds): one volcano per
  * VOLCANO_CELL square, placed from the seed, its shape added to the height field next to the landforms
  * (`Terrain.landShape`). The flows' channels are cut into it by the same functions the lava is drawn from
  * (render/volcano/VolcanoView.ts), so the lava lies in its channel exactly. Where the lava is, and how high its surface
@@ -16,18 +16,18 @@ import { Rng, clamp, deriveSeed, hash2i, smoothstep } from '@futuremagic/core';
 import { bump } from './landforms';
 import type { Skeleton } from './skeleton';
 
-/** Side of the square one volcano may stand in (m). Its reach stays within 700 m of a centre placed 800 m or more from the edge. */
-export const VOLCANO_CELL = 2200;
+/** Side of the square one volcano may stand in (m). Its reach (at most 920 m) stays within a square of a centre placed 1000 m or more from the edge. */
+export const VOLCANO_CELL = 2800;
 /** The sizes, in one place: base radius of the cone, height of its rim over the foot, crater rim radius, floor depth below the rim (m). */
 export const VOLCANO = {
-  base: [440, 560] as const,
-  height: [130, 190] as const,
-  rim: [70, 95] as const,
-  depth: [26, 36] as const,
+  base: [620, 760] as const,
+  height: [230, 310] as const,
+  rim: [85, 115] as const,
+  depth: [30, 40] as const,
   /** Cells that get one: share of the cells wholly in volcanic country. */
-  chance: 0.45,
+  chance: 0.6,
   /** How the cone's flank profile bends (1: straight; more: steeper near the top). */
-  bend: 1.55,
+  bend: 1.45,
   /** How much of the rim's height the saddle (the lowest point, where the lava spills) is cut (m). */
   saddle: 6.5,
   /** The lava's channel on the flank: half width at the head and at the toe (m), and how deep it is cut (m). */
@@ -146,6 +146,14 @@ export class Volcanoes {
     return coneAt(v, Math.hypot(dx, dz), Math.atan2(dz, dx), this.skeleton.elevation(x, z));
   }
 
+  /** How much of the other landforms the volcano keeps off (x, z): 1 over the cone, easing to 0 at the edge of its reach. */
+  shield(x: number, z: number): number {
+    const v = this.squareAt(x, z);
+    if (!v) return 0;
+    const r = Math.hypot(x - v.x, z - v.z);
+    return r >= v.reach ? 0 : 1 - smoothstep(v.R * 0.9, v.reach, r);
+  }
+
   /** The volcano whose reach holds (x, z), else null. */
   holding(x: number, z: number): Volcano | null {
     const v = this.squareAt(x, z);
@@ -168,15 +176,15 @@ export class Volcanoes {
   private found(i: number, j: number): Volcano | null {
     const rng = new Rng(hash2i(this.seed, i, j)), sk = this.skeleton;
     if (rng.float() >= VOLCANO.chance) return null;
-    // Keep 800 m from the square's edges: no reach crosses into a neighbour's square.
-    const x = (i + (800 + rng.float() * (VOLCANO_CELL - 1600)) / VOLCANO_CELL) * VOLCANO_CELL;
-    const z = (j + (800 + rng.float() * (VOLCANO_CELL - 1600)) / VOLCANO_CELL) * VOLCANO_CELL;
+    // Keep 1000 m from the square's edges: no reach crosses into a neighbour's square.
+    const x = (i + (1000 + rng.float() * (VOLCANO_CELL - 2000)) / VOLCANO_CELL) * VOLCANO_CELL;
+    const z = (j + (1000 + rng.float() * (VOLCANO_CELL - 2000)) / VOLCANO_CELL) * VOLCANO_CELL;
     const R = rng.range(VOLCANO.base[0], VOLCANO.base[1]);
     const e0 = sk.elevation(x, z), shore = sk.lastShore;
     if (e0 < 30 || shore < 1500 || sk.kindShare('volcanic', x, z) < 0.9) return null;
     for (let a = 0; a < 8; a++) {
-      const px = x + Math.cos((a * TAU) / 8) * R, pz = z + Math.sin((a * TAU) / 8) * R;
-      if (sk.kindShare('volcanic', px, pz) < 0.6 || sk.elevation(px, pz) < 8 || this.watered(x + Math.cos((a * TAU) / 8) * R * 0.7, z + Math.sin((a * TAU) / 8) * R * 0.7)) return null;
+      const px = x + Math.cos((a * TAU) / 8) * R * 0.85, pz = z + Math.sin((a * TAU) / 8) * R * 0.85;
+      if (sk.kindShare('volcanic', px, pz) < 0.3 || sk.elevation(px, pz) < 8 || this.watered(x + Math.cos((a * TAU) / 8) * R * 0.5, z + Math.sin((a * TAU) / 8) * R * 0.5)) return null;
     }
     for (let a = 0; a < 8; a++) if (Math.abs(sk.elevation(x + Math.cos((a * TAU) / 8) * 120, z + Math.sin((a * TAU) / 8) * 120) - e0) > TILT) return null;
     if (this.watered(x, z)) return null;
