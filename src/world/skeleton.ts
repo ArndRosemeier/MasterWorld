@@ -238,19 +238,20 @@ export class Skeleton {
    * some 1000 km: the warm biomes lie hundreds of kilometres to the south of the start, `northCooling`). Null if none is met.
    * It looks for the biome as it is meant to be seen, in plain country (a kind with no swell, bareness or mesa: a meadow on a moor's
    * bare hills or a badland's ridges is not a meadow to look at), and takes any country only where there is no such place.
-   * For the debug menu and checks.
+   * `also(x, z)`: a further wish for the spot (a wood: thick trees there), kept in the first two tries. For the debug menu and checks.
    */
-  nearestBiome(id: string, x: number, z: number): { x: number; z: number } | null {
+  nearestBiome(id: string, x: number, z: number, also?: (x: number, z: number) => boolean): { x: number; z: number } | null {
     const k = this.shape.biomes.findIndex((b) => b.id === id);
     if (k < 0) return null;
     const plain = this.kinds.find((d) => !d.swell && !d.bare && !d.mesa)?.id;
     const out = emptySample(), is = (px: number, pz: number): boolean => this.sample(px, pz, out).biome === k;
-    const find = (inPlain: boolean): { x: number; z: number } | null => {
+    const find = (inPlain: boolean, extra: boolean): { x: number; z: number } | null => {
       const inside = (px: number, pz: number) => (is(px, pz) && is(px + 120, pz) && is(px - 120, pz) && is(px, pz + 120) && is(px, pz - 120)
-        && (!inPlain || (plain !== undefined && this.kindShare(plain, px, pz) > 0.99)) ? { x: px, z: pz } : null);
+        && (!inPlain || (plain !== undefined && this.kindShare(plain, px, pz) > 0.99)) && (!extra || also!(px, pz)) ? { x: px, z: pz } : null);
       return spiralFind(x, z, inside, 1000, 2000, 500, 80000) ?? spiralFind(x, z, inside, 160000, 8000, 4000, 100000);
     };
-    return (plain !== undefined ? find(true) : null) ?? find(false);
+    // The best look first (plain country, and what `also` asks), then less.
+    return (plain !== undefined && also ? find(true, true) : null) ?? (also ? find(false, true) : null) ?? (plain !== undefined ? find(true, false) : null) ?? find(false, false);
   }
 
   /** How much of mesa country is at (x, z), 0..1. */
