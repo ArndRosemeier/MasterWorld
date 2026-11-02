@@ -1179,6 +1179,19 @@ export interface TwistDef {
 export type AskVerb = 'clear' | 'fetch' | 'lost' | 'seal' | 'parley' | 'watch' | 'thief';
 export const ASK_VERBS: readonly AskVerb[] = ['clear', 'fetch', 'lost', 'seal', 'parley', 'watch', 'thief'];
 
+/**
+ * A thing an ask names: a catalogue item and what it is called (`{family}`: the household's name). A personal ask's things say
+ * whose they are (`for`: the pursuits or trades whose it is) and how those people tell of losing it (`told`, `{thing}`).
+ */
+export interface AskThing {
+  readonly item: string;
+  readonly name: string;
+  readonly lore: string;
+  readonly for?: { readonly pursuits?: readonly string[]; readonly trades?: readonly string[] };
+  readonly told?: readonly string[];
+  readonly thanks?: string;
+}
+
 export interface AskDef {
   /** The kind (the VGM remembers kinds given, D62): a slug. */
   readonly id: string;
@@ -1190,7 +1203,12 @@ export interface AskDef {
   /** Only places with dwellers (`true`), only empty ones (`false`), or either (none). */
   readonly lived?: boolean;
   /** `fetch`: the things it may name, each a catalogue item and what it is called (`{family}`: the household's name). */
-  readonly things?: readonly { readonly item: string; readonly name: string; readonly lore: string }[];
+  readonly things?: readonly AskThing[];
+  /**
+   * D68, N3: asked only by someone for something of their own calling or pursuit (the VGM's favour, vgm/favours.ts), never of a
+   * household in general: each of its `things` says whose it is (`for`), so the person who asks is the one the thing fits.
+   */
+  readonly personal?: boolean;
   /**
    * `lost`: someone of the town went in and did not come back (`{who}` their name in every line). `alive` the share
    * found alive (they sit hurt at the end of the place; come up to, they get up, say `found` and walk home). The
@@ -1711,6 +1729,18 @@ export interface PursuitDef {
   readonly races?: readonly string[];
 }
 
+/**
+ * How someone asks a favour of the hero (D68, N3), by temperament: `greeting` they blurt it out as the talk opens, `news` they tell it
+ * when asked for news, `again` they only hint and tell it when asked a second time. `lead` comes before the task as they tell it,
+ * `close` after; `hint` is all they say the first time when it is `again`.
+ */
+export interface AskingManner {
+  readonly when: 'greeting' | 'news' | 'again';
+  readonly lead: readonly string[];
+  readonly close: readonly string[];
+  readonly hint?: readonly string[];
+}
+
 /** How a temperament speaks and how likely it is to be someone's (D68, N1). Lines are first person; `{claim}` is what they know. */
 export interface TemperamentDef {
   /** The odds of the temperament for someone: `base` plus each of their traits (0..1) times its weight; `young` and `old` are 1 for those age groups. */
@@ -1730,6 +1760,8 @@ export interface TemperamentDef {
   /** When asked how they know: first-hand (`{source}`, `{claim}`), and from another. */
   readonly source: string;
   readonly testimony: string;
+  /** How they bring up a task of their own (N3): when, in what words before and after, and what they hint at if they hold it back. */
+  readonly asking: AskingManner;
   /** What they add when there is more to tell. */
   readonly more: string;
   /** Their thanks, and what they say when they cannot follow. */
@@ -2181,6 +2213,7 @@ function validatePersona(p: PersonaDef, where: string): string[] {
     for (const k of ['intro', 'greeting', 'farewell', 'wellbeing', 'nothing'] as const) if (!v[k]?.length) out.push(`${where}: persona.${t}.${k} is empty`);
     if (!v.intro?.every((l) => l.includes('{name}'))) out.push(`${where}: persona.${t}.intro lines must name {name}`);
     if (!v.more) out.push(`${where}: persona.${t}.more is empty`);
+    if (!v.asking?.lead.length || !v.asking.close.length || (v.asking.when === 'again' && !v.asking.hint?.length)) out.push(`${where}: persona.${t}.asking needs lead and close lines (and a hint if it is asked again)`);
     for (const k of ['sure', 'heard', 'source', 'testimony'] as const) if (!v[k]?.includes('{claim}')) out.push(`${where}: persona.${t}.${k} must say {claim}`);
     for (const k of ['source', 'testimony'] as const) if (!v[k]?.includes('{source}')) out.push(`${where}: persona.${t}.${k} must say {source}`);
     if (!v.thanks || !v.repair) out.push(`${where}: persona.${t} needs thanks and repair`);
@@ -2418,6 +2451,8 @@ function validateAsks(m: SettingModule, where: string): string[] {
     if (a.verb === 'parley' && (!a.parley || !a.dwellers?.length)) out.push(`${where}: ask "${a.id}" is a parley: it needs parley (terms, struck, short, broken) and the dwellers who talk`);
     if (a.verb === 'fetch' && (!a.things?.length || !a.words.missing)) out.push(`${where}: ask "${a.id}" fetches nothing (things), or has no words for the thing not brought (missing)`);
     for (const t of a.things ?? []) if (!m.items.items.some((d) => d.id === t.item)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is no catalogue item (${t.item})`);
+    if (a.personal && (a.verb !== 'fetch' || !a.things?.every((t) => t.for && (t.for.pursuits?.length || t.for.trades?.length) && t.told?.length && t.thanks))) out.push(`${where}: ask "${a.id}" is personal: it must fetch things that each say whose they are (for), how they are told of (told) and the thanks`);
+    for (const t of a.things ?? []) for (const pu of t.for?.pursuits ?? []) if (!m.talk.persona.pursuits.some((x) => x.id === pu)) out.push(`${where}: ask "${a.id}" thing "${t.name}" is for pursuit "${pu}" the setting has not`);
   }
   return out;
 }

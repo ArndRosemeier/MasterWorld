@@ -4,6 +4,7 @@
  * from giving the same kind twice in a row.
  */
 import type { AskDef, TwistDef } from '../contract';
+import { craftAsk } from './crafts';
 
 export const asks: readonly AskDef[] = [
   {
@@ -176,6 +177,8 @@ export const asks: readonly AskDef[] = [
       wants: { rival: 'I will say it plainly: ever since our things began to go, {who} has done very well in the same trade as ours.' },
     },
   },
+  // Asked of the hero by a person for something of their own (D68, N3; vgm/favours.ts), never of a household in general.
+  craftAsk,
 ];
 
 /** What may turn out other than told (Q3): seen in the place and heard in talk, never a note. */

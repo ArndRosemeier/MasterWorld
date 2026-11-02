@@ -54,9 +54,9 @@ export interface AskPlace {
   readonly wants?: readonly PromiseWant[];
 }
 
-/** The setting's asks a place fits. */
+/** The setting's asks a place fits (a personal ask is a person's own: favours.ts, never a household's). */
 export function asksFitting(setting: Pick<SettingModule, 'asks'>, p: AskPlace): AskDef[] {
-  return (setting.asks ?? []).filter((a) => (!a.kinds || a.kinds.includes(p.decision.template)) && (a.lived === undefined || a.lived === p.lived) && (!a.dwellers || (!!p.dweller && a.dwellers.includes(p.dweller))));
+  return (setting.asks ?? []).filter((a) => !a.personal).filter((a) => (!a.kinds || a.kinds.includes(p.decision.template)) && (a.lived === undefined || a.lived === p.lived) && (!a.dwellers || (!!p.dweller && a.dwellers.includes(p.dweller))));
 }
 
 /**
@@ -261,11 +261,13 @@ export function askWords(setting: Pick<SettingModule, 'asks'>, ask: PromiseAsk |
   // `{coins}`, `{name}`, `{house}` and `{place}` are left for the game to fill.
   const f = (t: string) => cap(fill(t, v)), g = (t: string) => fill(t, v);
   const dead = a.verb === 'lost' && !ask.alive ? a.lost?.dead : undefined;
+  // A person's own thing is told of in their way (a bee keeper's skep is not a smith's iron).
+  const own = ask.thing === undefined ? undefined : a.things?.[ask.thing], told = own?.told ?? a.words.told;
   return {
-    told: f(a.words.told[ask.line % a.words.told.length]!),
+    told: f(told[ask.line % told.length]!),
     topic: g(dead?.topic ?? a.words.topic),
     note: g(dead?.note ?? a.words.note),
-    thanks: f(dead?.thanks ?? a.words.thanks),
+    thanks: f(dead?.thanks ?? own?.thanks ?? a.words.thanks),
     missing: f(a.words.missing ?? ''),
     found: f(a.lost?.found ?? ''),
     ...(a.thief ? { thief: { accuse: f(a.thief.accuse), confess: f(a.thief.confess), catch: f(a.thief.catch), spare: f(a.thief.spare), caught: f(a.thief.caught), spared: f(a.thief.spared), ...(a.thief.again ? { again: f(a.thief.again) } : {}) } } : {}),

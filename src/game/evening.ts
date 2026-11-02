@@ -17,6 +17,7 @@ import { regionDecisions, walkFrontier } from '../vgm/frontier';
 import { houseOf, loreOf, placeOf } from '../vgm/dungeons';
 import { endingOf, keepPromise, nextPromise, occupationOf, openPromises } from '../vgm/leads';
 import { wantsOf } from '../vgm/wants';
+import { favourFor, favourHolds } from '../vgm/favours';
 import { asEnded, askDefOf, holdsKeepsake, keepsakeOf, twistOf, verbOf } from '../vgm/asks';
 import { NightWatch, nightWatchFor, watchDoor } from '../vgm/watch';
 import { hailer } from '../vgm/guide';
@@ -112,6 +113,8 @@ export interface EveningOptions {
   readonly mage?: boolean;
   /** The levels the hero must end within (D58, G1: an evening of play brings a fresh hero to level 3–5); none: any. */
   readonly levels?: readonly [number, number];
+  /** Evening one begins with a favour asked by a person of the town (D68, N3) in place of the market hail. */
+  readonly favour?: boolean;
   /** The loop check's coverage runs: the household asks only these kinds of task (ask ids), so each is played end to end. */
   readonly only?: readonly string[];
 }
@@ -131,7 +134,7 @@ const CLIMB_COST = 8;
 /** How long one visit below may take, seconds. */
 const DELVE_LIMIT = 1200;
 /** Why each want asks (the loop's log line). */
-const WANT_WHY: Readonly<Record<PromiseWant['kind'], string>> = { rival: 'suspects a rival in trade,', elder: 'is old and wants it back before the end', parent: 'fears for a child of the house', pious: 'wants the restless laid to rest', peaceable: 'would rather it were talked out' };
+const WANT_WHY: Readonly<Record<PromiseWant['kind'], string>> = { rival: 'suspects a rival in trade,', elder: 'is old and wants it back before the end', parent: 'fears for a child of the house', pious: 'wants the restless laid to rest', peaceable: 'would rather it were talked out', craft: 'asked the hero for what is theirs by calling' };
 
 /** Copper kept back from abilities (with the room): a mending or two. */
 const LESSON_RESERVE = 40;
@@ -327,6 +330,26 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
   };
 
   /**
+   * A favour (D68, N3): someone of the town the VGM has ask the hero for something of their own calling or pursuit; the hero
+   * talks with them, and they say it in their manner (blurted at once, told when asked, or hinted at till asked again).
+   */
+  const asked = (): DungeonDecision => {
+    for (const p of people) {
+      const d = favourFor({ town, people, person: p.id }, { seed, log, hours, setting, home: town.decision });
+      if (!d) continue;
+      log = [...log, d];
+      say(`the VGM has ${talk.nameOf(p.id)} ask a favour: ${d.id}`);
+      township.promised(d);
+      let reply = talk.greet(p.id);
+      for (let again = 0; again < 3 && !reply.heard.includes(d.id); again++) reply = talk.ask(p.id, 'news');
+      if (!reply.heard.includes(d.id)) throw new Broke(`${talk.nameOf(p.id)} asked a favour and never said it: "${reply.text}"`);
+      say(`${talk.nameOf(p.id)} says: "${reply.text}"`);
+      return d;
+    }
+    throw new Broke('nobody of the town would ask a favour of the hero');
+  };
+
+  /**
    * A new hero on the market who asks nobody (vgm/guide.ts): someone who has heard of a promised place is
    * sent over (stepping out of their door), opens with a hail, and their news is the first lead.
    */
@@ -378,7 +401,7 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
       let paid = 0;
       const fromRumour = rumour && openPromises(log).some((o) => o.id === rumour!.id) ? rumour : null;
       if (fromRumour) say(`follows the rumour of ${fromRumour.id}`);
-      const lead = e === 0 ? hailed() : fromRumour ?? hearLead(heard);
+      const lead = e === 0 ? (opts.favour ? asked() : hailed()) : fromRumour ?? hearLead(heard);
       rumour = null;
       heard.add(lead.id);
       watch.leads = 1;
@@ -397,7 +420,7 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
       const names = talk.namesFor(dungeon), keepsake = own ? keepsakeOf(setting, dungeon, names) : null;
       // What the household asked (Q2). Places other tools make are not the Builder's to vary, so they are tagged: new
       // dwellers, a guild's task, a master's deed, and any place made without an ask (the first lead, a story event's).
-      const given = !own ? ' (dwellers)' : dungeon.task ? ' (task)' : dungeon.quest ? ' (deed)' : !dungeon.ask ? ' (other)' : '';
+      const given = !own ? ' (dwellers)' : dungeon.task ? ' (task)' : dungeon.quest ? ' (deed)' : dungeon.ask?.want?.kind === 'craft' ? ' (favour)' : !dungeon.ask ? ' (other)' : '';
       verbs.push(`${verb === 'lost' ? `lost (${ask?.alive ? 'alive' : 'dead'})` : verb}${given}`);
       const twist = own ? twistOf(setting, dungeon.ask) : null;
       // What an earlier ending brought about (Q4), as the log has it.
@@ -652,14 +675,14 @@ export function playEvening(seed: number, setting0: SettingModule, opts: Evening
     // Gate C (C9): the VGM answers every need; none stands overdue longer than OVERDUE_MOST.
     for (const n of NEEDS) if (overdue[n] > OVERDUE_MOST) throw new Broke(`${n} stood overdue ${(overdue[n] / 60).toFixed(1)} min (at most ${OVERDUE_MOST / 60})`);
     // Gate Q (Q2): in natural play no kind of task the VGM gives is given twice in a row (the runs that ask one kind only may).
-    const natural = verbs.filter((v) => !/\((dwellers|task|deed|other)\)$/.test(v)).map((v) => v.split(' ')[0]!);
+    const natural = verbs.filter((v) => !/\((dwellers|task|deed|favour|other)\)$/.test(v)).map((v) => v.split(' ')[0]!);
     if (!opts.only) for (let i = 1; i < natural.length; i++) if (natural[i] === natural[i - 1]) throw new Broke(`the same kind of task twice in a row: ${verbs.join(', ')}`);
     // Gate Q: the endings and the wants met read back from the log alone (the log is the save).
     for (const [id, ending] of endings) if (endingOf(log, id) !== ending) throw new Broke(`the log does not keep how ${id} ended (${ending})`);
     for (const d of log) {
       if (d.kind !== 'dungeon' || !d.ask?.want) continue;
-      const t = townById(terrain.towns, d.town), w = d.ask.want;
-      if (!(t && wantsOf(townsfolk(t.plan, t.decision.seed ?? seed), d).some((x) => x.person === w.person && x.kind === w.kind))) throw new Broke(`the want behind ${d.id} does not replay from the log`);
+      const t = townById(terrain.towns, d.town), w = d.ask.want, folk = t && townsfolk(t.plan, t.decision.seed ?? seed);
+      if (!(folk && (w.kind === 'craft' ? favourHolds(setting, folk, d) : wantsOf(folk, d).some((x) => x.person === w.person && x.kind === w.kind)))) throw new Broke(`the want behind ${d.id} does not replay from the log`);
     }
     // The next lead: someone has news of a place not yet visited.
     const next = hearLead(heard);
