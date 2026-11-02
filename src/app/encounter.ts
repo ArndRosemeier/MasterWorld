@@ -26,6 +26,7 @@ import { joltOf } from '../render/jolt';
 import { warning, type Director } from '../vgm/director';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
+import { foeLine } from '../game/foeSpeech';
 import type { FightHud } from './fightHud';
 import { OVER_HEAD } from './speech';
 import type { Notes } from './notes';
@@ -220,9 +221,7 @@ export class Encounter {
     if (l.kind === 'chief') {
       const said = this.delve.speak();
       if (said) {
-        // The bubble floats OVER_HEAD over the point it is given (their feet), so give the feet less that much below the head.
-        const who = l.who, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
-        this.host.say(said.text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
+        this.bubble(l.who, said.text);
       }
       return null;
     }
@@ -232,6 +231,20 @@ export class Encounter {
     this.kneel = new SearchKneel(w.pos, w.yaw, { x: O.x + l.x, z: O.z + l.z }, lid, () => this.found(l), f && { x: O.x + f[0], z: O.z + f[1] });
     p.puppet = this.kneel;
     return null;
+  }
+
+  /** `text` in a bubble over `who`'s head while they live (the bubble floats OVER_HEAD over the point it is given, so give the feet less that much below the head). */
+  private bubble(who: Creature, text: string): void {
+    const O = this.creatures.group.position, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
+    this.host.say(text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
+  }
+
+  /** What a band says and why it fights (D64), by whoever speaks for it: a bubble over their head, a line picked by who they are and how often they have spoken. */
+  private said = 0;
+  private foeSays(who: Creature, e: FightEvent & { readonly kind: 'warn' | 'break' }): void {
+    const n = this.said++;
+    const text = foeLine(this.setting, who.def, e.kind === 'warn' ? e.turn : e.cause, who.id, n);
+    if (text) this.bubble(who, text);
   }
 
   /** The hands are in what was searched: what it held, if anything. */
@@ -385,6 +398,7 @@ export class Encounter {
         break;
       case 'heal': this.hud.healed(); this.act('drink', 1.1); break;
       // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
+      case 'warn': case 'break': this.foeSays(e.who, e); break;
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
       case 'killed':

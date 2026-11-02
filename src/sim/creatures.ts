@@ -8,7 +8,7 @@
  * sequence of steps. Pure.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import { WARNING_STANCES, type CreatureDef, type Tier } from '../setting/contract';
+import { WARNING_STANCES, type BreakCause, type CreatureDef, type Tier, type WarnTurn } from '../setting/contract';
 import type { Spawn } from '../world/dungeon/cellar';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { strike, type Guard, type Strike } from './combat';
@@ -36,6 +36,11 @@ export interface Creature {
   aware: number;
   /** Leads the den's fight (the lair's first). */
   leader: boolean;
+  /** What it is saying with its body now (a raised hand, a jibe, a nod), seconds left of it; the speaker of a band shows each turn. */
+  signal: WarnTurn | null;
+  signalLeft: number;
+  /** Weapon drawn while the band talks (its last warning, a robber's demand), though the fight has not begun. */
+  armed: boolean;
   /** It has greeted the hero already (a friend's faction: D65). */
   greeted: boolean;
   /** The band it warns the hero with (D64): the id of the one who noticed first; -1 while it is in none. */
@@ -104,6 +109,8 @@ interface Band {
 const SETTLE_AT = 1.25;
 /** A warning band repeats itself this often (s) while the hero stays within it. */
 const REPEAT = 10;
+/** How long (s) the speaker shows what it says. */
+const SIGNAL = 2.2;
 /** A robbers' band walks up at this share of its pace. */
 const CLOSE_IN = 0.55;
 
@@ -153,14 +160,7 @@ export type DenEvent =
   /** It lifted the bar of a barred door from its bar's side (link): the door is seen opening away from it. */
   | { readonly kind: 'unbarred'; readonly who: Creature; readonly link: number };
 
-/**
- * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
- * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back.
- */
-export type WarnTurn = 'warn' | 'last' | 'demand' | 'jeer' | 'settle' | 'greet';
-
-/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak. */
-export type BreakCause = 'line' | 'struck' | 'patience' | 'many' | 'frail' | 'hated';
+export type { BreakCause, WarnTurn };
 
 /** Body radius by kind and size, metres. */
 export function radiusOf(def: CreatureDef): number {
@@ -251,7 +251,7 @@ export class Den {
       const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
-        aware: 0, leader: id === 0 && def.pack, band: -1, greeted: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
+        aware: 0, leader: id === 0 && def.pack, band: -1, signal: null, signalLeft: 0, armed: false, greeted: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
         repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
@@ -285,6 +285,7 @@ export class Den {
     for (const c of this.creatures) {
       if (c.state === 'dead') { c.y = this.ground.floatAt?.(c.x, c.z, c.y) ?? c.y; continue; }
       c.stagger = Math.max(0, c.stagger - dt);
+      if ((c.signalLeft -= dt) <= 0) { c.signalLeft = 0; c.signal = null; }
       c.ready = Math.max(0, c.ready - dt);
       c.repath = Math.max(0, c.repath - dt);
       c.hopIn = Math.max(0, c.hopIn - dt);
@@ -377,7 +378,7 @@ export class Den {
       c.path = [];
       this.call(c, out);
     } else if (tier === 'friend' || tier === 'honoured') {
-      if (!c.greeted) { for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.greeted = true; out.push({ kind: 'warn', who: c, turn: 'greet' }); }
+      if (!c.greeted) { for (const o of this.creatures) if (o === c || (o.def.faction === c.def.faction && this.hears(c, o))) o.greeted = true; this.signalling(c, 'greet', []); out.push({ kind: 'warn', who: c, turn: 'greet' }); }
       c.state = 'idle';
       c.aware = 0.3;
     } else this.warnUp(c, q, out);
@@ -430,7 +431,7 @@ export class Den {
       const d = Math.min(...m.map((c) => Math.hypot(q.x - c.x, q.z - c.z)));
       if (!q.alive || d > st.warn! * SETTLE_AT || m.every((c) => c.aware < 0.25)) { this.standDown(id, m, who, q.alive, out); continue; }
       if (d <= st.line!) { this.breakBand(id, m, who, 'line', out); continue; }
-      const utter = (turn: WarnTurn) => { b.turn = turn; b.at = this.time; out.push({ kind: 'warn', who, turn }); };
+      const utter = (turn: WarnTurn) => { b.turn = turn; b.at = this.time; this.signalling(who, turn, m); out.push({ kind: 'warn', who, turn }); };
       switch (st.kind) {
         case 'guard':
           if (b.turn === null) utter('warn');
@@ -453,11 +454,18 @@ export class Den {
     }
   }
 
+  /** The speaker shows what it says (a gesture for a moment); a last warning or a demand has the whole band draw. */
+  private signalling(who: Creature, turn: WarnTurn, band: readonly Creature[]): void {
+    who.signal = turn;
+    who.signalLeft = SIGNAL;
+    if (turn === 'last' || turn === 'demand') for (const c of band) c.armed = true;
+  }
+
   /** The band's warning is over and it fights, one of its words saying why; the rest of its pack in earshot joins. */
   private breakBand(id: number, m: readonly Creature[], who: Creature, cause: BreakCause, out: DenEvent[]): void {
     this.bands.delete(id);
     out.push({ kind: 'break', who, cause });
-    for (const c of m) { c.state = 'fight'; c.band = -1; c.path = []; c.close = false; }
+    for (const c of m) { c.state = 'fight'; c.band = -1; c.path = []; c.close = false; c.armed = false; }
     this.call(who, out);
   }
 
@@ -465,8 +473,8 @@ export class Den {
   private standDown(id: number, m: readonly Creature[], who: Creature, said: boolean, out: DenEvent[]): void {
     const b = this.bands.get(id);
     this.bands.delete(id);
-    if (said && b?.turn) out.push({ kind: 'warn', who, turn: 'settle' });
-    for (const c of m) { c.band = -1; this.goHome(c, out); }
+    if (said && b?.turn) { this.signalling(who, 'settle', m); out.push({ kind: 'warn', who, turn: 'settle' }); }
+    for (const c of m) { c.band = -1; c.armed = false; this.goHome(c, out); }
   }
 
   /** It stands with its band, facing the hero; a robber walks up to the distance it demands from. */
