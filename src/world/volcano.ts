@@ -298,3 +298,13 @@ export function nearVent(v: Volcano, x: number, z: number): boolean {
   for (const e of v.vents) if (Math.hypot(x - e.x, z - e.z) < e.r * 1.8) return true;
   return false;
 }
+
+/** Is (x, z) on the crater (its walls and the rim's crest) or beside a flow's lava, where nothing grows? */
+export function scorched(v: Volcano, x: number, z: number): boolean {
+  const dx = x - v.x, dz = z - v.z, r = Math.hypot(dx, dz);
+  if (r < v.rimR * 1.3) return true;
+  if (v.state !== 'erupting') return false;
+  const th = Math.atan2(dz, dx);
+  for (const f of v.flows) if (r > f.r0 - 15 && r < f.r1 + 12 && Math.abs(acrossFlow(f, r, th)) < flowHalf(f, r) * 2.8 + 3) return true;
+  return false;
+}
