@@ -22,7 +22,7 @@ import { ACTION_CLIPS, HERO_CLIPS, PACE, SIT_DOWN, STAND_UP } from './clips';
 import { gripHeld } from './grips';
 import { FADE, castShadows, handOf, playClip, preparePeople, seatOf } from './play';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
-import { inBuild } from './build';
+import { inBuild, shorter } from './build';
 import type { HeroBuildDef } from '../../setting/contract';
 import type { FigureRig, LimbGoals } from '@futuremagic/figure';
 import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from './puppet';
@@ -66,6 +66,8 @@ export interface HeroLooks {
   readonly outfits: readonly string[];
   /** The build a random hero is drawn in. */
   readonly build?: HeroBuildDef;
+  /** The tallest a hero stands (m); a taller look is brought down to it. */
+  readonly maxHeightM?: number;
 }
 
 /** Outfit presets a hero is never offered (real-world religious orders). */
@@ -125,6 +127,15 @@ export function newHero(catalog: CharacterCatalog, looks: HeroLooks, base: Chara
 }
 
 /** Options for Actors' Character.load that give the hero's catalog. */
+/** Brings a character down to the setting's tallest hero (a few tries: the height law is estimated). */
+async function fitHeight(c: Character, max: number | undefined): Promise<void> {
+  for (let i = 0; i < 4; i++) {
+    const body = shorter(c.config.body, c.height, max);
+    if (!body) return;
+    await c.set({ body });
+  }
+}
+
 export const loadOptions = (looks: HeroLooks) => ({
   pack: PACK, materials: nodeMaterials, clipLibraries: false,
   themes: { themes: [...looks.themes], without: [...looks.without] },
@@ -163,7 +174,7 @@ export class HeroView {
   /** The limbs' goals in the scene's frame (the world's less the floating origin). */
   private readonly goals: LimbGoals = limbGoals();
 
-  private constructor(private front: Character, private back: Character, private readonly stage: Stage) {
+  private constructor(private front: Character, private back: Character, private readonly stage: Stage, private readonly maxHeight?: number) {
     this.object.name = 'hero';
     this.object.add(front.object);
   }
@@ -176,10 +187,11 @@ export class HeroView {
     const opts = loadOptions(looks);
     const front = await Character.load({ ...opts, renderer, worker: new HumanWorker(), config: { ...look, anatomy: false, animation: 'idle' } });
     if (!look) await front.set(newHero(front.catalog, looks, front.config, seed, race));
+    await fitHeight(front, looks.maxHeightM);
     const back = await Character.load({ ...opts, renderer, shareWith: front });
     for (const c of [front, back]) c.setLod(0); // always close to the camera
     castShadows(front.object);
-    return new HeroView(front, back, stage);
+    return new HeroView(front, back, stage, looks.maxHeightM);
   }
 
   /**
@@ -218,6 +230,7 @@ export class HeroView {
       this.wanted = null;
       const next = this.back;
       await next.set(want);
+      await fitHeight(next, this.maxHeight);
       // Compiled out of the scene, with every shadow caster of its own.
       castShadows(next.object);
       await preparePeople(this.stage, next.object);

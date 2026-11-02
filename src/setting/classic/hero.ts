@@ -10,6 +10,8 @@ export const hero: HeroLooksDef = {
   themes: ['medieval', 'nordic', 'antique', 'fantasy'],
   without: ['real-faith'],
   races: ['human', 'dwarf', 'halfling', 'elf'],
+  // Doors, ceilings, stairs and cave ways are built for a hero up to this tall (docs/design/caves.md: 2.1 m).
+  maxHeightM: 2.1,
   outfits: ['med-traveller', 'med-peasant', 'peasant', 'med-archer'],
   // A hero sets out young to prime, fit and lean (Arnd: no overweight grandma as the first hero).
   // Dwarves and halflings stay stocky and short, as Actors makes them; nobody gets a belly or wide hips.

@@ -1867,6 +1867,11 @@ export interface HeroLooksDef {
    * pick any look. None: Actors' whole range.
    */
   readonly build?: HeroBuildDef;
+  /**
+   * The tallest a hero stands (m): doors, ceilings, stairs and ways are built for it. A taller look (Actors'
+   * height slider reaches 2.4 m for an elf) is brought down to it.
+   */
+  readonly maxHeightM?: number;
 }
 
 /** Ranges a random hero's body is drawn in, as Actors' body values ([low, high]). */
