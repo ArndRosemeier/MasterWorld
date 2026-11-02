@@ -924,6 +924,8 @@ export interface CreatureDef {
   readonly senses: { readonly sight: number; readonly hearing: number };
   /** skittish: keeps away unless cornered or many; hostile: attacks on sight. */
   readonly temper: 'skittish' | 'hostile';
+  /** Who it belongs to (D65): a people's id or one of `factions.others`. It never changes. */
+  readonly faction: string;
   /**
    * A shy beast's flight distance, metres (deer): farther off it only lifts its head and watches the hero,
    * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
@@ -1834,6 +1836,36 @@ export interface StandingDef {
   readonly prices: readonly [number, number];
 }
 
+/** How one faction stands towards another (D65): constant, never moved by anything the hero does. */
+export const HOSTILITIES = ['ally', 'neutral', 'wary', 'hostile'] as const;
+export type Hostility = (typeof HOSTILITIES)[number];
+
+/**
+ * A faction besides the peoples (D65): smugglers, bandits, goblins, the undead, the town watch, beasts of prey and the beasts
+ * they hunt. Like a people it has one number for what it thinks of the hero (`regard`, −100 .. 100).
+ */
+export interface FactionDef {
+  readonly id: string;
+  readonly name: string;
+  readonly plural: string;
+  /** What it thinks of the hero at first. */
+  readonly regard: number;
+  /** It hears of deeds: killing its kind moves the hero's standing with it and with its foes, and a change of tier is told. Beasts do not. */
+  readonly aware: boolean;
+}
+
+/**
+ * Factions and who is against whom (D65). The peoples (`peoples`) are factions too. Every creature kind has one (`CreatureDef.faction`),
+ * every townsperson their people's. The matrix is constant: creatures do not gain or lose factions or friends; only the hero's standing moves.
+ */
+export interface FactionsDef {
+  readonly others: readonly FactionDef[];
+  /** Each pair that is not neutral, both ways round (a faction is its own ally). */
+  readonly matrix: readonly (readonly [string, string, Hostility])[];
+  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. */
+  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number };
+}
+
 export interface SettingModule {
   readonly contractVersion: typeof CONTRACT_VERSION;
   /** Stable lowercase slug: the save identity. */
@@ -1850,6 +1882,8 @@ export interface SettingModule {
   /** The peoples as factions (plan 11.6, D34), and what changes the hero's standing with them. */
   readonly peoples: readonly PeopleDef[];
   readonly standing: StandingDef;
+  /** The factions besides the peoples, and the hostility between all (D65). */
+  readonly factions: FactionsDef;
   /** Levels and experience (D58). */
   readonly growth: GrowthDef;
   readonly talk: TalkDef;
@@ -2039,6 +2073,7 @@ export function validateSetting(m: SettingModule): string[] {
   if (!t.troubled.includes('{subject}')) out.push(`${where}: talk.troubled must name {subject}`);
   out.push(...validateFight(m, where));
   out.push(...validatePeoples(m, where));
+  out.push(...validateFactions(m, where));
   out.push(...validateRoutines(m.routines, where));
   out.push(...validateAsks(m, where));
   if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
@@ -2115,6 +2150,26 @@ function validateAsks(m: SettingModule, where: string): string[] {
 }
 
 /** The peoples: one for every people with names, sensible regard, and a hold's guard that exists. */
+/** Factions (D65): every creature has a known one, the matrix names known factions and says each pair once. */
+export function validateFactions(m: SettingModule, where: string): string[] {
+  const out: string[] = [], f = m.factions;
+  const ids = new Set([...m.peoples.map((p) => p.id), ...f.others.map((o) => o.id)]);
+  if (ids.size !== m.peoples.length + f.others.length) out.push(`${where}: a faction is defined twice`);
+  for (const o of f.others) if (!(Math.abs(o.regard) <= 100)) out.push(`${where}: faction "${o.id}" regard must be in −100..100`);
+  for (const c of m.creatures) if (!ids.has(c.faction)) out.push(`${where}: creature "${c.id}" belongs to unknown faction "${c.faction}"`);
+  const seen = new Set<string>();
+  for (const [a, b, is] of f.matrix) {
+    if (!ids.has(a) || !ids.has(b)) out.push(`${where}: hostility ${a}–${b} names an unknown faction`);
+    else if (a === b) out.push(`${where}: hostility ${a}–${a}: a faction is its own ally`);
+    if (!HOSTILITIES.includes(is) || is === 'neutral') out.push(`${where}: hostility ${a}–${b} is "${is}": say only ally, wary or hostile`);
+    const key = [a, b].sort().join('|');
+    if (seen.has(key)) out.push(`${where}: hostility ${a}–${b} is given twice`);
+    seen.add(key);
+  }
+  if (!(f.kill.own < 0 && f.kill.foes > 0 && f.kill.upTo > 0)) out.push(`${where}: factions.kill needs own below 0, foes and upTo above 0`);
+  return out;
+}
+
 function validatePeoples(m: SettingModule, where: string): string[] {
   const out: string[] = [];
   const ids = new Set(m.peoples.map((p) => p.id));
