@@ -1053,16 +1053,12 @@ export async function start(b: Boot): Promise<void> {
     }
     // `volcano`: before an active volcano (the nearest, or of a state or id), on the side its lava spills, facing the crater (K7d).
     if (params.volcano) {
-      const want = params.volcano, p0 = player.walker.pos;
-      for (const reach of [3000, 8000, 20000, 45000, 90000]) {
-        const vs = terrain.volcanoes.nearTo(p0.x, p0.z, reach).filter((v) => want === 'any' || v.state === want || v.id === want).sort((a, b) => Math.hypot(a.x - p0.x, a.z - p0.z) - Math.hypot(b.x - p0.x, b.z - p0.z));
-        const v = vs[0];
-        if (!v) continue;
+      const p0 = player.walker.pos, v = terrain.volcanoes.nearestVolcano(p0.x, p0.z, params.volcano);
+      if (v) {
         const out = ({ rim: v.rimR * 1.35, foot: 420, far: 1100 } as Record<string, number>)[params.volcanoAt] ?? 420;
         const tx = v.x + Math.cos(v.phi0) * out, tz = v.z + Math.sin(v.phi0) * out;
         console.info(`[volcano] ${v.id} (${v.state}) at ${Math.round(v.x)}, ${Math.round(v.z)}, lake ${terrain.lakeLevel(v)?.toFixed(1) ?? 'none'}, floor ${terrain.height(v.x, v.z).toFixed(1)}, rim ${v.rimR.toFixed(0)} m, saddle ${v.phi0.toFixed(2)} rad, foot ${v.R.toFixed(0)} m, height ${v.H.toFixed(0)} m, vents ${v.vents.slice(0, 3).map((e) => `${Math.round(e.x)},${Math.round(e.z)} r${e.r.toFixed(0)}`).join(' | ')}`);
         player.teleport(tx, undefined, tz, Math.atan2(v.x - tx, v.z - tz) + Math.PI);
-        break;
       }
     }
     // `wreck`: in the sea 14 m off a wreck near the start town, facing her (one is put there now if there is none).

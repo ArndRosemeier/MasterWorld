@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { Terrain } from '../src/world/terrain';
-import { VOLCANO, acrossFlow, flowHalf } from '../src/world/volcano';
+import { VOLCANO, acrossFlow, flowHalf, scorched } from '../src/world/volcano';
 import { settingById } from '../src/setting/index';
 import { SMALL } from './small';
 
@@ -64,4 +64,14 @@ test('volcano: a steaming one holds no lava, only vents', () => {
   assert.equal(other.lakeLevel(s), null);
   assert.equal(other.lavaAt(s.x, s.z), null);
   assert.ok(s.vents.length >= 9);
+});
+
+test('volcano: nothing grows in the crater or beside a flow, trees may stand on the open flank', () => {
+  assert.ok(scorched(v, v.x + v.rimR * 0.9, v.z), 'the crater walls');
+  assert.ok(terrain.rockAt(v.x + v.rimR * 1.1, v.z, terrain.height(v.x + v.rimR * 1.1, v.z)));
+  const f = v.flows[0], r = (f.r0 + f.r1) / 2;
+  let th = f.phi;
+  for (let i = 0; i < 20; i++) th -= acrossFlow(f, r, th) / r;
+  assert.ok(scorched(v, v.x + Math.cos(th) * r, v.z + Math.sin(th) * r), 'on the flow');
+  assert.ok(!scorched(v, v.x + Math.cos(th + 1.2) * (v.R * 0.7), v.z + Math.sin(th + 1.2) * (v.R * 0.7)), 'the open flank');
 });
