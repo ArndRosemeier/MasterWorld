@@ -305,12 +305,15 @@ export class TownLife {
     const was = this.kept;
     if (was.size === kept.size && [...kept].every(([id, b]) => was.get(id) === b)) return;
     this.kept = new Map(kept);
+    // Before the first step nobody has seen the town: those kept are at their posts from the start, not walking there.
+    this.skipping = this.time === 0;
     for (const a of this.agents) {
       const id = a.person.id;
       if (was.get(id) === kept.get(id) || a.held || a.post) continue;
       if (a.seek) a.seek = undefined;
       this.choose(a, false);
     }
+    this.skipping = false;
   }
 
   /** The stall (a seller's spot) of market seller `id`, one each in turn (-1: the town has no stall). */
@@ -727,7 +730,8 @@ export class TownLife {
     const inside = (spot: number) => at(spot, 'indoors', [120, 400]);
     const stroll = () => { const n = r.int(0, this.nav.xs.length - 1); return free(this.nav.xs[n], this.nav.zs[n], 'stroll', [20, 60]); };
     let task = a.task;
-    if (task === 'sleep') return at(home, 'sleep', [600, 1200]);
+    // The temple's keeper lies in the temple's cot, not in the house they were counted to (a fallen hero is brought to them).
+    if (task === 'sleep') return at(p.role === 'keeper' && this.temple >= 0 ? this.temple : home, 'sleep', [600, 1200]);
     // Marked on the hero's map (a teacher, one a mark sends the hero to): in that building while awake, where the
     // hero was sent to find them; a gathering, a feast or a market day does not take them from it.
     const kept = this.kept.get(p.id);
