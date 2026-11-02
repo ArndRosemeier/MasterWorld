@@ -32,6 +32,22 @@ export function framesOf(def, data) {
   return frames;
 }
 
+/**
+ * The take as played by its mirror image: left and right swapped (a wave with the right hand becomes a wave with the left, so a hand
+ * that holds a weapon stays free). Each bone's world rotation is reflected across the x = 0 plane (axis (x, y, z) becomes (x, -y, -z))
+ * and handed to its opposite bone, the root's sideways travel and the heading flipped. The rig's rest pose is symmetric, so the
+ * reference directions the rotations are measured from mirror each other.
+ */
+export function mirrorFrames(def, frames) {
+  const swap = def.bones.map((name) => {
+    const other = name.endsWith('_l') ? `${name.slice(0, -2)}_r` : name.endsWith('_r') ? `${name.slice(0, -2)}_l` : name;
+    const i = def.bones.indexOf(other);
+    if (i < 0) throw new Error(`mirror: no ${other} beside ${name}`);
+    return i;
+  });
+  return frames.map((f) => ({ q: swap.map((from) => { const [x, y, z, w] = f.q[from]; return [x, -y, -z, w]; }), root: [-f.root[0], f.root[1], f.root[2]], yaw: -f.yaw }));
+}
+
 /** How unlike two frames are once each is turned to face +z (0: the same pose). */
 function unlike(a, b, flat) {
   const ta = yawQuat(-a.yaw), tb = yawQuat(-b.yaw);

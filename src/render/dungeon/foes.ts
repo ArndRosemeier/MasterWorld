@@ -85,10 +85,11 @@ export interface FoeDoing {
 
 /**
  * The gesture of each turn of a band's words (D64), motion-capture takes cut into clips (src/render/folk/moves.ts MOVE_CUTS): a raised
- * hand for a warning, angry hands for a last word, an argument for a demand, a laugh for a jibe, a shrug for giving way, a wave for a
- * friend; a shaken head settles a quarrel. (Drawing a blade, pointing and handing over coin have no take cut yet.)
+ * hand (the free one) for a warning, a laugh for a jibe, a shrug for giving way, a wave for a friend; a shaken head settles a quarrel.
+ * A last warning and a demand have no clip of their own: the band's weapons are drawn (`armed`, the grip changes) and it stands in its
+ * fighting stance (null here). Pointing and handing over coin have no take cut yet.
  */
-export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string>> = { warn: 'raised hand', last: 'angry hands', demand: 'argue', jeer: 'laugh', settle: 'shake head', greet: 'wave hello', yield: 'shrug' };
+export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string | null>> = { warn: 'raised hand', last: null, demand: null, jeer: 'laugh', settle: 'shake head', greet: 'wave hello', yield: 'shrug' };
 
 /** The clip for it; the dead and the gaunt (ghouls) shamble and claw. */
 export function foeClip(def: CreatureDef, d: FoeDoing): string {
@@ -99,7 +100,8 @@ export function foeClip(def: CreatureDef, d: FoeDoing): string {
   if (d.action === 'stab') return 'sword slash C';
   if (d.action === 'swing_1h') return d.variant % 2 ? 'sword slash B' : 'sword slash A';
   if (d.action === 'slam') return dead ? 'zombie scratch' : 'hook';
-  if (d.signal && d.speed < 0.2 && !dead && !d.low) return SIGNAL_CLIPS[d.signal];
+  const gesture = d.signal && d.speed < 0.2 && !dead && !d.low ? SIGNAL_CLIPS[d.signal] : null;
+  if (gesture) return gesture;
   if (d.speed > 2.6) return 'jog';
   if (d.speed > 0.2) return dead ? 'zombie walk' : 'walk';
   if (d.low === 'beg') return 'repair (kneeling)';

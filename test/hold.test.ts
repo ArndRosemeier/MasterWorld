@@ -87,11 +87,16 @@ test('hold: an outsider is warned, warned again in the court, and attacked if th
   const s = scene(0);
   s.stand(COURT.depth + HOLD_WARN + 30, 3);
   assert.equal(s.events.length, 0, 'far off: nothing');
-  s.stand(COURT.depth + HOLD_WARN - 5, 3);
+  s.stand(COURT.depth + HOLD_WARN - 5, 0.3);
+  // Shown, not only said (rule 11): one warden raises a hand towards the hero; a last warning has all of them draw.
+  assert.equal(s.den.creatures.filter((c) => c.signal === 'warn').length, 1, 'a warden gestures the warning');
+  s.stand(COURT.depth + HOLD_WARN - 5, 2.7);
   assert.deepEqual(s.events.map((e) => e.kind), ['warn']);
   assert.ok(s.den.peace && s.den.fighting.length === 0, 'a warning, no blows');
+  assert.ok(s.den.creatures.every((c) => !c.armed), 'weapons at rest');
   s.stand(COURT.depth - 3, 1);
   assert.deepEqual(s.events.map((e) => e.kind), ['warn', 'last']);
+  assert.ok(s.den.creatures.every((c) => c.armed) && s.den.creatures.some((c) => c.signal === 'last'), 'a last warning: weapons drawn');
   s.stand(COURT.depth - 3, HOLD_GRACE + 1);
   assert.ok(s.events.some((e) => e.kind === 'attack'), 'they attack');
   assert.ok(!s.den.peace && s.watch.atWar);
@@ -103,7 +108,9 @@ test('hold: an outsider is warned, warned again in the court, and attacked if th
 test('hold: a friend of the hold is hailed and walks in peace; striking a warden ends it', () => {
   const s = scene(20);
   s.stand(COURT.depth + 10, 2);
-  s.stand(4, 10);
+  s.stand(4, 0.2);
+  assert.ok(s.den.creatures.some((c) => c.signal === 'greet'), 'a warden greets them with a wave');
+  s.stand(4, 9.8);
   assert.deepEqual(s.events.map((e) => e.kind), ['hail']);
   assert.ok(s.den.peace && s.den.fighting.length === 0, 'walking right up to the door in peace');
   // A blow: the peace is over, and the dwarves will not forget it.

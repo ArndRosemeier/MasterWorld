@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cutLoop, findLoop, framesOf } from './cutLoop.mjs';
+import { cutLoop, findLoop, framesOf, mirrorFrames } from './cutLoop.mjs';
 
 /**
  * A made-up take: two bones swinging with a 1.2 s cycle, the body walking 0.8 hip heights a second along a heading
@@ -38,4 +38,16 @@ test('cut loop: one gait cycle off the walking stretch, facing +z on the spot, c
   assert.ok(Math.abs(out[1]) < 1e-5 && Math.abs(out[3] - 1) < 1e-5, `faces +z: ${[...out.slice(0, 4)]} loop ${JSON.stringify(loop)}`);
   for (let f = 0; f <= last; f++) assert.ok(Math.hypot(out[f * stride + 8], out[f * stride + 10]) < 1e-4, `travels at ${f}`);
   assert.ok(Math.abs(out[9] - (data[loop.start * stride + 9] + 0.1)) < 1e-5, 'lifted');
+});
+
+test('mirror: left and right swap, a rotation about an axis reflects across x, the root and heading flip, and mirroring twice is the take', () => {
+  const bones = ['pelvis', 'hand_l', 'hand_r'], def = { bones, rootBone: 'pelvis', fps: 30, frameCount: 1 };
+  const frames = [{ q: [[0, 0, 0, 1], [0.1, 0.2, 0.3, 0.9], [0.5, -0.5, 0.5, 0.5]], root: [0.2, 1, -0.3], yaw: 0.4 }];
+  const m = mirrorFrames(def, frames)[0];
+  assert.deepEqual(m.q[1], [0.5, 0.5, -0.5, 0.5], 'the right hand\'s rotation is now the left\'s, reflected');
+  assert.deepEqual(m.q[2], [0.1, -0.2, -0.3, 0.9]);
+  assert.deepEqual(m.root, [-0.2, 1, -0.3]);
+  assert.equal(m.yaw, -0.4);
+  assert.deepEqual(mirrorFrames(def, [m])[0], frames[0]);
+  assert.throws(() => mirrorFrames({ ...def, bones: ['pelvis', 'hand_l'] }, frames), /no hand_r/);
 });

@@ -163,3 +163,10 @@ test('brawl: the watch sent at raiders goes for them unseen, and a tender cuts a
   watch.tend(fell, 3);
   assert.equal(fell.downFor, 3);
 });
+
+test('brawl: a pack that has made its kill is fed: the herd is not wiped out, however it goes', () => {
+  for (let seed = 1; seed <= 6; seed++) {
+    const { es, deer } = hunt(0, 20, seed, 80);
+    assert.ok(living(deer).length >= 1, `seed ${seed}: ${es.filter((e) => e.kind === 'died').length} of 3 deer died`);
+  }
+});

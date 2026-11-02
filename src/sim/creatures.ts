@@ -156,8 +156,8 @@ const CLOSE_IN = 0.55;
 const LOOK = 0.6, DIN = 4;
 /** A brawler's blow at a prey that runs reaches this much further (m): it springs after it. */
 const LUNGE = 2.5;
-/** A hunter creeping up on shy prey goes at this share of its pace, and a failed hunt leaves it winded this long (s). */
-const STALK_CREEP = 0.4, WINDED = 30;
+/** A hunter creeping up on shy prey goes at this share of its pace, and a failed hunt leaves it winded, and a kill leaves it fed, this long (s). */
+const STALK_CREEP = 0.4, WINDED = 30, FED = 90;
 /** A hunter in its burst springs this much further (m) at prey that runs. */
 const BOUND = 2.5;
 /** A body knocked down lies this long (s) before it gets up, and gets up with this share of its health. */
@@ -555,6 +555,20 @@ export class Den {
     }
   }
 
+  /**
+   * A living one of this den shows what its people say (a gesture), facing the hero at (x, z): the nearest to them speaks. A last warning
+   * has the whole den draw; a settle puts the weapons away again. For a hold's wardens, who are not a warning band (game/hold.ts).
+   */
+  gesture(turn: WarnTurn, at: { readonly x: number; readonly z: number }): void {
+    const alive = this.creatures.filter((c) => c.state !== 'dead' && c.state !== 'down');
+    if (!alive.length) return;
+    let who = alive[0];
+    for (const c of alive) if (Math.hypot(at.x - c.x, at.z - c.z) < Math.hypot(at.x - who.x, at.z - who.z)) who = c;
+    who.dir = Math.atan2(at.z - who.z, at.x - who.x);
+    this.signalling(who, turn, alive);
+    if (turn === 'settle') for (const c of alive) c.armed = false;
+  }
+
   /** The speaker shows what it says (a gesture for a moment); a last warning or a demand has the whole band draw. */
   private signalling(who: Creature, turn: WarnTurn, band: readonly Creature[]): void {
     who.signal = turn;
@@ -710,7 +724,12 @@ export class Den {
   /** Whom it fights: it closes in on its prey and strikes, until one of them falls or runs, or it loses sight of it. */
   private brawl(c: Creature, dt: number, out: DenEvent[]): void {
     const p = c.prey;
-    if (!p || p.c.state === 'dead' || p.c.state === 'down' || (p.c.state === 'flee' && Math.hypot(p.c.x - c.x, p.c.z - c.z) > c.def.senses.sight)) { this.settleDown(c); return; }
+    if (!p || p.c.state === 'dead' || p.c.state === 'down' || (p.c.state === 'flee' && Math.hypot(p.c.x - c.x, p.c.z - c.z) > c.def.senses.sight)) {
+      // A hunter that brought its prey down is fed, and hunts no more for a long while (the herd is not wiped out).
+      if (p && c.def.stalks && (p.c.state === 'dead' || p.c.state === 'down')) c.winded = FED;
+      this.settleDown(c);
+      return;
+    }
     const t = p.c, dx = t.x - c.x, dz = t.z - c.z, d = Math.hypot(dx, dz), dy = Math.abs(t.y - c.y);
     const atk = c.def.attacks[0], reach = atk.reach + radiusOf(c.def) + radiusOf(t.def);
     const sees = d < c.def.senses.sight && this.ground.sees(c.x, c.y, c.z, t.x, t.y, t.z, 0.9);
