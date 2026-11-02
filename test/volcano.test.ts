@@ -52,7 +52,11 @@ test('volcano: the lake stands under the rim\'s lowest crest and over the crater
   const y = terrain.lavaAt(x, z);
   assert.ok(y !== null && y > terrain.height(x, z), 'lava on the flow line');
   const off = flowHalf(f, r) * 3 + 15;
-  assert.equal(terrain.lavaAt(x + Math.cos(th + Math.PI / 2) * off, z + Math.sin(th + Math.PI / 2) * off), null);
+  const ox = x + Math.cos(th + Math.PI / 2) * off, oz = z + Math.sin(th + Math.PI / 2) * off;
+  // (Another flow of the same volcano may happen to run there: then it is on that one's line.)
+  const ro = Math.hypot(ox - v.x, oz - v.z), tho = Math.atan2(oz - v.z, ox - v.x);
+  const onAnother = v.flows.some((g) => ro > g.r0 && ro < g.r1 && Math.abs(acrossFlow(g, ro, tho)) < flowHalf(g, ro));
+  if (!onAnother) assert.equal(terrain.lavaAt(ox, oz), null);
   // Far from the volcano none.
   assert.equal(terrain.lavaAt(v.x + 3000, v.z), null);
 });
