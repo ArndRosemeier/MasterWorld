@@ -71,7 +71,7 @@ const EMPTY: Cell = { forms: [], relief: 0 };
 const CACHE = 4096;
 
 /** A smooth hump: 1 at t = 0 down to 0 at t = 1 (flat at both ends). */
-const bump = (t: number): number => (t >= 1 ? 0 : (1 - t * t) * (1 - t * t));
+export const bump = (t: number): number => (t >= 1 ? 0 : (1 - t * t) * (1 - t * t));
 
 export class Landforms {
   private readonly cells = new Map<number, Cell>();

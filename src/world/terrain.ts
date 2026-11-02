@@ -17,6 +17,7 @@ import type { Field, TownPlan } from '@futuremagic/settlement';
 import { Town, TownGround } from './town';
 import { Landforms, type Landform } from './landforms';
 import type { Lake } from './lakes';
+import { Volcanoes, lavaIn, lowestCrest, type Volcano } from './volcano';
 
 /**
  * How far out from a town's middle the landforms are eased away (its farms and outlying houses stand on calm
@@ -43,6 +44,8 @@ export class Terrain {
   private readonly wetProbe: WaterHere = emptyWater();
   /** The small shapes of the land (D55): knolls, dells, gullies … and the middle band of relief. */
   readonly landforms: Landforms;
+  /** The active volcanoes of volcanic country (K7d). */
+  readonly volcanoes: Volcanoes;
 
   /** `hydro`, `brooks`: tile sizes for drainage (tests use small tiles; null: no brooks). */
   constructor(readonly seed: number, readonly setting: SettingModule, hydro: HydroOptions = HYDRO, brooks: HydroOptions | null = BROOKS) {
@@ -55,6 +58,32 @@ export class Terrain {
       (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity,
       (x, z) => this.erodedLand(x, z),
     );
+    this.volcanoes = new Volcanoes(seed, this.skeleton, (x, z) => this.hydro.riverAt(x, z, this.wetProbe).river || this.hydro.brookFloor(x, z, DELL_REACH) < Infinity);
+  }
+
+  /** The level a volcano's lava lake stands at (m; null: it holds none): under its rim's lowest crest, which a spilling lake brims. */
+  private readonly lakeLevels = new WeakMap<Volcano, number | null>();
+  lakeLevel(v: Volcano): number | null {
+    if (v.state === 'steaming') return null;
+    let y = this.lakeLevels.get(v);
+    if (y === undefined) {
+      const low = lowestCrest(v, (x, z) => this.height(x, z));
+      y = low - (v.state === 'erupting' ? 0.35 : v.drop);
+      if (y - this.height(v.x, v.z) < 3) y = null;
+      this.lakeLevels.set(v, y);
+    }
+    return y;
+  }
+
+  /**
+   * The height of the lava's surface at (x, z) when lava lies there (a volcano's lake, or a flow in its channel), else null
+   * (the hero burns in it).
+   */
+  lavaAt(x: number, z: number): number | null {
+    const v = this.volcanoes.holding(x, z);
+    if (!v || v.state === 'steaming') return null;
+    const ground = this.height(x, z), lake = this.lakeLevel(v), kind = lavaIn(v, x, z, ground, lake);
+    return kind === 'lake' ? lake : kind === 'flow' ? ground + 0.3 : null;
   }
 
   /** Each pond's level as the land drawn round it holds it (NaN: it holds none), by dell. */
@@ -82,6 +111,7 @@ export class Terrain {
   /** The towns' grounds hold no landforms (a town levels its ground). */
   private freeTowns(): void {
     this.landforms.setFree(this.townSpots.map((s) => ({ x: s.d.x, z: s.d.z, r: formsOut(s.d.radius) * 0.7, calm: formsOut(s.d.radius) })));
+    this.volcanoes.keepFree(this.townSpots.map((s) => ({ x: s.d.x, z: s.d.z, r: formsOut(s.d.radius) })));
   }
 
   private fields: ArchField[] = [];
@@ -353,7 +383,7 @@ export class Terrain {
     const clear = bk?.river ? smoothstep(bk.half + BROOK_CLEAR[0], bk.half + BROOK_CLEAR[1], bk.dist) : 1;
     if (lake) { const keep = 1 - lake.calm(x, z); forms *= keep; calm *= keep; }
     if (forms > 0) {
-      const off = this.landforms.offset(x, z);
+      const off = this.landforms.offset(x, z) + this.volcanoes.lift(x, z);
       let shaped = Math.max(Math.min(level, 1), level + off * forms * (off > 0 ? clear : 1));
       // By a brook they dig no lower than its water (a gully runs down into it, a dell beside it stays dry).
       if (bk?.river && bk.dist < bk.valley && shaped < level) shaped = Math.max(shaped, Math.min(level, bk.level + 0.6 + (bk.dist - bk.half) * 0.04));
