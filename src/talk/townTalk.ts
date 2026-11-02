@@ -7,7 +7,6 @@
  */
 import { AgentCore, characterFromProfile, createSettingSession, hearResponse, type Act, type Atom, type Domain, type Fact, type Plan, type Profile, type SettingSession, type SettingSnapshot } from 'solarpolis-dialogue';
 import { createEnglishResources, englishModule, type EnglishResources } from 'solarpolis-dialogue/english';
-import { hash2f } from '@futuremagic/core';
 import type { AskDef, SettingModule, TalkDef } from '../setting/contract';
 import type { Person } from '../sim/people';
 import { loreOf, placeOf } from '../vgm/dungeons';
@@ -19,7 +18,8 @@ import { askDefOf, askWords, askedOne, thingOf, twistOf } from '../vgm/asks';
 import { dungeonOf, type Decision, type DecisionLog, type DungeonDecision, type FestivityDecision } from '../world/decisions';
 import { sketchCellar, type CellarSketch } from '../world/dungeon/cellar';
 import type { Town } from '../world/town';
-import { cap, fill, nameFolk, type Folk } from './folk';
+import { cap, fill, nameFolk, selfOf, type Folk } from './folk';
+import { pickFor, voiceOf } from './persona';
 
 /** A promised cellar as the townsfolk know it. */
 export interface TalkCellar {
@@ -109,7 +109,8 @@ export interface Manner {
   readonly curt: string | null;
 }
 
-const TEMPERAMENTS = ['warm', 'reserved', 'curious', 'dry', 'lively'] as const;
+/** The place a building is, as the talk's domain names it. */
+const homeId = (building: number) => `house:${building}`;
 const pid = (id: number) => `p${id}`;
 /** Lines arrive as sentences; the realizer adds its own capital and full stop (and quotes them mid-sentence). */
 const clause = (s: string) => s.charAt(0).toLowerCase() + s.slice(1).replace(/[.!]\s*$/, '');
@@ -214,15 +215,28 @@ export class TownTalk {
     const names: Record<string, string> = {};
     const social: Record<string, Record<string, unknown>> = {};
     const voices: Record<string, Record<string, unknown>> = {};
+    const persona = talk.persona;
+    // Where each lives (Conversations' profile `home` names a place of the domain).
+    for (const f of folk) {
+      const home = homeId(f.person.home);
+      entities[home] ??= { type: 'place' };
+      names[home] ??= f.house;
+    }
     const characters = folk.map((f) => {
-      const p = f.person;
-      const profile: Profile = { id: pid(p.id), temperament: TEMPERAMENTS[Math.floor(hash2f(p.seed, 1, 2) * TEMPERAMENTS.length)] };
+      const p = f.person, v = voiceOf(persona, f.persona);
+      const profile: Profile = { id: pid(p.id), temperament: f.persona.temperament, pursuits: [...f.persona.pursuits], ageGroup: f.persona.ageGroup, home: homeId(p.home) };
       entities[pid(p.id)] = { type: 'person' };
       names[pid(p.id)] = f.name;
-      voices[pid(p.id)] = {};
+      // Their temperament's voice for what they know and what they only heard (the engine's lines are the fallback).
+      voices[pid(p.id)] = { greeting: pickFor(p, 4, v.greeting), thanks: v.thanks, unknown: pickFor(p, 5, v.nothing), confirmed: v.sure, tentative: v.heard, repairs: { unsupported: v.repair } };
       social[pid(p.id)] = {
-        identity: fill((p.bySea ? talk.identity['traveller:sea'] : undefined) ?? talk.identity[`${p.role}:${p.trade}`] ?? talk.identity[p.role] ?? talk.identity.homemaker, { name: f.name, trade: p.trade, house: f.house }),
-        sourceReply: 'I know it from {source}: {claim}.',
+        identity: selfOf(p, f.persona, f.name, f.house, talk),
+        greeting: pickFor(p, 4, v.greeting),
+        farewell: pickFor(p, 6, v.farewell),
+        wellbeing: v.wellbeing,
+        sourceReply: v.source,
+        testimony: v.testimony,
+        repair: v.repair,
       };
       // The household's own source reads as their own house.
       return { ...characterFromProfile(profile), voice: pid(p.id), personality: { detail: 1, testimony: 'provisional' as const, affiliation: 0.9 } };
@@ -258,11 +272,14 @@ export class TownTalk {
     const resources: EnglishResources = {
       ...createEnglishResources({
         entities: names,
+        // What each pursuit is called and why people like it (the party talk of N6 reads these).
+        pursuits: Object.fromEntries(talk.persona.pursuits.map((d) => [d.id, { name: d.name, reasons: [...d.reasons] }])),
         predicates: {
-          troubled: { positive: talk.troubled, negative: `nothing is wrong in {subject}` },
-          noticed: { positive: '{sign}' },
-          story: { positive: '{line}' },
-          befell: { positive: '{line}' },
+          // Evidential: what they know first-hand is said in their temperament's words (`voices`).
+          troubled: { positive: talk.troubled, negative: `nothing is wrong in {subject}`, evidential: true },
+          noticed: { positive: '{sign}', evidential: true },
+          story: { positive: '{line}', evidential: true },
+          befell: { positive: '{line}', evidential: true },
         },
       }),
       voices,
@@ -534,7 +551,7 @@ export class TownTalk {
       if (shown) this.told.set(person, shown); else this.told.delete(person);
     }
     // Knowing nothing reads as plain talk, not as the engine's "I don't know about that".
-    const nothing = this.talk.nothing;
+    const nothing = voiceOf(this.talk.persona, this.byId.get(person)!.persona).nothing;
     const text = factual && !r.plan.results.length && act.function === 'ask' ? nothing[(person + n) % nothing.length] : this.ownWords(person, r.text);
     return { text, heard, done: false };
   }
