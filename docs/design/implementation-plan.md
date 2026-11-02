@@ -231,7 +231,7 @@ Gate Q (**passed 2026-11-02** on 8b9c3a3d, Arnd's eye on the parley, seal and ni
 
 Built (2026-11-01, MW #457 to #464): all five steps. `npm run loop` prints `gate Q: met` for a run that has three kinds of task, none twice in a row, a twist, a consequence and a want, and each evening checks that the endings and wants read back from the log (two of the eight runs meet it). The plan thread's review (2026-11-01) found three of the six verbs and all but one kind of want missing in the runs; fixed: five kinds of want (`rival`, `elder`, `parent`, `pious`, `peaceable`), coverage runs that ask one kind only (`only`), the night watch widened to the dead and smugglers, and the loop now fails when a verb, three kinds of want, the three twists (first, changed, lied) or a run meeting gate Q is missing. GPU shots of a parley, a seal and a night watch were taken on Arnd's PC (`tools/shot/asks.mjs`, which now prints F2 and F3 per scene). Still open for the gate: F2 to F4 numbers, Arnd's eye.
 
-### Phase K: Caves that form (Arnd, 2026-11-01, D63; K1 and K2 now, next to phases D and Q)
+### Phase K: Caves that form (Arnd, 2026-11-01, D63; K5 to K8 with the mines now, Arnd 2026-11-02, next to phase R)
 
 Goal: natural caves stop being rooms and passages. They form from rock and a process (water, lava, people after ore), and the game reads where one can go from the rock itself. The design is in [caves.md](caves.md). K1 and K2 are preview only, with Arnd's eye on many seeds before anything goes into play (hands-on design, Arnd's wish).
 
