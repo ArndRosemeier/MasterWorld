@@ -1,46 +1,56 @@
 /**
  * The hero seen climbing rock (D56, rule 11): hand over hand up, down and along a face while the walker is
- * on it (game/walker.ts, mode `climb`), and the pull-up over its top (`pull`). The holds are
- * @futuremagic/figure's ladder rungs laid on the face, leaning back with it; the body is its puppet.
+ * on it (game/walker.ts, mode `climb`), and the pull-up over its top (`pull`). The climb is a motion-capture cycle
+ * (CLIMB_CUTS: a ladder take of the CMU library, cut by `npm run packs`) played as fast as the body rises, backwards
+ * going down, so a foot stays on its hold; the pull-up is @futuremagic/figure's ledge, its puppet.
  */
-import { LadderClimb, type Climber, type Ladder } from '@futuremagic/figure';
+import { LadderClimb, type Climber } from '@futuremagic/figure';
 import type { Walker } from '../game/walker';
 import type { HeroPuppet } from '../render/hero/HeroView';
+import { CLIMB_CUTS } from '../render/hero/clips';
 
 /** Where the holds are: the face is this far in front of the walker's body (game/walker.ts OFF_FACE). */
 const FACE = 0.35;
-/** The most a face leans back, metres in per metre up: with the hands over the head (reach) the holds must stay near the body, so the face is taken as near sheer. */
-const MAX_LEAN = 0.1;
+/** How far in front of its hips the cycle's hands take hold (m, for the pack's body: hip height 0.89), as the pack step measures. */
+const HANDS = 0.5;
+/** The pack body's hip height (m): the cycle's measures are scaled from it to the hero's. */
+const PACK_HIP = 0.89;
+/** Seconds over which the speed the cycle is played at follows the body's (the walker moves in steps). */
+const SMOOTH = 0.08;
+/** Sideways along the face counts this much of its length as climbing (a shuffle along it, hand over hand). */
+const ALONG = 0.5;
 
 export class ClimbPose {
   private readonly climb = new LadderClimb();
   private pulling = false;
-  private lastY = 0;
-  // Rock is climbed with the hands over the head (on a ladder they take the rungs at the chest).
-  private readonly face: Ladder = { x: 0, z: 0, nx: 0, nz: 1, lo: 0, hi: 0, floor: 0, halfWidth: 0.3, rim: false, reach: 1.9, hang: 0.2 };
-
-  constructor(private readonly height: (x: number, z: number) => number) {}
+  private last: { x: number; y: number; z: number } | null = null;
+  private v = 0;
+  private readonly cycle = { v: 0, rise: 1 };
+  /** The puppet for the cycle: no pose over the clip, no limbs put anywhere; the clip is the climb. */
+  private readonly puppet: HeroPuppet = { pose: null, limbs: null, clip: CLIMB_CUTS[0].clip, climbRate: this.cycle };
 
   /** This frame's pose for a walker on a face (and where the body goes), or null when it is not on one. */
   onFace(w: Walker, body: Climber, dt: number): { readonly puppet: HeroPuppet; readonly pos: { x: number; y: number; z: number }; readonly yaw: number } | null {
     const F = w.face, p = w.pos;
     if (w.mode === 'climb') {
       this.pulling = false;
-      // The face at the feet, and how far it leans back (a metre up it is that much further in).
-      const fx = p.x + F.nx * FACE, fz = p.z + F.nz * FACE;
-      // (Measured on the face over the body's own height: just under the feet the ground at its foot may
-      // still be gentle, which would lay the holds far back and out of the hands' reach.)
-      const rise = Math.max(...[0, 0.5, 1].map((d) => this.height(fx + F.nx * (d + 0.5), fz + F.nz * (d + 0.5)) - this.height(fx + F.nx * (d - 0.5), fz + F.nz * (d - 0.5))));
-      const lean = rise > 1 / MAX_LEAN ? 1 / rise : MAX_LEAN, h = p.y - F.from;
-      const l = this.face;
-      l.nx = F.nx; l.nz = F.nz;
-      // The rungs' line at the climb's foot, so the face leans through the feet now.
-      l.x = fx - F.nx * lean * h; l.z = fz - F.nz * lean * h;
-      l.lean = lean; l.floor = l.lo = F.from; l.hi = p.y + 3;
-      this.climb.cling(l, h, p.y >= this.lastY - 1e-4, body);
-      this.lastY = p.y;
-      return { puppet: this.climb, pos: this.climb.pos, yaw: this.climb.yaw };
+      // How fast it climbs now (up: positive), smoothed, along the face counted in part.
+      const last = this.last;
+      if (last && dt > 1e-4) {
+        const along = Math.abs((p.x - last.x) * -F.nz + (p.z - last.z) * F.nx);
+        const v = ((p.y - last.y) + along * ALONG * Math.sign(p.y - last.y || 1)) / dt;
+        this.v += (v - this.v) * (1 - Math.exp(-dt / SMOOTH));
+      }
+      this.last = { x: p.x, y: p.y, z: p.z };
+      // The cycle's metres: its rise in hip heights, for this body's hips.
+      this.cycle.v = this.v;
+      this.cycle.rise = CLIMB_CUTS[0].rise * body.hipHeight;
+      // The body is placed so its hands, in front of its hips, meet the face.
+      const back = FACE - HANDS * (body.hipHeight / PACK_HIP);
+      return { puppet: this.puppet, pos: { x: p.x + F.nx * back, y: p.y, z: p.z + F.nz * back }, yaw: w.yaw };
     }
+    this.last = null;
+    this.v = 0;
     if (w.mode === 'pull') {
       const q = w.pull;
       if (!this.pulling) {

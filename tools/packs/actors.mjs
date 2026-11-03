@@ -14,10 +14,12 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import * as core from '@actors/core';
-import { cutLoop, findLoop, findStill, framesOf, mirrorFrames } from './cutLoop.mjs';
+import { climbLoop, cutLoop, findClimb, findLoop, findStill, framesOf, mirrorFrames } from './cutLoop.mjs';
 
 /** A cut whose ends differ more than this (cutLoop's measure) is refused: it would hitch at the seam. */
 const MAX_SEAM = 0.06;
+/** A climbing step's end may differ from its start's mirror image by more (a ladder is climbed with the whole body, and the seam is spread over the cycle). */
+const MAX_CLIMB_SEAM = 0.12;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const version = JSON.parse(readFileSync(join(root, 'node_modules/@actors/generator/package.json'), 'utf8')).version;
@@ -39,6 +41,9 @@ for (const m of moveText.matchAll(/\{ clip: '([^']+)', take: '([^']+)', (mirror:
   cuts.push({ clip: m[1], take: m[2], mirror: !!m[3], still: { secs: [Number(m[4]), Number(m[5])], seam: Number(m[6]), travel: Number(m[7]), upright: { hips: Number(m[8]), tilt: Number(m[9]) } } });
 }
 if (!cuts.some((c) => c.still)) throw new Error('no MOVE_CUTS in src/render/folk/moves.ts');
+// The climb cut out of a CMU ladder take (src/render/hero/clips.ts CLIMB_CUTS), one `{ clip, take, rise }` a line.
+for (const m of heroClips.matchAll(/\{ clip: '([^']+)', take: '([^']+)', rise: ([\d.]+) \}/g)) cuts.push({ clip: m[1], take: m[2], climb: true, rise: Number(m[3]) });
+if (!cuts.some((c) => c.climb)) throw new Error('no CLIMB_CUTS in src/render/hero/clips.ts');
 // The pack's walk at its own speed (m/s): the cuts' paces are measured against it.
 const walkPace = Number(heroClips.match(/PACE[^=]*=\s*\{[^}]*\bwalk: ([\d.]+)/)?.[1]);
 if (!walkPace) throw new Error('no PACE.walk in src/render/hero/clips.ts');
@@ -153,18 +158,23 @@ function cutTakes(src, manifest) {
     const def = { ...lib.rigs[entry.rig], ...entry };
     const taken = framesOf(def, decodeClip(def, buf(join(src, 'clips/cmu', entry.file))));
     const frames = c.mirror ? mirrorFrames(def, taken) : taken;
-    const loop = c.still ? findStill(def, frames, c.still) : findLoop(def, frames);
-    if (!loop || (!c.still && loop.score > MAX_SEAM)) throw new Error(`${c.take}: no clean loop (${loop ? `seam ${loop.score.toFixed(3)}` : 'no fitting stretch'})`);
+    // A climb: one step and its mirror image make the cycle; the others find their loop in the take itself.
+    const step = c.climb ? findClimb(def, frames, mirrorFrames(def, frames)) : null;
+    if (c.climb && (!step || step.score > MAX_CLIMB_SEAM)) throw new Error(`${c.take}: no clean climbing step (${step ? `seam ${step.score.toFixed(3)}` : 'none'})`);
+    const cycle = c.climb ? climbLoop(frames, mirrorFrames(def, frames), step) : frames;
+    const loop = c.climb ? { start: 0, len: cycle.length - 1, score: step.score } : c.still ? findStill(def, frames, c.still) : findLoop(def, frames);
+    if (!loop || (!c.still && !c.climb && loop.score > MAX_SEAM)) throw new Error(`${c.take}: no clean loop (${loop ? `seam ${loop.score.toFixed(3)}` : 'no fitting stretch'})`);
     const out = { ...def, loop: true, frameCount: loop.len + 1 };
-    let data = cutLoop(def, frames, loop);
-    data = cutLoop(def, frames, loop, (ground.lo - lowest({ def: out, data }).lo) / ground.hip);
-    const pace = c.still ? 0 : (walkPace * measureGait(skeleton, { def: out, data }).speed) / walkFeet;
-    if (!c.still && Math.abs(pace - c.pace) > 0.05 * c.pace) console.warn(`${c.clip}: paces ${pace.toFixed(2)} m/s, src/render/folk/gaits.ts says ${c.pace}`);
+    let data = cutLoop(def, cycle, loop);
+    data = cutLoop(def, cycle, loop, (ground.lo - lowest({ def: out, data }).lo) / ground.hip);
+    const pace = c.still || c.climb ? 0 : (walkPace * measureGait(skeleton, { def: out, data }).speed) / walkFeet;
+    if (!c.still && !c.climb && Math.abs(pace - c.pace) > 0.05 * c.pace) console.warn(`${c.clip}: paces ${pace.toFixed(2)} m/s, src/render/folk/gaits.ts says ${c.pace}`);
+    if (c.climb && Math.abs(2 * step.rise - c.rise) > 0.03 * c.rise) console.warn(`${c.clip}: the body rises ${(2 * step.rise).toFixed(3)} hip heights a cycle, src/render/hero/clips.ts CLIMB_CUTS says ${c.rise}`);
     const file = `clips/cut/${c.clip.replace(/[^a-z0-9]+/g, '-')}.bin`;
     writeFileSync(join(dest, file), new Uint8Array(encodeClipI16(def.bones.length, out.frameCount, data)));
-    console.log(`  ${c.clip}: ${c.take} frames ${loop.start}-${loop.start + loop.len} (${(loop.len / def.fps).toFixed(2)} s), seam ${loop.score.toFixed(3)}, ${c.still ? 'on the spot' : `${pace.toFixed(2)} m/s`}`);
+    console.log(`  ${c.clip}: ${c.take} frames ${c.climb ? step.start : loop.start}-${(c.climb ? step.start : loop.start) + (c.climb ? step.len : loop.len)} (${(loop.len / def.fps).toFixed(2)} s), seam ${loop.score.toFixed(3)}, ${c.still ? 'on the spot' : c.climb ? `rises ${(2 * step.rise).toFixed(3)} hip heights` : `${pace.toFixed(2)} m/s`}`);
     return { name: c.clip, file, fps: def.fps, frameCount: out.frameCount, loop: true, bones: def.bones, refDirs: def.refDirs, rootBone: def.rootBone,
-      source: `${def.source}, frames ${loop.start}-${loop.start + loop.len} cut into a loop`, category: c.still ? 'Actions' : 'Locomotion', description: def.description, encoding: 'i16' };
+      source: `${def.source}, frames ${c.climb ? step.start : loop.start}-${(c.climb ? step.start : loop.start) + (c.climb ? step.len : loop.len)} cut into a loop`, category: c.still ? 'Actions' : 'Locomotion', description: def.description, encoding: 'i16' };
   });
 }
 

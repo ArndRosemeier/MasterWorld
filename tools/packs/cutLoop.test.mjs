@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cutLoop, findLoop, framesOf, mirrorFrames } from './cutLoop.mjs';
+import { climbLoop, cutLoop, findClimb, findLoop, framesOf, mirrorFrames } from './cutLoop.mjs';
 
 /**
  * A made-up take: two bones swinging with a 1.2 s cycle, the body walking 0.8 hip heights a second along a heading
@@ -50,4 +50,39 @@ test('mirror: left and right swap, a rotation about an axis reflects across x, t
   assert.equal(m.yaw, -0.4);
   assert.deepEqual(mirrorFrames(def, [m])[0], frames[0]);
   assert.throws(() => mirrorFrames({ ...def, bones: ['pelvis', 'hand_l'] }, frames), /no hand_r/);
+});
+
+/** A made-up climb: the body rises 0.3 hip heights a second; the left hand swings up in the first second of every two, the right in the second. */
+function climb() {
+  const fps = 30, n = 150, bones = ['pelvis', 'hand_l', 'hand_r'], stride = bones.length * 4 + 3;
+  const data = new Float32Array(n * stride);
+  for (let f = 0; f < n; f++) {
+    const t = f / fps, phase = t % 2, l = phase < 1 ? Math.sin(Math.PI * phase) : 0, r = phase >= 1 ? Math.sin(Math.PI * (phase - 1)) : 0;
+    const q = (a) => [Math.sin(a / 2), 0, 0, Math.cos(a / 2)];
+    data.set([0, 0, 0, 1], f * stride);
+    data.set(q(0.8 * l), f * stride + 4);
+    data.set(q(0.8 * r), f * stride + 8);
+    data.set([0, 0.3 * t + 0.02 * Math.sin(2 * Math.PI * t), 0], f * stride + 12);
+  }
+  return { def: { bones, rootBone: 'pelvis', fps, frameCount: n }, data };
+}
+
+test('climb: a step whose end is the mirror image of its start, and with its mirror image a cycle that closes and carries the rise on', () => {
+  const { def, data } = climb();
+  const frames = framesOf(def, data), mirrored = mirrorFrames(def, frames);
+  const win = findClimb(def, frames, mirrored);
+  assert.ok(win, 'a step');
+  assert.ok(win.score < 0.01, `ends alike: ${win.score}`);
+  assert.ok(Math.abs(win.len - 30) <= 1, `a step of ${win.len} frames`);
+  assert.ok(Math.abs(win.rise - 0.3) < 0.03, `rises ${win.rise}`);
+  const cycle = climbLoop(frames, mirrored, win);
+  assert.equal(cycle.length, 2 * win.len + 1);
+  // The second half rises on from where the first ended, by as much.
+  const up = cycle[win.len].root[1] - cycle[0].root[1], on = cycle[2 * win.len].root[1] - cycle[win.len].root[1];
+  assert.ok(Math.abs(up - on) < 0.03, `${up} then ${on}`);
+  // And it closes once the rise is taken out, the hands back where they began.
+  const out = cutLoop(def, cycle, { start: 0, len: 2 * win.len }), stride = 15;
+  for (let k = 0; k < 12; k++) assert.ok(Math.abs(out[k] - out[2 * win.len * stride + k]) < 1e-5, `seam differs at ${k}`);
+  assert.ok(Math.abs(out[13] - out[2 * win.len * stride + 13]) < 1e-5, 'the rise is out of the loop');
+  assert.equal(findClimb(def, frames.map((f) => ({ ...f, root: [0, 0, 0] })), mirrored), null, 'a take that does not rise has no climbing step');
 });

@@ -8,6 +8,16 @@ export const HERO_CLIPS = [
   'sit down', 'sit', 'stand up', 'spell ready', 'throw',
 ];
 
+/**
+ * The climb: a cycle of two steps (a rung each, left foot and hand, then right) cut out of a ladder take of the CMU
+ * motion-capture library by `npm run packs` (tools/packs/actors.mjs, `findClimb` in tools/packs/cutLoop.mjs). The body
+ * rises `rise` hip heights over the cycle, which is how fast the clip must play for the feet to stay on their holds:
+ * the pack step says when it is off. Keep each entry on one line with plain quoted `clip` and `take`.
+ */
+export const CLIMB_CUTS = [
+  { clip: 'climb', take: 'cmu 14_34', rise: 0.586 },
+] as const;
+
 /** How long sitting down and standing up again take (s): the clips' own lengths (40 and 32 frames at 30 fps). */
 export const SIT_DOWN = 40 / 30;
 export const STAND_UP = 32 / 30;

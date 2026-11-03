@@ -330,6 +330,8 @@ export class HeroView {
     const action = this.front.actor.currentAction;
     const pace = PACE[clip];
     if (action && pace) action.timeScale = Math.min(1.8, Math.max(0.5, speed / pace));
+    // Climbing: the cycle goes as fast as the body rises (a foot on its hold stays on it), backwards going down.
+    else if (action && p.puppet?.climbRate) action.timeScale = (p.puppet.climbRate.v / p.puppet.climbRate.rise) * action.getClip().duration;
     this.front.update(dt);
     if (p.gait === 'ride') {
       // Seated: the rider's seat (below the middle of the hips) on the saddle.

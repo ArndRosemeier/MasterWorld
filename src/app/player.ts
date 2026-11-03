@@ -55,7 +55,7 @@ export class Player {
 
   constructor(private readonly camera: PerspectiveCamera, canvas: HTMLElement, private readonly world: WalkWorld, flying: boolean) {
     this.walker = new Walker(world);
-    this.climbing = new ClimbPose((x, z) => world.height(x, z));
+    this.climbing = new ClimbPose();
     this.heroCam = new HeroCamera(camera, canvas, world);
     this.fly = new FlyCamera(camera, canvas, world.height);
     this.flyingNow = flying;
