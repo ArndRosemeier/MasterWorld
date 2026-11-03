@@ -16,7 +16,7 @@
 import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { launch } from './launch.mjs';
+import { launch, NO_VSYNC } from './launch.mjs';
 import { drawnNear, measureFrames, shadersQuiet } from './wait.mjs';
 
 const TIMEOUT = 120000;
@@ -64,7 +64,7 @@ const difference = (page, a, b) => page.evaluate(async ([a, b]) => {
 /** Shader builds recorded so far (count), and what was built from the `from`-th on (names). */
 const builds = (page, from = Infinity) => page.evaluate((from) => { const m = window.shaders; return m ? { n: m.events.length, what: m.events.slice(from).map((e) => `${e.kind} ${e.what}`) } : { n: 0, what: [] }; }, from);
 
-const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const { server, base, browser } = await launch({ args: NO_VSYNC });
 const t0 = Date.now();
 const rows = [];
 let failed = false;

@@ -11,13 +11,13 @@
  * (default 10000): what each spent its time on, against the other frames. PROBE_SHADOW_EVERY=<n> draws the sun's
  * shadow map every n frames.
  */
-import { launch } from './launch.mjs';
+import { launch, NO_VSYNC } from './launch.mjs';
 
 const MEASURE = Number(process.env.PROBE_MEASURE ?? 2000);
 const query = process.argv[2] ?? '?title=0&day=0&gl&hour=12&weather=clear';
 const turns = (process.env.PROBE_TURNS ?? '').split(',').filter(Boolean).map((t) => { const [h, k] = t.split(':'); return { hour: Number(h), kind: k }; });
 
-const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const { server, base, browser } = await launch({ args: NO_VSYNC });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
 await page.goto(base + (query.startsWith('?') ? query : '?' + query));

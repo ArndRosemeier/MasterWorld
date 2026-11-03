@@ -7,6 +7,8 @@
  */
 /** Browser switches every check's Chromium gets: no sound unless SHOT_SOUND=1. */
 export const MUTE = process.env.SHOT_SOUND ? [] : ['--mute-audio'];
+/** Browser switches that stop the frame waiting for the screen (vsync and the frame cap off): probe, set, play. */
+export const NO_VSYNC = ['--disable-gpu-vsync', '--disable-frame-rate-limit'];
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -20,7 +20,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { launch } from './launch.mjs';
+import { launch, NO_VSYNC } from './launch.mjs';
 import { drawnNear, measureFrames, shadersQuiet } from './wait.mjs';
 import { hurtTraveller, meet, raidFarm, standClear } from './acts.mjs';
 import { fileURLToPath } from 'node:url';
@@ -599,7 +599,7 @@ const dir = join(root, `${date}-${commit}${dirty}`);
 mkdirSync(dir, { recursive: true });
 
 // No frame cap: with vsync a GPU frame shows as the screen's 16.7 ms however little it costs.
-const { server, base, browser } = await launch({ args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const { server, base, browser } = await launch({ args: NO_VSYNC });
 const t0 = Date.now();
 const rows = [];
 let failed = false, gpuName = '';
