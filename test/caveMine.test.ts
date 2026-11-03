@@ -59,6 +59,19 @@ test('mines (K8): the lumps of ore lie on the wall they show in, none hung in th
   }
 });
 
+/** The real walker at a winze's foot, pushing up it, until it stands on the landing (or 25 s are up); the ladder alone must carry it (`tire` refuses). */
+function climbWinze(world: ReturnType<typeof formedWorld>, l: { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number }): { walker: Walker; climbed: boolean } {
+  const hor = Math.hypot(l.x1 - l.x0, l.z1 - l.z0), ux = (l.x1 - l.x0) / hor, uz = (l.z1 - l.z0) / hor, walker = new Walker(world);
+  walker.tire = () => false;
+  walker.place(l.x0 - ux * 0.5, l.z0 - uz * 0.5, l.y0 + 0.02);
+  let climbed = false;
+  for (let s = 0; s < 60 * 25 && !(climbed && walker.mode === 'ground' && walker.pos.y > l.y1 - 0.5); s++) {
+    walker.step({ forward: 1, strafe: 0, heading: Math.atan2(-ux, -uz), walk: false, up: false, down: false }, 1 / 60);
+    if (walker.mode === 'climb') climbed = true;
+  }
+  return { walker, climbed };
+}
+
 test('mines (K8): a winze leans up between two levels in a niche at a drift\'s side, with a ladder up its floor; the reader links its foot and head, and the real walker climbs it without tiring', () => {
   // A mine of two levels (found by seed on the real small size; the climb, the reader and the boxes are checked on it).
   const c = formCave(caves, 17, 'hard-rock', 'small'), d = dressFormed(c, caves), { reading: R } = readFormed(c, caves, d);
@@ -72,21 +85,24 @@ test('mines (K8): a winze leans up between two levels in a niche at a drift\'s s
   const boxes = ladderBoxes(l);
   assert.ok(boxes.length >= 2 + Math.floor(Math.hypot(hor, rise) / 0.34) - 1, `${boxes.length} boxes: two rails and a rung every third of a metre`);
   // The real walker, standing at the foot facing up the slope, climbs it and stands on the landing above, though it would tire on bare rock (`tire` refuses).
-  const world = formedWorld(c.field as BrickField, undefined, null, d.ladders), w = new Walker(world), ux = (l.x1 - l.x0) / hor, uz = (l.z1 - l.z0) / hor;
-  w.tire = () => false;
-  w.place(l.x0 - ux * 0.5, l.z0 - uz * 0.5, l.y0 + 0.02);
-  let climbed = false;
-  for (let s = 0; s < 60 * 25 && !(climbed && w.mode === 'ground' && w.pos.y > l.y1 - 0.5); s++) {
-    w.step({ forward: 1, strafe: 0, heading: Math.atan2(-ux, -uz), walk: false, up: false, down: false }, 1 / 60);
-    if (w.mode === 'climb') climbed = true;
-  }
-  assert.ok(climbed && w.mode === 'ground' && w.pos.y > l.y1 - 0.5, `ended ${w.mode} at ${w.pos.y.toFixed(1)}, the head is at ${l.y1.toFixed(1)}`);
+  const world = formedWorld(c.field as BrickField, undefined, null, d.ladders), ux = (l.x1 - l.x0) / hor, uz = (l.z1 - l.z0) / hor;
+  const w = climbWinze(world, l);
+  assert.ok(w.climbed && w.walker.mode === 'ground' && w.walker.pos.y > l.y1 - 0.5, `ended ${w.walker.mode} at ${w.walker.pos.y.toFixed(1)}, the head is at ${l.y1.toFixed(1)}`);
   // Without the ladder (a bare shaft) the same climb tires the hero out and lets go.
   const bare = new Walker(formedWorld(c.field as BrickField)); let spent = 0;
   bare.tire = (dt) => (spent += dt) < 3;
   bare.place(l.x0 - ux * 0.5, l.z0 - uz * 0.5, l.y0 + 0.02);
   for (let s = 0; s < 60 * 25; s++) bare.step({ forward: 1, strafe: 0, heading: Math.atan2(-ux, -uz), walk: false, up: false, down: false }, 1 / 60);
   assert.ok(bare.pos.y < l.y1 - 0.5, 'a tiring climb does not reach the top of ten metres');
+});
+
+test('mines (K8): the ladder carries the climber up medium mines whose rock beside the shaft is thin, or whose foot is open (GPU look: the hero hung part way)', () => {
+  for (const seed of [7, 15]) {
+    const c = formCave(caves, seed, 'hard-rock', 'medium'), d = dressFormed(c, caves), l = d.ladders[0];
+    assert.ok(l, `seed ${seed}: a winze`);
+    const w = climbWinze(formedWorld(c.field as BrickField, undefined, null, d.ladders), l);
+    assert.ok(w.climbed && w.walker.mode === 'ground' && w.walker.pos.y > l.y1 - 0.5, `seed ${seed}: ended ${w.walker.mode} at ${w.walker.pos.y.toFixed(1)}, the head is at ${l.y1.toFixed(1)}`);
+  }
 });
 
 test('mines (K8): winzes keep out of the stopes and from each other, and a mine of one level has none', () => {

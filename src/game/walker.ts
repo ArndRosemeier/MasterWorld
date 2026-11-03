@@ -9,6 +9,7 @@
  */
 import { clamp, damp } from '@futuremagic/core';
 import { caveHolds } from '../world/rockHolds';
+import type { LadderGrip } from '../world/cave/dress';
 
 /** What the walker needs to know of the world around it. */
 export interface WalkWorld {
@@ -36,8 +37,8 @@ export interface WalkWorld {
   climbable?(x: number, z: number): { readonly nx: number; readonly nz: number } | null;
   /** The rock itself offers holds wherever it stands as a wall (a cave's broken rock): climbed by its faces in `rockSurface`. */
   rockHolds?(): boolean;
-  /** Is (x, y, z) at a ladder? Climbed without tiring, and quicker than a rock face (a winze's, in a mine). */
-  ladderAt?(x: number, y: number, z: number): boolean;
+  /** Where (x, y, z) takes hold of a ladder (a winze's, in a mine), or null: climbed without tiring, quicker than a rock face, and carried by the ladder itself. */
+  ladderAt?(x: number, y: number, z: number): LadderGrip | null;
   /**
    * Living bodies (foes, wardens): does a body of radius `r` at (x, z), feet at `y`, press into one? One already
    * touching where the asker stands now, (ax, az), lets it go, so a walker is never stuck in another.
@@ -299,6 +300,8 @@ export class Walker {
     }
     const asked = this.mode === 'ground' && len > 0.3;
     this.stuckFor = asked && Math.hypot(p.x - x0, p.z - z0) < speed * len * dt * 0.1 ? this.stuckFor + dt : 0;
+    // Walking into the foot of a ladder, facing up it: onto it.
+    if (this.mode === 'ground' && intent.forward > 0.5 && this.boardLadder(-sh, -ch)) return;
     // Pushing on into a face with holds: onto it.
     if (asked && intent.forward > 0.5 && this.stuckFor > 0 && this.spec.climb && (this.world.climbable || this.inRock())) {
       this.pushing += dt;
@@ -409,6 +412,19 @@ export class Walker {
     return true;
   }
 
+  /** Onto the ladder at the foot of a winze, when facing up it (dx, dz: the way the body pushes); whether it got on. */
+  private boardLadder(dx: number, dz: number): boolean {
+    const p = this.pos, g = this.world.ladderAt?.(p.x, p.y, p.z);
+    if (!g || !g.foot || g.nx * dx + g.nz * dz < 0.5) return false;
+    this.mode = 'climb';
+    this.face.nx = g.nx; this.face.nz = g.nz; this.face.from = p.y;
+    p.x = g.x - g.nx * OFF_FACE; p.z = g.z - g.nz * OFF_FACE;
+    this.vel.x = this.vel.y = this.vel.z = 0;
+    this.yaw = Math.atan2(-g.nx, -g.nz);
+    this.pushing = 0;
+    return true;
+  }
+
   /**
    * In a cave, pushing on into rock that is too high to step and too low to climb (a ledge, a rough steep ramp of the
    * floor): the body hops up on it, seen as a jump. Whether it did.
@@ -446,7 +462,7 @@ export class Walker {
     }
     // Spent, or jumping off: let go.
     const moving = Math.abs(intent.forward) > 0.1 || Math.abs(intent.strafe) > 0.1;
-    const ladder = this.world.ladderAt?.(p.x, p.y, p.z) ?? false;
+    const ladder = this.world.ladderAt?.(p.x, p.y, p.z) ?? null;
     if (intent.up || (!ladder && this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
     const v = ladder ? Math.max(1.1, this.spec.climb ?? 0.8) : (this.spec.climb ?? 0.8);
     // The feet on the face again after the move: up or down, and along it (right of one facing it: (-nz, nx)).
@@ -459,7 +475,7 @@ export class Walker {
     const top = rock ? this.support(tx, tz, y + PULL_RISE * this.height) : this.world.height(tx, tz);
     // In a cave the ledge's top is where the body fits (stood up on it, clear of the roof).
     const over = rock ? top > y && !this.bodyInRock(tx, top, tz) : this.groundSlope(tx, tz) <= this.spec.maxSlope;
-    if (intent.forward > 0 && top - y < PULL_RISE * this.height && over) {
+    if (intent.forward > 0 && (!ladder || ladder.head) && top - y < PULL_RISE * this.height && over) {
       const q = this.pull;
       this.mode = 'pull';
       q.t = 0; q.x0 = p.x; q.y0 = p.y; q.z0 = p.z; q.x1 = tx; q.z1 = tz; q.y1 = top;
@@ -470,6 +486,14 @@ export class Walker {
     if (intent.forward < 0 && back >= y - 0.25 && (rock || this.groundSlope(p.x, p.z) <= this.spec.maxSlope * 1.5)) {
       this.mode = 'ground';
       p.y = this.support(p.x, p.z, y);
+      return;
+    }
+    // On a ladder the rails carry the climber, whatever the rock beside them is like (a thin wall, a niche): along its line.
+    const rung = ladder && this.world.ladderAt?.(p.x, y, p.z);
+    if (rung) {
+      F.nx = rung.nx; F.nz = rung.nz;
+      p.x = rung.x - rung.nx * OFF_FACE; p.z = rung.z - rung.nz * OFF_FACE; p.y = y;
+      this.yaw = Math.atan2(-rung.nx, -rung.nz);
       return;
     }
     const at = this.faceAt(ax, az, y, F.nx, F.nz);
