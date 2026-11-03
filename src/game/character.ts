@@ -416,8 +416,11 @@ export function oldPoints(setting: Pick<SettingModule, 'growth' | 'backgrounds' 
   return Math.max(0, level * setting.growth.points.perLevel - paid);
 }
 
-/** Strength a climb spends (stamina per second): hanging still, and more while moving on the face. */
-export const CLIMB_COST = { hang: 0.2, move: 0.55 };
+/**
+ * Strength a climb spends (stamina per second): hanging still, and more while moving on the face. (Moving: 0.55 at the old
+ * 0.85 m/s up a face, 0.39 at today's 0.6, so a metre costs what it did.)
+ */
+export const CLIMB_COST = { hang: 0.2, move: 0.39 };
 
 /** Health a fall of `metres` costs: nothing up to 4 m, then more and more (a fall of 20 m nearly kills). */
 export function fallHurt(metres: number): number {

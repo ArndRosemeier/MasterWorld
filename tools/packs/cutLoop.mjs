@@ -91,6 +91,44 @@ export function findLoop(def, frames, { cycle = [0.8, 1.9], minPace = 0.25, maxT
 }
 
 /**
+ * Finds one step of a climb: the window [start, start + len] on the stretch where the body rises, whose end is the
+ * mirror image of its start (the other foot and hand now lead, one rung higher), so the step and its mirror
+ * (`climbLoop`) make a seamless cycle of two steps. `rise` is the root's rise over the step, in hip heights;
+ * only steps rising at least `minRise` a second (hip heights) count.
+ */
+export function findClimb(def, frames, mirrored, { secs = [0.8, 2.6], minRise = 0.2 } = {}) {
+  const fps = def.fps, n = frames.length;
+  const lo = Math.round(secs[0] * fps), hi = Math.round(secs[1] * fps);
+  let best = null;
+  for (let a = 0; a + lo < n; a++) {
+    for (let len = lo; len <= hi && a + len < n; len++) {
+      const b = a + len, rise = frames[b].root[1] - frames[a].root[1];
+      if (rise / (len / fps) < minRise) continue;
+      // Steady: the rise keeps coming all the way, not all in the middle.
+      const third = frames[a + Math.round(len / 3)].root[1] - frames[a].root[1], twoThirds = frames[a + Math.round((2 * len) / 3)].root[1] - frames[a].root[1];
+      if (third < 0.15 * rise || twoThirds > 0.85 * rise) continue;
+      const score = unlike(frames[a], mirrored[b], true);
+      if (!best || score < best.score) best = { start: a, len, score, rise };
+    }
+  }
+  return best;
+}
+
+/** The cycle from a step `win` (findClimb): the step, then its mirror image on top of it, the root's rise carried on. */
+export function climbLoop(frames, mirrored, win) {
+  const { start, len } = win, out = [];
+  for (let f = 0; f <= len; f++) out.push(frames[start + f]);
+  const lift = frames[start + len].root[1] - mirrored[start].root[1];
+  // Sideways sway and travel of the mirrored half carried on from where the first half ended.
+  const end = frames[start + len].root, m0 = mirrored[start].root;
+  for (let f = 1; f <= len; f++) {
+    const m = mirrored[start + f];
+    out.push({ q: m.q, root: [end[0] + m.root[0] - m0[0], m.root[1] + lift, end[2] + m.root[2] - m0[2]], yaw: frames[start + len].yaw + m.yaw - mirrored[start].yaw });
+  }
+  return out;
+}
+
+/**
  * Whether frames a..b keep upright: the hips never more than `hips` hip heights below where the take stands (its 90th percentile),
  * the chest never leaning more than `tilt` radians off upright. Not a squat, a sit or a tumble.
  */

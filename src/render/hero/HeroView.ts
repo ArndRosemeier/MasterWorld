@@ -330,6 +330,8 @@ export class HeroView {
     const action = this.front.actor.currentAction;
     const pace = PACE[clip];
     if (action && pace) action.timeScale = Math.min(1.8, Math.max(0.5, speed / pace));
+    // Climbing: the cycle is held at the phase of the limbs' paces on the rock (a foot on its hold stays on it).
+    else if (action && p.puppet?.phase !== undefined) { action.timeScale = 0; action.time = (p.puppet.phase % 1) * action.getClip().duration; }
     this.front.update(dt);
     if (p.gait === 'ride') {
       // Seated: the rider's seat (below the middle of the hips) on the saddle.

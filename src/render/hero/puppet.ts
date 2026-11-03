@@ -14,6 +14,8 @@ export interface HeroPuppet {
   readonly limbs: LimbGoals | null;
   /** The clip under it (else the gait's). */
   readonly clip?: string;
+  /** The clip is a climbing cycle (CLIMB_CUTS), held at this phase of it (0 to 1: the paces of the limbs on the rock) instead of played. */
+  readonly phase?: number;
 }
 
 const goal = (): LimbGoal => ({ p: new Vector3(), w: 0 });

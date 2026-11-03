@@ -55,7 +55,7 @@ export class Player {
 
   constructor(private readonly camera: PerspectiveCamera, canvas: HTMLElement, private readonly world: WalkWorld, flying: boolean) {
     this.walker = new Walker(world);
-    this.climbing = new ClimbPose((x, z) => world.height(x, z));
+    this.climbing = new ClimbPose();
     this.heroCam = new HeroCamera(camera, canvas, world);
     this.fly = new FlyCamera(camera, canvas, world.height);
     this.flyingNow = flying;
@@ -259,6 +259,7 @@ export class Player {
     }
     if (!hero) return;
     if (this.hideHero) { hero.visible = false; return; }
+    if (walker.mode !== 'climb' && walker.mode !== 'pull') this.climbing.onGround(walker.pos);
     const ridden = riding && horses ? horses.saddle(this.steeds.indexOf(riding), this.seat) : null;
     if (riding && ridden) {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.

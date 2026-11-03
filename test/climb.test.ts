@@ -77,7 +77,7 @@ test('climb: spent, the climber lets go and falls; the fall is measured', () => 
   const f = wallFoot(true), w = new Walker(world);
   w.place(f.x, f.z);
   const heading = Math.atan2(-f.nx, -f.nz);
-  let strength = 30;
+  let strength = 42;
   w.tire = (dt, effort) => (strength -= dt * effort) > 0;
   let top = 0;
   for (let t = 0; t < 60 && w.mode !== 'air'; t += 0.05) { w.step(go(1, heading), 0.05); top = Math.max(top, w.pos.y); }
