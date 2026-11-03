@@ -351,7 +351,7 @@ export async function start(b: Boot): Promise<void> {
         return [s, f, d].reduce<number | null>((m, v) => (v === null ? m : m === null ? v : Math.min(m, v)), null);
       },
       // The surface as drawn, waves and all: a swimmer rides the swell.
-      waterLevel: (x, z) => water?.surfaceAt(x, z) ?? null,
+      waterLevel: (x, _y, z) => water?.surfaceAt(x, z) ?? null,
       // Rock faces with holds (D56).
       climbable: (x, z) => terrain.climbable(x, z),
       // The buildings, the tree trunks and the townsfolk (whom one walks around, not through).
@@ -368,7 +368,7 @@ export async function start(b: Boot): Promise<void> {
       floor: (x, z, y) => (below() ? null : landWorld.floor!(x, z, y)),
       rockSurface: (x, y, z) => { const b = below(); return b ? b.rockSurface(x, y, z) : landWorld.rockSurface(x, y, z); },
       sightSurface: (x, y, z) => { const b = below(); return b ? (b.sightSurface ?? b.rockSurface)(x, y, z) : landWorld.sightSurface!(x, y, z); },
-      waterLevel: (x, z) => { const b = below(); return b ? b.waterLevel(x, z) : landWorld.waterLevel(x, z); },
+      waterLevel: (x, y, z) => { const b = below(); return b ? b.waterLevel(x, y, z) : landWorld.waterLevel(x, y, z); },
       climbable: (x, z) => (below() ? null : landWorld.climbable!(x, z)),
       // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
       rockHolds: () => !!below()?.rockHolds?.(),
@@ -682,7 +682,7 @@ export async function start(b: Boot): Promise<void> {
     let horses: HorseView | null = null;
     if (params.horses > 0) {
       loading.set('Saddling the horses');
-      const free = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && world.waterLevel(x, z) === null;
+      const free = (x: number, z: number, r: number) => !world.wall?.(x, z, r) && world.waterLevel(x, player.walker.pos.y, z) === null;
       const by = player.walker.pos;
       const spots = horseSpots(by.x, by.z, player.walker.yaw, params.horses, free);
       horses = await HorseView.make(view.renderer, spots.length);
@@ -1038,7 +1038,7 @@ export async function start(b: Boot): Promise<void> {
         standFloor: (x, z, near) => player.walker.support(x, z, near),
         blocksAt: (x, z, r, y) => world.wall!(x, z, r, y),
         rockGapAt: (x, y, z) => world.rockSurface(x, y, z),
-        wetAt: (x, z) => world.waterLevel(x, z),
+        wetAt: (x, y, z) => world.waterLevel(x, y, z),
       },
       realm: () => cellars?.realm ?? 'land',
       ready: async (realm) => realm === 'land' || !!(await cellars?.build(realm)),
@@ -1223,7 +1223,7 @@ export async function start(b: Boot): Promise<void> {
     sounds = new SoundDirector({
       engine: sound.engine, seed, camera: view.camera, walker: player.walker, terrain, town: () => towns?.nearest(view.camera.position.x, view.camera.position.z)?.town ?? null,
       water: (x, z) => sea.waterAt(x, z),
-      waterLevel: (x, z) => world.waterLevel(x, z),
+      waterLevel: (x, y, z) => world.waterLevel(x, y, z),
       weather: () => wx.shown,
       hour: () => view.sky.hour,
       flash: () => ({ light: view.sky.flash, bearing: view.sky.flashBearing }),
@@ -1975,7 +1975,7 @@ export async function start(b: Boot): Promise<void> {
       // The hero's spot and the camera's behind them (about where it trails): no wall, no trunk, no water; and no
       // trunk across the view to what they look at (up to 60 m, short of it, which may stand among trees itself).
       clear: (x, z, yaw, at) => {
-        const wet = (px: number, pz: number) => (world.waterLevel(px, pz) ?? -Infinity) >= terrain.height(px, pz) + 0.05 || inChannel(terrain.hydro.brookAt(px, pz, brookHere), 1.5);
+        const wet = (px: number, pz: number) => (world.waterLevel(px, terrain.height(px, pz), pz) ?? -Infinity) >= terrain.height(px, pz) + 0.05 || inChannel(terrain.hydro.brookAt(px, pz, brookHere), 1.5);
         // A crop field's grain stands as high as the camera.
         const inCrop = (px: number, pz: number) => { const f = towns?.nearest(px, pz)?.town.fieldAt(px, pz); return !!f && f.paddock < 0; };
         const standsFree = (px: number, pz: number, r: number) => !world.wall?.(px, pz, r) && !trunks.blocks(px, pz, r) && !wet(px, pz) && !inCrop(px, pz);
@@ -2596,7 +2596,7 @@ export async function start(b: Boot): Promise<void> {
       if (followOrigin) ORIGIN.follow(view.camera.position.x, view.camera.position.z);
       // Under the sea, or in the waterline (render/underwater.ts): the camera's height over the surface at it, waves and all.
       // Down in a place, its own water (a sea cave's drowned storey), not the sea's.
-      const camAt = view.camera.position, surf = below() ? world.waterLevel(camAt.x, camAt.z) : sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
+      const camAt = view.camera.position, surf = below() ? world.waterLevel(camAt.x, camAt.y, camAt.z) : sea.surfaceAt(camAt.x, camAt.z), overSea = surf === null ? 10 : camAt.y - surf;
       view.sky.underwater = overSea < -UNDER_LENS;
       updateVeil(view.camera, overSea, view.sky.underwater, view.sky.murk, dt);
       wx.apply(dt, view.camera.position, hours(), view.sky);

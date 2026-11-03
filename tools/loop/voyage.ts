@@ -77,7 +77,7 @@ function crossing(name: string, seed: number, terrain: Terrain, log: readonly De
   const hero = (walker = new Walker({
     height: (x, z) => terrain.height(x, z),
     rockSurface: () => null,
-    waterLevel: (x, z) => (water(x, z) > 0 ? SEA_LEVEL : null),
+    waterLevel: (x, _y, z) => (water(x, z) > 0 ? SEA_LEVEL : null),
     floor: (x, z, y) => decks.underfoot(x, z, y),
     wall: (x, z, rad, y) => decks.hull(x, z, rad, y ?? 0),
   }));

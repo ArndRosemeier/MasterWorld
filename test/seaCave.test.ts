@@ -31,7 +31,7 @@ test('sea cave: the walker swims its drowned room, dives to the floor and comes 
   assert.equal(f.flood, c.layout.flood);
   assert.ok(f.pools.every((p) => !wet.has(p.hall)) && f.streams.every((s) => !wet.has(s.hall)), 'no pool or stream under the water');
   const world = dungeonWorld(space, { x: 0, y: 0, z: 0 });
-  assert.equal(world.waterLevel(0, 0), c.layout.flood);
+  assert.equal(world.waterLevel(0, 0, 0), c.layout.flood);
   const r = c.layout.rooms.find((q) => wet.has(q.id))!, x = (r.x + r.w / 2) * C, z = (r.z + r.d / 2) * C;
   const w = new Walker(world);
   w.place(x, z, space.floorAt(x, z, r.level * S + 2)! + 0.3);

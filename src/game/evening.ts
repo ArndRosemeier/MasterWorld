@@ -744,7 +744,7 @@ export class LandWalk {
       height: (x, z) => terrain.height(x, z),
       floor: (x, z) => standAt(terrain, x, z),
       rockSurface: (x, y, z) => terrain.rockSurface(x, y, z),
-      waterLevel: (x, z) => { const h = terrain.height(x, z), d = terrain.waterDepth(x, z, h); return d > 0.4 ? h + d : null; },
+      waterLevel: (x, _y, z) => { const h = terrain.height(x, z), d = terrain.waterDepth(x, z, h); return d > 0.4 ? h + d : null; },
       wall: (x, z, r) => solidAt(terrain, x, z, r),
       ...(climb ? { climbable: (x: number, z: number) => terrain.climbable(x, z) } : {}),
     };

@@ -45,7 +45,7 @@ export interface RoomProbe {
   /** Rock as a signed distance (positive in air); null away from it. */
   rockGapAt(x: number, y: number, z: number): number | null;
   /** Water's surface here, or null. */
-  wetAt(x: number, z: number): number | null;
+  wetAt(x: number, y: number, z: number): number | null;
 }
 
 /** Forward on the ground for a walker's yaw (0 faces −z). */
@@ -85,7 +85,7 @@ export function hasRoom(f: PortalFrame, shape: PortalShape, probe: RoomProbe): b
     const x = f.x + rx * w * k + fx * along, z = f.z + rz * w * k + fz * along;
     const y = probe.standFloor(x, z, f.y);
     if (!Number.isFinite(y) || Math.abs(y - f.y) > LEVEL) return false;
-    const water = probe.wetAt(x, z);
+    const water = probe.wetAt(x, y, z);
     if (water !== null && water > y + 0.25) return false;
     if (probe.blocksAt(x, z, 0.3, f.y)) return false;
     for (const up of [0.4, 1.2, 2.0, shape.height - 0.2]) {
