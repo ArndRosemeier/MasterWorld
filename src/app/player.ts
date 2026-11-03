@@ -161,7 +161,7 @@ export class Player {
     const s = this.riding;
     if (!s) return false;
     const w = this.world;
-    const spot = s.dismountSpot((x, z, r) => !w.wall?.(x, z, r) && w.waterLevel(x, this.walker.pos.y, z) === null);
+    const here = this.walker.pos.y, spot = s.dismountSpot((x, z, r) => !w.wall?.(x, z, r) && w.waterLevel(x, here, z) === null);
     s.ridden = false;
     this.riding = null;
     this.walker.place(spot.x, spot.z);
