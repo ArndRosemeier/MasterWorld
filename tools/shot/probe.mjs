@@ -23,6 +23,23 @@ page.on('pageerror', (e) => console.error(`[page error] ${e.message}`));
 await page.goto(base + (query.startsWith('?') ? query : '?' + query));
 await page.waitForFunction(() => window.__mwReady === true, null, { timeout: 300000 });
 await page.addStyleTag({ content: '#loading{display:none!important}' });
+// Hiding a part must hold: townsfolk, the hero and small life set `visible` again every frame, so a hidden part's
+// `visible` is pinned to false (what its own code sets is kept and comes back with `__show`).
+await page.evaluate(() => {
+  window.__pinHidden = (o) => {
+    if (o.userData.probeWas !== undefined) return;
+    o.userData.probeWas = o.visible;
+    Object.defineProperty(o, 'visible', { configurable: true, get: () => false, set: (v) => { o.userData.probeWas = v; } });
+  };
+  window.__show = () => {
+    for (const o of window.game.view.scene.children) {
+      if (o.userData.probeWas === undefined) continue;
+      delete o.visible;
+      o.visible = o.userData.probeWas;
+      delete o.userData.probeWas;
+    }
+  };
+});
 // `PROBE_SHADOW_EVERY=<n>`: the sun's shadow map drawn every n frames instead of the sky's own (for weighing it).
 if (process.env.PROBE_SHADOW_EVERY) await page.evaluate((n) => { window.game.view.sky.shadowEvery = n; }, Number(process.env.PROBE_SHADOW_EVERY));
 
@@ -203,13 +220,13 @@ async function probe(title) {
     row(label, m, { p50: (before.p50 + after.p50) / 2 });
     before = after;
   };
-  const restore = () => { for (const o of window.game.view.scene.children) if (o.userData.probeWas !== undefined) { o.visible = o.userData.probeWas; delete o.userData.probeWas; } };
+  const restore = () => window.__show();
   for (const { name } of list) {
     await page.evaluate((name) => { window.__hide = name; }, name);
-    await paired(`without ${name}`, () => { for (const o of window.game.view.scene.children) if ((o.name || o.type).replace(/ [-\d:]+$/, '') === window.__hide) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
+    await paired(`without ${name}`, () => { for (const o of window.game.view.scene.children) if ((o.name || o.type).replace(/ [-\d:]+$/, '') === window.__hide) window.__pinHidden(o); }, restore);
   }
   await paired('without sun shadow redraw', () => { window.__every = window.game.view.sky.shadowEvery; window.game.view.sky.shadowEvery = 1e9; }, () => { window.game.view.sky.shadowEvery = window.__every; });
-  await paired('nothing (empty scene, post chain only)', () => { for (const o of window.game.view.scene.children) if (o.isMesh || o.isGroup || o.isInstancedMesh) { o.userData.probeWas = o.visible; o.visible = false; } }, restore);
+  await paired('nothing (empty scene, post chain only)', () => { for (const o of window.game.view.scene.children) if (o.isMesh || o.isGroup || o.isInstancedMesh) window.__pinHidden(o); }, restore);
   await churn();
   await page.waitForTimeout(5000);
   const c = await churn();
