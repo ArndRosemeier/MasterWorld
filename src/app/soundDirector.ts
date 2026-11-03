@@ -36,7 +36,7 @@ export interface SoundHost {
   /** Water surface and depth at a point (the masks), null where unknown. */
   water(x: number, z: number): { level: number; depth: number } | null;
   /** Calm water level under the walker in its own space (null in rooms and the cellar). */
-  waterLevel(x: number, z: number): number | null;
+  waterLevel(x: number, y: number, z: number): number | null;
   weather(): WeatherState;
   hour(): number;
   /** The lightning's light now (0..1) and its bearing. */
@@ -380,7 +380,7 @@ export class SoundDirector {
   /** What is under a body's feet (the hero's, a horse's). */
   private footing(wk: Walker): Footing {
     const { terrain } = this.host, p = wk.pos, where = this.host.where();
-    const level = this.host.waterLevel(p.x, p.z);
+    const level = this.host.waterLevel(p.x, p.y, p.z);
     const g = terrain.townGround(p.x, p.z);
     const town = g === TownGround.Street || g === TownGround.Building ? 'street' : g === TownGround.Market ? 'market' : g === TownGround.Yard || g === TownGround.Path ? 'yard' : null;
     const bi = terrain.biomeAt(p.x, p.z);

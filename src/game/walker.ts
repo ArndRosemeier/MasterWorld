@@ -16,8 +16,11 @@ export interface WalkWorld {
   height(x: number, z: number): number;
   /** Rock volumes with their ground as a signed distance (positive in air); null away from them. */
   rockSurface(x: number, y: number, z: number): number | null;
-  /** Calm water surface level here, or null where there is no water. */
-  waterLevel(x: number, z: number): number | null;
+  /**
+   * Calm water surface level for a body at (x, y, z), or null where there is no water. `y` is the body's height (the
+   * feet's): overland there is one surface per (x, z) and `y` is ignored; underground, where floors stack, it picks the storey.
+   */
+  waterLevel(x: number, y: number, z: number): number | null;
   /**
    * Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. With
    * `y` (the feet's height) a floor that has another over it (a ship's cabin under its castle's deck) is the one a step
@@ -201,7 +204,7 @@ export class Walker {
 
   /** Where the water surface is, if the body is in it deep enough to swim; else null. */
   private swimLevel(x: number, z: number, feet: number): number | null {
-    const w = this.world.waterLevel(x, z);
+    const w = this.world.waterLevel(x, feet, z);
     return w !== null && w > feet + this.height * 0.6 ? w : null;
   }
 
@@ -320,7 +323,7 @@ export class Walker {
         this.airTop = -Infinity;
       }
     }
-    const level = this.world.waterLevel(p.x, p.z);
+    const level = this.world.waterLevel(p.x, p.y, p.z);
     if (this.mode !== 'swim') {
       const w = this.swimLevel(p.x, p.z, p.y);
       if (w !== null) { this.mode = 'swim'; v.y *= 0.3; }
@@ -498,7 +501,7 @@ export class Walker {
 
   /** The head is under the water (diving): the hero holds their breath (game/breath.ts). */
   get headUnder(): boolean {
-    const w = this.mode === 'swim' ? this.world.waterLevel(this.pos.x, this.pos.z) : null;
+    const w = this.mode === 'swim' ? this.world.waterLevel(this.pos.x, this.pos.y, this.pos.z) : null;
     return w !== null && this.pos.y + this.height * 0.9 < w;
   }
 
