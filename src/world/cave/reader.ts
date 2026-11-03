@@ -15,7 +15,7 @@
 import { MinHeap } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import { brickColumns, fieldAt, type BrickField } from '../dungeon/rockMesh';
-import { columnSpans, type Dressing } from './dress';
+import { columnSpans, type Dressing, type Pool } from './dress';
 import type { Skeleton } from './skeleton';
 
 export type LinkKind = 'walk' | 'climb' | 'drop' | 'swim';
@@ -151,12 +151,15 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
     }
   }
 
-  // (The swimmer's way over the water is clear: no rock stands out of it across the line, at the chest and at the head.)
-  const clearOver = (y: number, x0: number, z0: number, x1: number, z1: number): boolean => {
-    const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.4);
+  // (The swimmer's way across the water is clear: no rock stands out of it along the line, at the chest and at the head; under a sump's lid, at the depths the diver is at.)
+  const clearOver = (p: Pool, x0: number, z0: number, x1: number, z1: number): boolean => {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(len / 0.4);
+    // (The ends lie on the bank, where the swimmer has waded out: the line is clear between them.)
     for (let i = 0; i <= n; i++) {
+      if (i * 0.4 < 1.2 || (n - i) * 0.4 < 1.2) continue;
       const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n;
-      if (fieldAt(f, x, y + 0.4, z) < way.radius || fieldAt(f, x, y + 1.2, z) < way.radius) return false;
+      const over = fieldAt(f, x, p.y + 0.4, z) >= way.radius && fieldAt(f, x, p.y + 1.2, z) >= way.radius;
+      if (!over && !(p.lid !== undefined && fieldAt(f, x, p.y - 1, z) >= way.radius && fieldAt(f, x, p.y - 0.6, z) >= way.radius)) return false;
     }
     return true;
   };
@@ -166,7 +169,7 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
     for (let a = 0; a < count; a++) { const h = Math.hypot(cx[a] - p.x, cz[a] - p.z); if (h >= p.r - 0.4 && h <= p.r + 1.4 && Math.abs(cy[a] - p.y) <= 1.4) rim.push(a); }
     for (let m = 0; m < rim.length; m++) for (let n = m + 1; n < rim.length; n++) {
       const a = rim[m], b = rim[n], across = Math.hypot(cx[a] - cx[b], cz[a] - cz[b]);
-      if (across >= p.r && Math.min(cc[a], cc[b]) - Math.max(cy[a], cy[b]) >= stand && clearOver(p.y, cx[a], cz[a], cx[b], cz[b])) link(a, b, 3, true);
+      if (across >= p.r && Math.min(cc[a], cc[b]) - Math.max(cy[a], cy[b]) >= stand && clearOver(p, cx[a], cz[a], cx[b], cz[b])) link(a, b, 3, true);
     }
   }
 

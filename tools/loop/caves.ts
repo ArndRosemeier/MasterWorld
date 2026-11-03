@@ -35,12 +35,14 @@ function follow(w: Walker, r: Reading, cells: readonly number[]): boolean {
   const stuck = (k: number, why: string): false => { if (process.env.WHY) { const a = cells[k - 1], c = cells[k], e = [...Array(r.edgeStart[a + 1] - r.edgeStart[a]).keys()].map((n) => r.edgeStart[a] + n).find((n) => r.edgeTo[n] === c); console.log(`    stuck ${why} at step ${k}/${cells.length}: link ${e === undefined ? '?' : ['walk', 'climb', 'drop', 'swim'][r.edgeKind[e]]}, rise ${(r.y[c] - r.y[a]).toFixed(2)}, run ${Math.hypot(r.x[c] - r.x[a], r.z[c] - r.z[a]).toFixed(2)}, hero at ${(w.pos.y - r.y[a]).toFixed(2)} above the cell, ${near(r.x[c], r.y[c], r.z[c]).toFixed(1)} m from an opened way`); } if (process.env.WHY === '2') for (let q = Math.max(0, k - 4); q <= Math.min(cells.length - 1, k + 1); q++) console.log(`      cell ${q}: ${r.x[cells[q]].toFixed(1)} ${r.y[cells[q]].toFixed(2)} ${r.z[cells[q]].toFixed(1)} room ${r.room[cells[q]].toFixed(1)}`); if (process.env.WHY === '2') console.log(`      hero ${w.pos.x.toFixed(1)} ${w.pos.y.toFixed(2)} ${w.pos.z.toFixed(1)}`); return false; };
   let t = 0;
   for (let k = 1; k < cells.length; k++) {
-    const c = cells[k];
+    const c = cells[k], from = cells[k - 1], swim = [...Array(r.edgeStart[from + 1] - r.edgeStart[from]).keys()].some((n) => r.edgeTo[r.edgeStart[from] + n] === c && r.edgeKind[r.edgeStart[from] + n] === 3);
     for (let spent = 0; spent < 60 * 12; spent++, t++) {
       if (t > 60 * LIMIT) return stuck(k, 'out of time');
       const dx = r.x[c] - w.pos.x, dz = r.z[c] - w.pos.z, near = Math.hypot(dx, dz) < 0.4 && Math.abs(r.y[c] - w.pos.y) < 0.8;
       if (near) break;
-      w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: false, down: false }, 1 / 60);
+      // A swim under a sump's lid is a dive: down while far from the far bank, up when near it.
+      const far = Math.hypot(dx, dz);
+      w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: swim && far < 1.6, down: swim && far >= 1.6 && w.mode === 'swim' }, 1 / 60);
       if (spent === 60 * 12 - 1) return stuck(k, 'timeout');
     }
   }
