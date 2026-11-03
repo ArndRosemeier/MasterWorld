@@ -14,16 +14,8 @@ export interface HeroPuppet {
   readonly limbs: LimbGoals | null;
   /** The clip under it (else the gait's). */
   readonly clip?: string;
-  /**
-   * The clip is a climbing cycle (CLIMB_CUTS), played as fast as the body climbs: `v` the way up, signed (m/s; down
-   * plays it backwards), `rise` the metres the body gains over one cycle of the clip.
-   */
-  readonly climbRate?: { readonly v: number; readonly rise: number };
-  /**
-   * A wall the body climbs (world x, z of a point on it, `nx`, `nz` the way into it): hands and feet are held on it, wherever
-   * the clip puts them, the hands `hand` metres and the feet `foot` metres in front of it, by weight `w`.
-   */
-  readonly wall?: { readonly x: number; readonly z: number; readonly nx: number; readonly nz: number; readonly w: number; readonly hand: number; readonly foot: number };
+  /** The clip is a climbing cycle (CLIMB_CUTS), held at this phase of it (0 to 1: the paces of the limbs on the rock) instead of played. */
+  readonly phase?: number;
 }
 
 const goal = (): LimbGoal => ({ p: new Vector3(), w: 0 });
