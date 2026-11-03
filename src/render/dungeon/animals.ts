@@ -268,5 +268,7 @@ export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, 
     const own = (doing === 'walk' || doing === 'run') && b.doing === doing ? lib.speedOf(a.getClip().name) * lib.object.scale.x : 0;
     a.timeScale = own > 0 ? Math.min(1.6 * g, Math.max(0.5 * g, speed / own)) : g;
   }
+  // Standing about (not walking, running or hurt), every foot is on the ground, whatever an idle clip does with a leg (the giant turtle's hind legs hung).
+  lib.standing = doing === 'idle' || doing === 'alert' || doing === 'feed' || doing === 'rest' || doing === 'call' || doing === 'flick';
   lib.update(dt);
 }
