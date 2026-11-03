@@ -73,7 +73,7 @@ export const caves: CavesDef = {
       lava: {
         halfWidth: [2.6, 6.2], halfHeight: [2, 3.6], gradient: [0.02, 0.07], length: [1, 1.8], roof: 4,
         branches: [0, 2], branchLength: [28, 70], wander: 0.7, skylights: { most: 3, apart: 38, thin: 7 },
-        ledges: { lip: 0.35, levels: 2, first: 1.6, rise: 1.2 },
+        ledges: { lip: 0.7, levels: 2, first: 2.0, rise: 1.3 },
       },
     },
     {
@@ -89,7 +89,7 @@ export const caves: CavesDef = {
       collapse: { junction: 0, span: 6, most: 0 },
       mine: {
         halfWidth: [1.3, 1.8], halfHeight: [1.6, 2.1], square: 0.85, levels: [1, 3], gap: 10, adit: 28, roof: 3,
-        crosscuts: [1, 3], crosscutLength: [8, 22], stopes: 2, stopeLength: [4, 9], incline: 0.3,
+        crosscuts: [1, 3], crosscutLength: [8, 22], stopes: 2, stopeLength: [4, 9], incline: 0.3, winzes: { count: [0, 2], half: 0.95, lean: 0.2 },
         fittings: { posts: 4.5, post: 0.13, beam: 0.14, timbered: 0.7, gauge: 0.9, rail: 0.06, sleeper: 1.1, carts: 2 },
       },
     },
@@ -110,12 +110,12 @@ export const caves: CavesDef = {
     floor: { silt: [0.08, 0.32], relief: 0.14 },
     rocks: { along: 16, perHall: [8, 16], size: [0.35, 1.5] },
     // (`cutMost`: the stream's bed is never cut deeper than a step into the floor; where the floor stands higher over the water, there is no stream.)
-    water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4, cutMost: 0.4, ponds: { chance: 1, per100: 0.4, depth: 2, wide: 3.6, bank: 1.2, sump: 0.6, sumpWide: 2.4, sumpDepth: 3 } },
+    water: { width: [0.5, 1.5], bed: 0.28, pools: 4, poolDepth: 0.4, cutMost: 0.4, ponds: { chance: 1, per100: 0.9, depth: 2, wide: 3.6, bank: 1.2, sump: 0.85, sumpWide: 2, sumpDepth: 4 } },
     drips: { chance: 0.55, live: 0.55, spacing: 1.7, scatter: 18 },
     stones: { per100: 520, size: [0.06, 0.7], heaps: 0.3, most: 4500 },
     crystals: { per100: 9, count: [3, 9], len: [0.1, 0.5], oreTries: 5000 },
     formations: { length: [0.2, 2.6], age: 0.5, column: 7, straws: 0.12, most: 3000 },
-    lava: { drips: 70, length: [0.08, 0.75], cluster: [1, 4], most: 1400 },
+    lava: { drips: 110, length: [0.15, 1.1], cluster: [2, 6], most: 2400 },
   },
   // Ore is for show (no mining, ever): veins on faults and joints, seams along a bed, pockets.
   ore: {

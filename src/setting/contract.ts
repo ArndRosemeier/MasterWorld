@@ -232,6 +232,8 @@ export interface CaveMineDef {
   readonly stopeLength: readonly [number, number];
   /** How steeply an incline between two levels climbs (rise per metre). */
   readonly incline: number;
+  /** Winzes (K8: a steep shaft with a ladder from a drift up to the level above): most between two levels, the shaft's half width (m) and how far it leans along the strike (run per metre of rise: it is climbed up its floor). */
+  readonly winzes: { readonly count: readonly [number, number]; readonly half: number; readonly lean: number };
   /** What people fitted in (world/cave/fittings.ts): timber sets every `posts` m (a post's half thickness, the beam's, the share of sets that stand), rails (gauge, rail thickness, sleeper spacing) and carts (most). */
   readonly fittings: { readonly posts: number; readonly post: number; readonly beam: number; readonly timbered: number; readonly gauge: number; readonly rail: number; readonly sleeper: number; readonly carts: number };
 }

@@ -36,6 +36,8 @@ export interface Conduit {
   readonly level: number;
   /** Does the water run in it today? */
   readonly active: boolean;
+  /** A winze (K8): a steep shaft with a ladder up its floor; `foot` and `head` are the heights of the floors it joins, `top` the index of the point where the slope ends (a level stretch follows). */
+  readonly ladder?: { readonly foot: number; readonly head: number; readonly top: number };
 }
 
 /** A collapse void: the ceiling fell in a dome over (x, z), up from the floor `floor`, and a heap of rubble lies under it. */

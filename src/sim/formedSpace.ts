@@ -8,6 +8,7 @@ import { lockBox, shutAir, type CaveLock } from '../world/cave/locks';
 import type { ScaledLayout } from '../world/dungeon/cellar';
 import { fieldAt, type BrickField } from '../world/dungeon/rockMesh';
 import type { CaveWaterAt } from '../world/cave/water';
+import type { Ladder } from '../world/cave/dress';
 import type { FormedGround } from './formedGround';
 
 /** A room's home counts as the hero's place within this far of it (m). */
@@ -24,7 +25,7 @@ export interface CaveSounds {
 }
 
 export class FormedSpace extends DungeonSpace {
-  constructor(layout: ScaledLayout, readonly field: BrickField, readonly ground: FormedGround, private readonly homes: readonly { readonly x: number; readonly y: number; readonly z: number }[], readonly sounds: CaveSounds = { drips: [], streams: [] }, readonly locks: readonly CaveLock[] = [], /** Where its streams and pools stand (cave metres), for the walker: none, none in it. */ readonly water: CaveWaterAt | null = null) {
+  constructor(layout: ScaledLayout, readonly field: BrickField, readonly ground: FormedGround, private readonly homes: readonly { readonly x: number; readonly y: number; readonly z: number }[], readonly sounds: CaveSounds = { drips: [], streams: [] }, readonly locks: readonly CaveLock[] = [], /** Where its streams and pools stand (cave metres), for the walker: none, none in it. */ readonly water: CaveWaterAt | null = null, /** The ladders of its winzes (cave metres). */ readonly ladders: readonly Ladder[] = []) {
     super(layout);
     this.shutNow = locks;
     this.ground.holdShut(locks);

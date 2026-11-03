@@ -42,7 +42,9 @@ function follow(w: Walker, r: Reading, cells: readonly number[]): boolean {
       if (near) break;
       // A swim under a sump's lid is a dive: down while far from the far bank, up when near it.
       const far = Math.hypot(dx, dz);
-      w.step({ forward: 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: swim && far < 1.6, down: swim && far >= 1.6 && w.mode === 'swim' }, 1 / 60);
+      // (Dive first, then on: a sump's lid starts at the surface, so the swimmer goes down before it and under.)
+      const diving = swim && far >= 3 && w.mode === 'swim', sunk = w.pos.y < r.y[from] - 1.2;
+      w.step({ forward: diving && !sunk ? 0 : 1, strafe: 0, heading: Math.atan2(-dx, -dz), walk: false, up: swim && far < 3, down: diving }, 1 / 60);
       if (spent === 60 * 12 - 1) return stuck(k, 'timeout');
     }
   }
@@ -67,7 +69,7 @@ for (const rock of rocks) {
     // Back out: the way from the deepest place to a way in (drops cannot be climbed, so it is not the inward way reversed).
     const home = reachFree(g, caves.way.ramp.above, [deep]), out = g.entries.filter((e) => home.reached[e]).sort((a, b) => g.depth[a] - g.depth[b])[0];
     const outward = out === undefined ? null : wayTo(home.from, out);
-    const entry = inward[0], w = new Walker(formedWorld(c.field as BrickField, undefined, caveWater(r.dressing, caves.dress.water.bed, caves.dress.water.poolDepth)));
+    const entry = inward[0], w = new Walker(formedWorld(c.field as BrickField, undefined, caveWater(r.dressing, caves.dress.water.bed, caves.dress.water.poolDepth), r.dressing.ladders));
     w.place(g.x[entry], g.z[entry], g.y[entry] + 0.02);
     const went = follow(w, g, inward);
         const ok = went && outward !== null && follow(w, g, outward);

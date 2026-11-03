@@ -36,6 +36,8 @@ export interface WalkWorld {
   climbable?(x: number, z: number): { readonly nx: number; readonly nz: number } | null;
   /** The rock itself offers holds wherever it stands as a wall (a cave's broken rock): climbed by its faces in `rockSurface`. */
   rockHolds?(): boolean;
+  /** Is (x, y, z) at a ladder? Climbed without tiring, and quicker than a rock face (a winze's, in a mine). */
+  ladderAt?(x: number, y: number, z: number): boolean;
   /**
    * Living bodies (foes, wardens): does a body of radius `r` at (x, z), feet at `y`, press into one? One already
    * touching where the asker stands now, (ax, az), lets it go, so a walker is never stuck in another.
@@ -444,8 +446,9 @@ export class Walker {
     }
     // Spent, or jumping off: let go.
     const moving = Math.abs(intent.forward) > 0.1 || Math.abs(intent.strafe) > 0.1;
-    if (intent.up || (this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
-    const v = this.spec.climb ?? 0.8;
+    const ladder = this.world.ladderAt?.(p.x, p.y, p.z) ?? false;
+    if (intent.up || (!ladder && this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
+    const v = ladder ? Math.max(1.1, this.spec.climb ?? 0.8) : (this.spec.climb ?? 0.8);
     // The feet on the face again after the move: up or down, and along it (right of one facing it: (-nz, nx)).
     const y = p.y + intent.forward * v * dt;
     const ax = p.x + F.nx * OFF_FACE - F.nz * intent.strafe * v * 0.7 * dt, az = p.z + F.nz * OFF_FACE + F.nx * intent.strafe * v * 0.7 * dt;

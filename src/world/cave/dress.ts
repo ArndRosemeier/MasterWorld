@@ -13,7 +13,7 @@
 import { Noise, Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import { jointDistance, oreAt, type RockBlock } from './block';
-import { fitMine, type Box } from './fittings';
+import { fitMine, ladderBoxes, type Box } from './fittings';
 import type { Crystal, Stone } from './loose';
 import { BRICK, brickColumns, brickIndex, fieldAt, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import type { CondPoint, Conduit, Skeleton } from './skeleton';
@@ -52,12 +52,26 @@ export interface Pool {
   readonly lid?: { readonly tx: number; readonly tz: number; readonly half: number };
 }
 
+/** A winze's ladder (K8): the line its rails run along, up the shaft's floor, from the foot (at the lower drift's floor) to the head (at the floor above). */
+export interface Ladder { readonly x0: number; readonly y0: number; readonly z0: number; readonly x1: number; readonly y1: number; readonly z1: number }
+
+/** Is (x, y, z) at a ladder (within a body's reach of its line, between its foot and head)? The hero climbs there without tiring. */
+export function onLadder(ladders: readonly Ladder[], x: number, y: number, z: number): boolean {
+  return ladders.some((l) => {
+    if (y < l.y0 - 0.5 || y > l.y1 + 0.5) return false;
+    const dx = l.x1 - l.x0, dy = l.y1 - l.y0, dz = l.z1 - l.z0, t = Math.max(0, Math.min(1, ((x - l.x0) * dx + (y - l.y0) * dy + (z - l.z0) * dz) / (dx * dx + dy * dy + dz * dz || 1)));
+    return Math.hypot(x - l.x0 - dx * t, y - l.y0 - dy * t, z - l.z0 - dz * t) < 1.1;
+  });
+}
+
 /** A fallen rock: an ellipsoid turned by its yaw. */
 export interface Rock { readonly x: number; readonly y: number; readonly z: number; readonly rx: number; readonly ry: number; readonly rz: number; readonly yaw: number }
 
 export interface Dressing {
   readonly speleos: readonly Speleo[];
   readonly drips: readonly Drip[];
+  /** The ladders of a mine's winzes. */
+  readonly ladders: readonly Ladder[];
   readonly streams: readonly Stream[];
   readonly pools: readonly Pool[];
   readonly rocks: readonly Rock[];
@@ -189,7 +203,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
       if (roomAround(p.x, p.fl, p.z, r) < po.depth + 0.8) continue;
       const ring = ringFloor(p.x, p.fl, p.z, r);
       if (!ring || ring.hi - ring.lo > po.bank || !brickThere(col(p.x), Math.floor((ring.lo - po.depth - 1 - oy) / step), row(p.z))) continue;
-      const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2, r * 0.33);
+      const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2.4, r * 0.38);
       bowl(p.x, top, p.z, r, depth);
       if (sump) lid(p.x, p.z, p.tx, p.tz, half, r + BEACH, top);
       // Like a stream's channel, the pond keeps silt, rocks and stones out of its bowl.
@@ -421,7 +435,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
         const thin = lrng.chance(0.3);
         speleos.push(thin
           ? { kind: 'straw', x, z, y0: top - len, y1: top, rb: 0.012, rt: 0.035, waist: 1, dead: false, glaze: true }
-          : { kind: 'stalactite', x, z, y0: top - len, y1: top, rb: 0.02, rt: Math.max(0.05, 0.05 + 0.12 * len), waist: 0.8, dead: false, glaze: true });
+          : { kind: 'stalactite', x, z, y0: top - len, y1: top, rb: 0.02, rt: Math.max(0.06, 0.06 + 0.16 * len), waist: 0.8, dead: false, glaze: true });
         n++;
       }
     }
@@ -541,6 +555,16 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
   const { stones, crystals } = scatter();
   // --- a mine's timber, rails and carts ---
-  const fittings = block.rock.mine ? fitMine(sk.conduits, block.rock.mine, spanAt, rng.fork('fittings')) : [];
-  return { speleos, drips, streams, pools, rocks, stones, crystals, fittings, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
+  const ladders: Ladder[] = [];
+  for (const c of sk.conduits) if (c.ladder) {
+    // The rails lie on the shaft's floor: the shaft's axis, set down by its radius (square to the axis) and up a hand's width.
+    const a = c.points[0], b = c.points[c.ladder.top], { foot, head } = c.ladder, hor = Math.hypot(b.x - a.x, b.z - a.z), len = Math.hypot(hor, b.y - a.y) || 1, sn = (b.y - a.y) / len, cs = hor / len;
+    const dx = hor > 1e-6 ? (b.x - a.x) / hor : 0, dz = hor > 1e-6 ? (b.z - a.z) / hor : 0, lift = a.B - 0.1;
+    // (The floor's normal points up and back down the slope, (−d sin, cos); the ladder point is the axis point set down by `lift` along it.)
+    const axisAt = (y: number): [number, number] => { const u = (y + cs * lift - a.y) / ((b.y - a.y) || 1); return [a.x + (b.x - a.x) * u + dx * sn * lift, a.z + (b.z - a.z) * u + dz * sn * lift]; };
+    const [x0, z0] = axisAt(foot), [x1, z1] = axisAt(head);
+    ladders.push({ x0, y0: foot, z0, x1, y1: head, z1 });
+  }
+  const fittings = block.rock.mine ? [...fitMine(sk.conduits, block.rock.mine, spanAt, rng.fork('fittings')), ...ladders.flatMap((l) => ladderBoxes(l))] : [];
+  return { speleos, drips, ladders, streams, pools, rocks, stones, crystals, fittings, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
 }

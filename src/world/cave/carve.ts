@@ -46,7 +46,7 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
     if (!lg) return 0;
     let lip = 0;
     for (let k = 0; k < lg.levels; k++) {
-      const at = lg.first + k * lg.rise + 0.18 * ledgeNoise.n3(x / 9, k * 3.7, z / 9), dz = (up - at) / 0.42;
+      const at = lg.first + k * lg.rise + 0.18 * ledgeNoise.n3(x / 9, k * 3.7, z / 9), dz = (up - at) / 0.55;
       if (dz > -1 && dz < 1) lip = Math.max(lip, lg.lip * (1 - dz * dz) ** 2 * smoothstep(0.1, 0.6, 0.5 + 0.5 * ledgeNoise.n3(x / 6 + k * 11, 1.9, z / 6)));
     }
     return lip;

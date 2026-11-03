@@ -8,6 +8,7 @@
 import { Rng, v3norm } from '@futuremagic/core';
 import type { CaveMineDef } from '../../setting/contract';
 import { PartBuilder, type PartMesh } from './parts';
+import type { Ladder } from './dress';
 import type { Conduit } from './skeleton';
 
 /** An oriented box: its middle, its half sizes (`l` along the heading `yaw` tilted up by `pitch`, `h` along the box's up, `w` across), and its colour (0xrrggbb). */
@@ -76,6 +77,21 @@ export function fitMine(conduits: readonly Conduit[], mine: CaveMineDef, spanAt:
       // Ore heaped in it.
       out.push({ x: p.x, y: p.y + 0.82, z: p.z, l: 0.6, h: 0.14, w: f.gauge / 2 - 0.05, yaw, pitch, color: 0x7a5a3c });
     }
+  }
+  return out;
+}
+
+/** A winze's ladder as boxes (K8): two rails and a rung every `RUNG` metres, lying on the shaft's floor from the foot to the head. */
+const RUNG = 0.34, RAIL = 0.28;
+export function ladderBoxes(l: Ladder): Box[] {
+  const dx = l.x1 - l.x0, dy = l.y1 - l.y0, dz = l.z1 - l.z0, hor = Math.hypot(dx, dz), len = Math.hypot(hor, dy);
+  if (len < 1 || hor < 1e-3) return [];
+  // Across the ladder: horizontal, at right angles to the way up the slope.
+  const tx = -dz / hor, tz = dx / hor, across = Math.atan2(tz, tx), yaw = Math.atan2(dz, dx), pitch = Math.atan2(dy, hor), out: Box[] = [];
+  for (const sg of [-1, 1]) out.push({ x: (l.x0 + l.x1) / 2 + tx * RAIL * sg, y: (l.y0 + l.y1) / 2, z: (l.z0 + l.z1) / 2 + tz * RAIL * sg, l: len / 2 + 0.3, h: 0.04, w: 0.03, yaw, pitch, color: WOOD[0] });
+  for (let s = RUNG / 2; s < len; s += RUNG) {
+    const u = s / len;
+    out.push({ x: l.x0 + dx * u, y: l.y0 + dy * u, z: l.z0 + dz * u, l: RAIL + 0.03, h: 0.03, w: 0.03, yaw: across, pitch: 0, color: WOOD[1 + (Math.round(s / RUNG) % 3)] });
   }
   return out;
 }
