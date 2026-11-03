@@ -5,12 +5,13 @@
  * the hands and feet are not the clip's but sit on holds on the face (climbHolds.ts), each fixed while the body climbs
  * on past it, a diagonal pair at a time reaching on to the next. The pull-up is @futuremagic/figure's ledge, its puppet.
  */
+import { smoothstep } from '@futuremagic/core';
 import { LadderClimb, type Climber, type LimbGoals } from '@futuremagic/figure';
 import type { Walker } from '../game/walker';
 import type { HeroPuppet } from '../render/hero/HeroView';
 import { limbGoals } from '../render/hero/puppet';
 import { CLIMB_CUTS } from '../render/hero/clips';
-import { HoldSteps, SIZED_FOR, ease, type LimbKey } from './climbHolds';
+import { HoldSteps, SIZED_FOR, type LimbKey } from './climbHolds';
 
 /** The face is this far in front of the walker's body (game/walker.ts OFF_FACE). */
 const FACE = 0.35;
@@ -78,7 +79,7 @@ export class ClimbPose {
       }
       this.ground = null;
       this.grip = Math.min(1, this.grip + dt / GRAB);
-      const e = ease(this.grip);
+      const e = smoothstep(0, 1, this.grip);
       // How fast it climbs now, along the face (right of one facing it) and up it, smoothed.
       const last = this.last;
       if (last && dt > 1e-4) {
@@ -87,7 +88,7 @@ export class ClimbPose {
         this.vu += ((p.y - last.y) / dt - this.vu) * f;
       }
       this.last = { x: p.x, y: p.y, z: p.z };
-      this.holds.step({ p, nx: F.nx, nz: F.nz, face: FACE, k, vs: this.vs, vu: this.vu, dt });
+      this.holds.stepHolds({ p, nx: F.nx, nz: F.nz, face: FACE, k, vs: this.vs, vu: this.vu, dt });
       // The sway of the clip follows the paces, but no quicker than a body can sway (a small body's paces are quick).
       const cycles = this.holds.cycles, step = MAX_RATE * dt;
       this.shown = this.grip < 1 / 60 / GRAB * 2 ? cycles : this.shown + Math.max(-step, Math.min(step, cycles - this.shown));
@@ -128,10 +129,10 @@ export class ClimbPose {
       if (this.climb.active) {
         const c = this.climb.pos;
         if (this.advanceFirst) { this.advanceFirst = false; this.gap.x = this.at.x - c.x; this.gap.y = this.at.y - c.y; this.gap.z = this.at.z - c.z; }
-        const s = ease(Math.max(0, 1 - this.pullT / HAND_OFF));
+        const s = smoothstep(0, 1, Math.max(0, 1 - this.pullT / HAND_OFF));
         this.from.x = c.x + this.gap.x * s; this.from.y = c.y + this.gap.y * s; this.from.z = c.z + this.gap.z * s;
         this.pullPuppet.pose = this.climb.pose;
-        this.pullPuppet.limbs = this.climb.limbs ? this.mix(this.climb.limbs, ease(Math.min(1, this.pullT / HAND_OFF))) : null;
+        this.pullPuppet.limbs = this.climb.limbs ? this.mix(this.climb.limbs, smoothstep(0, 1, Math.min(1, this.pullT / HAND_OFF))) : null;
         return { puppet: this.pullPuppet, pos: this.from, yaw: this.climb.yaw };
       }
     }

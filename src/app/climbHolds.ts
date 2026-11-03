@@ -5,6 +5,7 @@
  * the second pair only once the first has taken hold, so one pair is on the rock (the next lets go as the last takes hold). Pure (no three.js): the pose
  * (climbPose.ts) puts the bones on these.
  */
+import { smoothstep } from '@futuremagic/core';
 
 export interface V3 { x: number; y: number; z: number }
 export type LimbKey = 'L' | 'R' | 'footL' | 'footR';
@@ -54,7 +55,6 @@ export interface Frame {
 export const STILL = 0.08;
 /** How far a reach has got when the other pair may let go. */
 const LANDED = 0.6;
-export const ease = (t: number) => t * t * (3 - 2 * t);
 const v3 = (): V3 => ({ x: 0, y: 0, z: 0 });
 
 export class HoldSteps {
@@ -82,7 +82,7 @@ export class HoldSteps {
 
   /** The cycles done, whole and partly (not wrapped). */
   get cycles(): number {
-    return (this.reached + ease(this.reaching[0] ?? 0) + ease(this.reaching[1] ?? 0)) / 2;
+    return (this.reached + smoothstep(0, 1, this.reaching[0] ?? 0) + smoothstep(0, 1, this.reaching[1] ?? 0)) / 2;
   }
 
   /** Where the limb would be held with the walker where it is now (`out`): its rest place. */
@@ -95,7 +95,7 @@ export class HoldSteps {
   }
 
   /** This frame: the pair furthest behind reaches on once it is further than it may lag; the others stay on their holds. */
-  step(f: Frame): void {
+  stepHolds(f: Frame): void {
     const rest = v3(), speed = Math.hypot(f.vs, f.vu);
     if (!this.started) {
       for (const l of this.limbs) this.restOf(l, f, l.hold);
@@ -135,7 +135,7 @@ export class HoldSteps {
     for (const l of this.limbs) {
       const h = l.hold, r = this.reaching[l.group];
       if (r !== null) {
-        const t = ease(r), lift = l.sizes.lift * f.k * Math.sin(Math.PI * t);
+        const t = smoothstep(0, 1, r), lift = l.sizes.lift * f.k * Math.sin(Math.PI * t);
         h.x = l.from.x + (l.to.x - l.from.x) * t - f.nx * lift;
         h.y = l.from.y + (l.to.y - l.from.y) * t;
         h.z = l.from.z + (l.to.z - l.from.z) * t - f.nz * lift;

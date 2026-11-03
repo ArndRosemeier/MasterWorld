@@ -7,7 +7,7 @@ function climb(k: number, vs: number, vu: number, secs: number, each: (h: HoldSt
   const h = new HoldSteps(), p = { x: 100, y: 50, z: 200 };
   const f = (): Frame => ({ p, nx: 0, nz: 1, face: 0.35, k, vs, vu, dt: 1 / 60 });
   for (let t = 0; t < secs * 60; t++) {
-    h.step(f());
+    h.stepHolds(f());
     each(h, f());
     // Right of one facing +z is -x (the walker's (-nz, nx)).
     p.x += (-1 * vs) / 60;
@@ -80,7 +80,7 @@ test('climb holds: along a face limbs step sideways between holds, not up and do
 
 test('climb holds: standing on the face the limbs stay put and the cycle does not turn', () => {
   const h = new HoldSteps(), p = { x: 0, y: 0, z: 0 };
-  for (let t = 0; t < 120; t++) h.step({ p, nx: 0, nz: 1, face: 0.35, k: 1, vs: 0, vu: 0, dt: 1 / 60 });
+  for (let t = 0; t < 120; t++) h.stepHolds({ p, nx: 0, nz: 1, face: 0.35, k: 1, vs: 0, vu: 0, dt: 1 / 60 });
   assert.equal(h.reached, 0);
   assert.equal(h.phase, 0);
 });
