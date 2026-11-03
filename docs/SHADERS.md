@@ -45,4 +45,4 @@ A guard in `tools/guards/rules.json` lets `positionWorld` and `modelWorldMatrix`
 
 ## Texture units
 
-WebGL 2 promises a fragment shader 16 textures, and a shader that reads more does not link (the land drew white after the roads, MW #155). The land's shader is near the limit (15 in October 2026): a new mask goes into a channel or a half of a texture it already reads (the town's two masks share one, `TOWN_MASKS`), a small table into a uniform array (`CROP_LOOK`). `npm run check:units` (in CI) fails above 16.
+WebGL 2 promises a fragment shader 16 textures, and a shader that reads more does not link (the land drew white after the roads, MW #155). The land's shader is at the limit (16 since November 2026: ambient occlusion reads one texture in every lit shader, `@futuremagic/stage` post.ts): a new mask goes into a channel or a half of a texture it already reads (the town's two masks share one, `TOWN_MASKS`), a small table into a uniform array (`CROP_LOOK`). `npm run check:units` (in CI) fails above 16.
