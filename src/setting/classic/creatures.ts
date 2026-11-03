@@ -119,17 +119,18 @@ export const creatures: readonly CreatureDef[] = [
   // gait). They are meant to awe (Arnd 2026-11-03: "not just a bigger one"): `giant` is how many times the normal animal they are grown, and `length` that
   // times its own (the elk 2.3 m, the tortoise 1.1 m, the wolf 1.15 m, the boar 1.4 m), so an elk stands 8 m at the shoulder with antlers over 14 m, a turtle
   // is a house of a shell, and their blows reach from a head that high. Two are a promise, peaceful and near: a giant elk of the open land and a giant turtle on the strand. They are the great beasts' own
-  // faction, at feud with nobody, and a shy one runs when struck; cornered it fights. The two that hunt live only far out (D29), at the
+  // faction, at feud with nobody, and placid: they take no notice of a hero so small, are afraid of nothing, and fight only once struck (Arnd
+  // 2026-11-03: "they are certainly not afraid"). They walk slowly, as their weight asks. The two that hunt live only far out (D29), at the
   // danger the land there holds, and never below.
   {
     id: 'giant elk', name: 'giant elk', plural: 'giant elk', body: { kind: 'beast', species: 'elk', length: 13.8, color: '#6e5238', giant: 6 },
-    health: 110, armour: 2, defence: 16, speed: 12, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'skittish', wary: 24, morale: 0.5, pack: false, role: 'melee', danger: 14,
+    health: 110, armour: 2, defence: 16, speed: 6, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 14,
     attacks: [{ name: 'antlers', damage: [6, 12], kind: 'pierce', reach: 3.5, time: 3, prowess: 30 }],
     loot: 'giant-elk', tell: 'Antlers like a dead tree above the grass, and the grass does not move for the wind.',
   },
   {
     id: 'giant turtle', name: 'giant turtle', plural: 'giant turtles', body: { kind: 'beast', species: 'turtle', length: 14, color: '#5a6a40', giant: 12.7, radius: 6.2 },
-    health: 140, armour: 7, defence: 6, speed: 2.4, senses: { sight: 30, hearing: 30 }, faction: 'great', temper: 'skittish', wary: 12, morale: 0.7, pack: false, role: 'melee', danger: 12,
+    health: 140, armour: 7, defence: 6, speed: 1.4, senses: { sight: 30, hearing: 30 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 12,
     attacks: [{ name: 'beak', damage: [5, 10], kind: 'bite', reach: 2.4, time: 3.5, prowess: 24 }],
     loot: 'giant-turtle', tell: 'A boulder by the water that is, on a closer look, breathing.',
   },

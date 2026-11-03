@@ -23,6 +23,7 @@ import { ROCK_STRIDE, rockPlacement } from '../../src/world/rocks';
 import { Terrain } from '../../src/world/terrain';
 import { caveMouth, mouthOffGround, siteInCliff } from '../../src/world/dungeon/caveMouth';
 import { groundIn } from '../../src/world/dungeon/site';
+import { feetOn } from './creatureFeet';
 
 /** Off the mesh by more than this (m), the hero is not on what is drawn: the check fails. */
 const LIMIT = 0.01;
@@ -30,6 +31,8 @@ const LIMIT = 0.01;
 const REACH = 1;
 /** Cave mouths tried round a square's middle: a site every `MOUTH_GRID` m out to `MOUTH_REACH` m, four ways round, the first `MOUTHS` that stand in a cliff. */
 const MOUTH_GRID = 24, MOUTH_REACH = 192, MOUTHS = 8;
+/** Creatures' feet: tried at `FEET` points of each square, at these sizes (1: a wolf, up to 14: the giants); a foot may sink at most this share of the size. */
+const FEET = 24, SIZES = [1, 6, 14], SINK = 0.02;
 /** A mouth's rock hangs over the drawn ground or sinks into it by more than this area (m²): the check fails. */
 const MOUTH_LIMIT = 1;
 
@@ -113,6 +116,17 @@ for (const name of seeds) {
     }
     const sum = (f: (m: (typeof tried)[number]) => number) => tried.reduce((a, m) => a + f(m), 0);
     console.log(`  cave mouths: ${tried.length} in cliffs, rock off the drawn ground: ${sum((m) => m.hover + m.buried).toFixed(1)} m² (on the land's own height it would be ${sum((m) => m.wild).toFixed(1)} m²)`);
+    // Creatures' feet: Actors' foot pass on the drawn ground, a synthetic animal of each size (no model files) at points all over the square.
+    for (const size of SIZES) {
+      let sunk = 0, floated = 0, at = '';
+      for (let k = 0; k < FEET; k++) {
+        const x = cx - 150 + ((k * 37.31) % 300), z = cz - 150 + ((k * 61.7) % 300), r = feetOn((px, pz) => g.footing(px, pz), x, z, k * 0.7, size, k);
+        if (r.sunk / size > sunk) { sunk = r.sunk / size; at = `?seed=${name}&pos=${x.toFixed(0)},${z.toFixed(0)}`; }
+        floated = Math.max(floated, r.floating / size);
+      }
+      if (sunk > SINK) failed = true;
+      console.log(`  feet of size ${size}: ${FEET} points, worst foot sunk ${(sunk * 100).toFixed(1)}% of its size${sunk > SINK ? ` FAIL ${at}` : ''}, most floating ${(floated * 100).toFixed(0)}%`);
+    }
   }
   console.log(`  (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
 }

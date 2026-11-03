@@ -156,6 +156,8 @@ export class CreatureView {
       } else if (animal) {
         body = animal;
         v.group.add(animal.place);
+        // Its feet stand on the drawn ground, whatever its size, deform or clip (Actors' foot pass); the centre point's height only places the body.
+        animal.lib?.setGround(ground);
       } else {
         let m = models.get(c.def.id);
         if (!m) { m = new CritterModel(speciesFor(c.def, seed), critterMaterials()); models.set(c.def.id, m); }
@@ -221,6 +223,7 @@ export class CreatureView {
         const want: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
         const doing = s.look.pick(dt, want, dead || blowT < 1 || hurtT < 1) as AnimalDoing;
+        this.near = Y;
         poseAnimal(s.body, X, Y, Z, yaw, doing, speed, dt, fresh);
         // A giant's blow-back and limp are a giant's: its stride and size, not a wolf's (the tilt stays small, a heavy body tips less).
         const big = c.def.body.kind === 'beast' && c.def.body.giant ? Math.max(1, c.def.body.length / 1.5) : 1;

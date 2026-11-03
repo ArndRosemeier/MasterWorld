@@ -1063,8 +1063,8 @@ export interface CreatureDef {
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };
-  /** skittish: keeps away unless cornered or many; hostile: attacks on sight (D64: a humanoid's `stance` says what it wants first). */
-  readonly temper: 'skittish' | 'hostile';
+  /** skittish: keeps away unless cornered or many; hostile: attacks on sight (D64: a humanoid's `stance` says what it wants first); placid: takes no notice of the hero at all, afraid of nothing, and defends itself only once struck (the peaceful giants, D67). */
+  readonly temper: 'skittish' | 'hostile' | 'placid';
   /** Who it belongs to (D65): a people's id or one of `factions.others`. It never changes. */
   readonly faction: string;
   /** What a humanoid wants of the hero before any blow (D64, phase R); every humanoid has one, beasts none (they only fight or flee). */

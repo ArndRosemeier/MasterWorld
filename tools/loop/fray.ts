@@ -109,7 +109,10 @@ function holdup(name: string): string | null {
   return null;
 }
 
-/** The giants (phase M, D67): a giant elk and a giant turtle walk off from a hero and nobody hunts them; a giant boar far out comes at the hero. */
+/**
+ * The giants (phase M, D67): the peaceful ones (a giant elk, a giant turtle) take no notice of a hero who walks right up to them, are
+ * not afraid and strike no blow, nor does anyone strike them; struck, the elk fights back and does not run. A giant boar far out comes at the hero.
+ */
 function giants(name: string): string | null {
   const seed = parseSeed(name);
   const flat: Land = { height: () => 0, waterDepth: () => 0, blocked: () => false };
@@ -120,33 +123,37 @@ function giants(name: string): string | null {
     return d;
   };
   const hero = (x: number): Quarry => ({ x, y: 0, z: 0, noise: 0.6, light: 0, alive: true, guard: { defence: 20, armour: 1, open: false } });
-  // The peaceful: a hero walks up to them, wolves lie beside the elk; no blow is struck by or at a great beast, and the elk walks away.
+  // The peaceful: a hero walks right up to them, wolves lie beside the elk; no blow is struck by or at a great beast, none notices, shies or flees.
   const elk = den('giant elk', 1, 0), turtle = den('giant turtle', 1, 60), wolves = den('wolf', 3, 9);
   elk.neighbours = [wolves]; wolves.neighbours = [elk];
-  let blows = 0, fled = 0;
-  const a0 = elk.creatures[0].x;
+  let blows = 0, noticed = 0;
   for (let t = 0; t < 120; t += DT) {
-    const at = Math.max(5, 40 - t * 0.6);
-    for (const e of [...elk.step(DT, hero(at)), ...turtle.step(DT, hero(60 + Math.max(5, 40 - t * 0.6))), ...wolves.step(DT, far)]) {
+    const at = Math.max(1, 40 - t * 0.6);
+    for (const e of [...elk.step(DT, hero(at)), ...turtle.step(DT, hero(60 + Math.max(1, 40 - t * 0.6))), ...wolves.step(DT, far)]) {
       if (e.kind === 'swing' && (e.who.def.faction === 'great' || e.who.def.faction === 'predators')) blows++;
-      if (e.kind === 'flee' && e.who.def.faction === 'great') fled++;
+      if ((e.kind === 'flee' || e.kind === 'notice' || e.kind === 'alarm') && e.who.def.faction === 'great') noticed++;
     }
+    for (const c of [...elk.creatures, ...turtle.creatures]) if (c.state !== 'idle') return `${c.def.name} was ${c.state} with a hero beside it (${t.toFixed(0)} s)`;
   }
   if (blows) return `a great beast was struck at or struck: ${blows} blows`;
-  if (!fled) return 'the giant elk and turtle never walked off from the hero';
-  if (Math.abs(elk.creatures[0].x - a0) < 1) return 'the giant elk stayed put';
+  if (noticed) return `the peaceful giants took notice of a hero: ${noticed} events`;
+  // Struck, the elk fights back (it does not run), and keeps on until it is hurt past its health.
+  const giant = elk.creatures[0];
+  elk.wound(giant, { outcome: 'hit', damage: 3 }, { x: giant.x + 3, y: 0, z: 0 });
+  for (let t = 0; t < 4; t += DT) elk.step(DT, hero(giant.x + 3));
+  if (giant.state !== 'fight') return `the struck giant elk did not fight back (${giant.state})`;
   // The hunters: a giant boar notices a hero close by and fights.
   const boar = den('giant boar', 1, 500);
   let fought = false;
   for (let t = 0; t < 30 && !fought; t += DT) { boar.step(DT, hero(510)); fought = boar.fighting.length > 0; }
   if (!fought) return 'the giant boar never went for the hero';
-  console.log(`  ${name}: the giant elk and turtle walked off from a hero (${fled} flights), the wolves beside them struck no blow at the elk; the giant boar went for the hero`);
+  console.log(`  ${name}: a hero walked up to the giant elk and turtle and they took no notice; struck, the elk fought back; the giant boar went for the hero`);
   return null;
 }
 
 let failed = 0;
 for (const name of seeds) {
-  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a holdup on the road', holdup], ['giants: the peaceful walk off, the boar fights', giants]] as const) {
+  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a holdup on the road', holdup], ['giants: the peaceful take no notice, the struck one fights, the boar hunts', giants]] as const) {
     console.log(`== ${name}: ${what}`);
     const why = run(name);
     if (why) { console.log(`FAILED: ${why}`); failed++; }

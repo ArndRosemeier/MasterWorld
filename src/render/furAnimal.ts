@@ -31,10 +31,17 @@ export async function furActor(animal: Animal<object, object>, renderer: WebGPUR
 }
 
 /**
+ * How fast a body grown `grown` times plays its clips (1 = as drawn): the weight of a giant is seen in its slowness. A pendulum would give
+ * 1 / sqrt(grown), and that read as a big animal in a hurry (Arnd 2026-11-03: "animates too fast"); a giant's breath, its head turning and its
+ * every step take far longer than that, `grown` to the power -0.8 (a body 6 times as big at 0.24, 13 times at 0.13).
+ */
+export function stepRate(grown: number): number { return Math.pow(Math.max(1, grown), -0.8); }
+
+/**
  * The clip playing at its own pace when the animal goes `pace` m/s (none: as it is), within half to 1.6 times. A body grown `grown` times
- * (a giant) strides that much farther at the same step and steps slower by its square root: its pace is `grown` times, its steps slow.
+ * (a giant) strides that much farther at the same step, so its pace is `grown` times, and it plays its clips at `stepRate`.
  */
 export function gaitPace(actor: ThreeActor, speed: number, pace: number | undefined, grown = 1): void {
-  const a = actor.currentAction, g = 1 / Math.sqrt(Math.max(1, grown));
+  const a = actor.currentAction, g = stepRate(grown);
   if (a) a.timeScale = pace ? Math.min(1.6 * g, Math.max(0.5 * g, speed / (pace * Math.max(1, grown)))) : g;
 }

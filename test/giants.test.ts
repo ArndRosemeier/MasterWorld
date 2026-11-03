@@ -36,7 +36,9 @@ test('the giants are in the setting: their own creatures, with loot that fits, a
 test('two giants are peaceful and near, as a promise; two hunt and live only where the land holds their danger (D29)', () => {
   for (const id of ['giant elk', 'giant turtle']) {
     const d = def(id);
-    assert.equal(d.temper, 'skittish', `${id} does not attack on sight`);
+    assert.equal(d.temper, 'placid', `${id} takes no notice of the hero, and is afraid of nothing`);
+    assert.equal(d.morale, 1, `${id} never runs from a fight it is in`);
+    assert.ok(!d.wary, `${id} keeps no flight distance`);
     assert.ok(d.danger <= 18, `${id} is no danger to a fresh hero`);
     assert.equal(d.faction, 'great', `${id}: the great beasts are at feud with nobody`);
   }
