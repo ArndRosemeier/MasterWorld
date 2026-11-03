@@ -413,13 +413,17 @@ export class Walker {
     return true;
   }
 
-  /** Onto the ladder at the foot of a winze, when facing up it (dx, dz: the way the body pushes); whether it got on. */
+  /**
+   * Onto the ladder at the foot of a winze, when facing up it or facing its foot (dx, dz: the way the body pushes); whether it got on. The hero comes in
+   * from the drift beside the foot as well as along the slope; the climb then draws the body onto the rails (a step to the side, seen).
+   */
   private boardLadder(dx: number, dz: number): boolean {
     const p = this.pos, g = this.world.ladderAt?.(p.x, p.y, p.z);
-    if (!g || !g.foot || g.nx * dx + g.nz * dz < 0.5) return false;
+    if (!g || !g.foot) return false;
+    const tx = g.x - p.x, tz = g.z - p.z, tl = Math.hypot(tx, tz) || 1;
+    if (g.nx * dx + g.nz * dz < 0.5 && (tx * dx + tz * dz) / tl < 0.5) return false;
     this.mode = 'climb';
     this.face.nx = g.nx; this.face.nz = g.nz; this.face.from = p.y;
-    p.x = g.x - g.nx * OFF_FACE; p.z = g.z - g.nz * OFF_FACE;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = Math.atan2(-g.nx, -g.nz);
     this.pushing = 0;
@@ -493,7 +497,8 @@ export class Walker {
     const rung = ladder && this.world.ladderAt?.(p.x, y, p.z);
     if (rung) {
       F.nx = rung.nx; F.nz = rung.nz;
-      p.x = rung.x - rung.nx * OFF_FACE; p.z = rung.z - rung.nz * OFF_FACE; p.y = y;
+      const k = damp(14, dt);
+      p.x += (rung.x - rung.nx * OFF_FACE - p.x) * k; p.z += (rung.z - rung.nz * OFF_FACE - p.z) * k; p.y = y;
       this.yaw = Math.atan2(-rung.nx, -rung.nz);
       return;
     }
