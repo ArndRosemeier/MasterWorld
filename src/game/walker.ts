@@ -110,7 +110,8 @@ export const WALK: WalkSpec = {
   /** Ground steeper than this (rise over run) cannot be walked up. */
   maxSlope: 1.25,
   grip: 12,
-  climb: 0.85,
+  /** Metres a second up a face: the pace of the motion-capture climb (render/hero/clips.ts CLIMB_CUTS), a step a rung or so, two a second or a little more. */
+  climb: 0.6,
 };
 
 export class Walker {

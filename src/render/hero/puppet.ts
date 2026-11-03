@@ -19,6 +19,11 @@ export interface HeroPuppet {
    * plays it backwards), `rise` the metres the body gains over one cycle of the clip.
    */
   readonly climbRate?: { readonly v: number; readonly rise: number };
+  /**
+   * A wall the body climbs (world x, z of a point on it, `nx`, `nz` the way into it): hands and feet are held on it, wherever
+   * the clip puts them, the hands `hand` metres and the feet `foot` metres in front of it, by weight `w`.
+   */
+  readonly wall?: { readonly x: number; readonly z: number; readonly nx: number; readonly nz: number; readonly w: number; readonly hand: number; readonly foot: number };
 }
 
 const goal = (): LimbGoal => ({ p: new Vector3(), w: 0 });

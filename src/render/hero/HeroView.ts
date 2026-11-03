@@ -446,7 +446,28 @@ export class HeroView {
   /** A scene's pose over the clips, and hands and feet onto its goals (moved into the scene's frame). */
   private puppetOn(p: HeroPuppet): void {
     const rig = this.rigOf();
-    if (rig && applyPuppet(rig, this.object, this.goals, p)) this.rigged = true;
+    if (rig && applyPuppet(rig, this.object, this.goals, p.wall ? { pose: null, limbs: this.holdWall(p.wall) } : p)) this.rigged = true;
+  }
+
+  private readonly wallLimbs: LimbGoals = limbGoals();
+
+  /** Where hands and feet go to lie on a wall: each where the clip has it now, moved along the wall's normal onto it. */
+  private holdWall(w: NonNullable<HeroPuppet['wall']>): LimbGoals {
+    const g = this.wallLimbs, bones = this.front.actor.bones;
+    this.object.updateMatrixWorld(true);
+    for (const [key, name, off] of [['L', 'hand_l', w.hand], ['R', 'hand_r', w.hand], ['footL', 'foot_l', w.foot], ['footR', 'foot_r', w.foot]] as const) {
+      const goal = g[key]!, bone = bones.find((b) => b.name === name);
+      goal.w = bone ? w.w : 0;
+      if (!bone) continue;
+      ORIGIN.toWorld(bone.getWorldPosition(goal.p));
+      // Into the wall by s now; it should be -off.
+      const d = -off - ((goal.p.x - w.x) * w.nx + (goal.p.z - w.z) * w.nz);
+      goal.p.x += w.nx * d;
+      goal.p.z += w.nz * d;
+    }
+    g.curl = { L: 1.25, R: 1.25 };
+    g.curlW = w.w;
+    return g;
   }
 
   /**
