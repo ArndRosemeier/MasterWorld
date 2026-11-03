@@ -41,6 +41,9 @@ export class ClimbPose {
   private pullT = 0;
   private readonly from: P3 = { x: 0, y: 0, z: 0 };
   private readonly at: P3 = { x: 0, y: 0, z: 0 };
+  /** Where the body was drawn before taking hold (the walker's jump onto the face is eased from there), and the gap left to close. */
+  private ground: P3 | null = null;
+  private readonly grab: P3 = { x: 0, y: 0, z: 0 };
   /** The ledge puppet's first frame still to come, and the gap between where the climb left the body and where it starts. */
   private advanceFirst = false;
   private readonly gap: P3 = { x: 0, y: 0, z: 0 };
@@ -49,11 +52,19 @@ export class ClimbPose {
   /** The puppet for the cycle: no pose over the clip, hands and feet laid on the wall; the clip is the climb. */
   private readonly puppet: HeroPuppet = { pose: null, limbs: null, clip: CLIMB_CUTS[0].clip, climbRate: this.cycle, wall: this.wall };
 
+  /** The body is on the ground (not on a face) at `p` this frame: where a grab starts from. */
+  onGround(p: P3): void {
+    this.ground = this.ground ?? { x: 0, y: 0, z: 0 };
+    this.ground.x = p.x; this.ground.y = p.y; this.ground.z = p.z;
+  }
+
   /** This frame's pose for a walker on a face (and where the body goes), or null when it is not on one. */
   onFace(w: Walker, body: Climber, dt: number): { readonly puppet: HeroPuppet; readonly pos: P3; readonly yaw: number } | null {
     const F = w.face, p = w.pos;
     if (w.mode === 'climb') {
       this.pulling = false;
+      if (this.grip === 0 && this.ground) { this.grab.x = this.ground.x - p.x; this.grab.y = this.ground.y - p.y; this.grab.z = this.ground.z - p.z; }
+      this.ground = null;
       this.grip = Math.min(1, this.grip + dt / GRAB);
       const e = this.grip * this.grip * (3 - 2 * this.grip);
       // How fast it climbs now (up: positive), smoothed, along the face counted in part.
@@ -67,10 +78,12 @@ export class ClimbPose {
       // The cycle's metres: its rise in hip heights, for this body's hips.
       this.cycle.v = this.v;
       this.cycle.rise = CLIMB_CUTS[0].rise * Math.max(body.hipHeight, MIN_HIP);
-      const k = body.hipHeight / PACK_HIP, back = FACE - HIPS * k * e;
+      const k = body.hipHeight / PACK_HIP, back = (FACE - HIPS * k) * e;
       const wall = this.wall;
       wall.x = p.x + F.nx * FACE; wall.z = p.z + F.nz * FACE; wall.nx = F.nx; wall.nz = F.nz; wall.w = e;
-      this.from.x = p.x + F.nx * back; this.from.y = p.y; this.from.z = p.z + F.nz * back;
+      // The walker jumps onto the face at the grab (up, and in): the body comes from where it stood.
+      const rest = 1 - e;
+      this.from.x = p.x + F.nx * back + this.grab.x * rest; this.from.y = p.y + this.grab.y * rest; this.from.z = p.z + F.nz * back + this.grab.z * rest;
       return { puppet: this.puppet, pos: this.from, yaw: w.yaw };
     }
     this.grip = 0;

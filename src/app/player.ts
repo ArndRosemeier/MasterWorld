@@ -259,6 +259,7 @@ export class Player {
     }
     if (!hero) return;
     if (this.hideHero) { hero.visible = false; return; }
+    if (walker.mode !== 'climb' && walker.mode !== 'pull') this.climbing.onGround(walker.pos);
     const ridden = riding && horses ? horses.saddle(this.steeds.indexOf(riding), this.seat) : null;
     if (riding && ridden) {
       // Seated on the saddle: pos is the point under it, the seat its height over the horse's ground.
