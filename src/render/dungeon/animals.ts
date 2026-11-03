@@ -18,7 +18,7 @@ import { loadLibraryAnimal, type LibraryAnimal, type ThreeActor } from '@actors/
 import { LIBRARY_KINDS, giantPlan, libraryClip, type AnimalDoing, type LibraryKind } from '../libraryAnimals';
 import { hash2f } from '@futuremagic/core';
 import { deformCoat, deformRanges, deformShape } from '@actors/animal';
-import { furActor, gaitPace } from '../furAnimal';
+import { furActor, gaitPace, stepRate } from '../furAnimal';
 
 export type { AnimalDoing };
 
@@ -262,8 +262,8 @@ export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, 
     // The same one-shot again (already running, so not restarted by play): from its start.
     if (a && ONCE.includes(doing)) a.time = 0;
   }
-  // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times (of a giant's slow step, `gaitRate`).
-  const a = lib.currentAction, g = lib.gaitRate;
+  // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times (of a giant's slow step, `stepRate`).
+  const a = lib.currentAction, g = stepRate(lib.deform?.scale ?? 1);
   if (a) {
     const own = (doing === 'walk' || doing === 'run') && b.doing === doing ? lib.speedOf(a.getClip().name) * lib.object.scale.x : 0;
     a.timeScale = own > 0 ? Math.min(1.6 * g, Math.max(0.5 * g, speed / own)) : g;

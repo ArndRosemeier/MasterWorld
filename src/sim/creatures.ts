@@ -438,6 +438,8 @@ export class Den {
       c.lost += dt;
     }
     if (this.peace) { if (c.state === 'alert' || c.state === 'warn') { c.state = 'idle'; c.band = -1; } return; }
+    // A placid one (a peaceful giant) takes no notice of a hero so small: it neither looks up nor shies; only a blow makes it fight (struck).
+    if (c.def.temper === 'placid' && c.state !== 'fight') return;
     // Left a hero it could not reach: it keeps to itself a while.
     if (c.spurn > 0 && c.state === 'idle') return;
     const noticed = (c.state === 'idle' || c.state === 'alert' || c.state === 'brawl') && c.aware >= 1 && !this.keepsOff(c, q);
@@ -712,6 +714,7 @@ export class Den {
   private quarrel(c: Creature): void {
     if (!this.feud || c.eye > 0 || c.spurn > 0 || c.winded > 0 || (c.state !== 'idle' && c.state !== 'alert')) return;
     c.eye = LOOK;
+    if (c.def.temper === 'placid') return;
     if (c.def.temper === 'skittish') {
       if (this.dread(c, null)) this.toFlee(c, this.walked);
       return;
