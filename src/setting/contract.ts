@@ -387,8 +387,8 @@ export interface CaveDressDef {
   readonly rocks: { readonly along: number; readonly perHall: readonly [number, number]; readonly size: readonly [number, number] };
   /** The stream of the live level: its width (least, most) and how deep the bed is cut, and the most it is cut into a floor that stands higher over the water (where the floor stands higher there is no stream); pools along it (per 100 m) and their depth. */
   readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number; readonly cutMost: number;
-    /** A plunge pool deep enough to swim in (K6, the first water of the sump): how many in 100 m of way, their depth (m) the least half-width of the way it lies in (it fills half of it, so a bank is left) and the most the floor round its rim may vary (m: a bank higher than a step cannot be climbed out onto). */
-    readonly ponds: { readonly chance: number; readonly per100: number; readonly depth: number; readonly wide: number; readonly bank: number };
+    /** A plunge pool deep enough to swim in (K6, the first water of the sump): how many in 100 m of way, their depth (m) the least half-width of the way it lies in (it fills half of it, so a bank is left) and the most the floor round its rim may vary (m: a bank higher than a step cannot be climbed out onto); a pond whose radius is `sumpWide` or more is a sump (rock over its middle down to the water, so the hero dives under it) with this chance, `sumpDepth` deep. */
+    readonly ponds: { readonly chance: number; readonly per100: number; readonly depth: number; readonly wide: number; readonly bank: number; readonly sump: number; readonly sumpWide: number; readonly sumpDepth: number };
   };
   /** Drips fall along the cracks that cross a way's roof: chance at each spacing metres along the crack, the drips still running (the rest are dead), the crack's spacing; and drips from the roof away from any crack, per 100 m of way. */
   readonly drips: { readonly chance: number; readonly live: number; readonly spacing: number; readonly scatter: number };

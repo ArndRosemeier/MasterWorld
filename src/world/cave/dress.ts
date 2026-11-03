@@ -46,6 +46,8 @@ export interface Pool {
   readonly r: number;
   /** A pond (the setting's `water.ponds`): cut this deep in the middle, deep enough to swim in. Shallow pools have none. */
   readonly depth?: number;
+  /** A sump: rock closes the way over the pond's middle down to the water, `half` either side of its middle along (tx, tz) (the way's direction); the hero dives under it. */
+  readonly lid?: { readonly tx: number; readonly tz: number; readonly half: number };
 }
 
 /** A fallen rock: an ellipsoid turned by its yaw. */
@@ -156,40 +158,47 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
 
   // --- ponds: standing water deep enough to swim in (K6, the first water of the sump) ---
-  // In a wide, level, high stretch of a way, away from the stream: the floor is cut into a smooth bowl and the water stands at the floor's level
-  // round it, so it fills at most 0.55 of the way's width and a bank is left on both sides.
+  // In a wide, level, high stretch of a way: the floor is cut into a smooth bowl and the water stands at the floor's level round it, so it fills
+  // half of the way's width at most and a bank is left on both sides. A big one may be a sump: rock closes the way over its middle down to the
+  // water, so the hero dives under it (held breath, game/breath.ts) and comes up on the far side.
   const po = d.water.ponds;
   if (po.chance > 0) {
-    const spots: { x: number; z: number; fl: number; hh: number; at: number }[][] = [];
+    const spots: { x: number; z: number; fl: number; hh: number; at: number; tx: number; tz: number }[][] = [];
     for (const c of passages) {
-      const row_: { x: number; z: number; fl: number; hh: number; at: number }[] = [];
+      const row_: { x: number; z: number; fl: number; hh: number; at: number; tx: number; tz: number }[] = [];
       for (let s = 0; s + 1 < c.points.length; s++) {
         const a = c.points[s], b = c.points[s + 1], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 1.1));
         for (let m = 0; m < n; m++) {
           const t = m / n, x = lerp(a.x, b.x, t), z = lerp(a.z, b.z, t), hh = lerp(wayHalf(a), wayHalf(b), t), sp = spanAt(x, lerp(a.y - a.B - a.D, b.y - b.B - b.D, t) + 1, z);
-          if (sp) row_.push({ x, z, fl: sp[0], hh, at: row_.length });
+          if (sp) row_.push({ x, z, fl: sp[0], hh, at: row_.length, tx: 0, tz: 0 });
         }
       }
+      // (The way's direction at each point, from the points either side.)
+      row_.forEach((q, i) => { const a = row_[Math.max(0, i - 2)], b = row_[Math.min(row_.length - 1, i + 2)], l = Math.hypot(b.x - a.x, b.z - a.z) || 1; q.tx = (b.x - a.x) / l; q.tz = (b.z - a.z) / l; });
       spots.push(row_);
     }
     const level = (r: { fl: number }[], i: number, o: number): number => r[Math.max(0, Math.min(r.length - 1, i + o))].fl;
     const found = spots.flatMap((r) => r.filter((p, i) => p.hh >= po.wide && Math.abs(level(r, i, -3) - p.fl) <= 0.35 && Math.abs(level(r, i, 3) - p.fl) <= 0.35 && i >= 3 && i + 3 < r.length));
     const want = Math.round(sk.stats.length / 100 * po.per100 + pondRng.float() * 0.8);
     let made = 0;
-    if (process.env.PD) console.error('found', found.length, 'want', want, 'length', Math.round(sk.stats.length));
     for (let tries = 0; made < want && tries < 80 && found.length; tries++) {
       const p = found.splice(Math.floor(pondRng.float() * found.length), 1)[0], r = Math.min(4.5, p.hh * 0.5);
-      if (pools.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < q.r + r + 1)) { if (process.env.PD) console.error('X near'); continue; }
-      if (roomAround(p.x, p.fl, p.z, r) < po.depth + 0.8) { if (process.env.PD) console.error('X room'); continue; }
+      if (pools.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < q.r + r + 1)) continue;
+      if (roomAround(p.x, p.fl, p.z, r) < po.depth + 0.8) continue;
       const ring = ringFloor(p.x, p.fl, p.z, r);
-      if (process.env.PD) console.error('X ring', ring ? (ring.hi - ring.lo).toFixed(2) : 'null');
       if (!ring || ring.hi - ring.lo > po.bank || !brickThere(col(p.x), Math.floor((ring.lo - po.depth - 1 - oy) / step), row(p.z))) continue;
-      const top = ring.lo - 0.05;
-      bowl(p.x, top, p.z, r, po.depth);
+      const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2, r * 0.33);
+      bowl(p.x, top, p.z, r, depth);
+      if (sump) lid(p.x, p.z, p.tx, p.tz, half, r + BEACH, top);
       // Like a stream's channel, the pond keeps silt, rocks and stones out of its bowl.
       const reach = r + BEACH + 0.6, i0 = Math.max(0, col(p.x - reach)), i1 = Math.min(nx - 1, col(p.x + reach)), k0 = Math.max(0, row(p.z - reach)), k1 = Math.min(nz - 1, row(p.z + reach));
       for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) chan[i + nx * k] = Math.min(chan[i + nx * k], Math.hypot(ox + i * step - p.x, oz + k * step - p.z) - r);
-      pools.push({ x: p.x, y: top, z: p.z, r, depth: po.depth });
+      // A stream through it comes in at the pond's level: its surface eases to the pond's over the last few metres (no step where the two waters meet).
+      for (const sm of streams) for (const q of sm.pts as [number, number, number, number][]) {
+        const dd = Math.hypot(q[0] - p.x, q[2] - p.z);
+        if (dd < r + 4) q[1] = lerp(top, q[1], smooth01((dd - r) / 4));
+      }
+      pools.push({ x: p.x, y: top, z: p.z, r, depth, ...(sump ? { lid: { tx: p.tx, tz: p.tz, half } } : {}) });
       made++;
     }
   }
@@ -250,6 +259,27 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     });
     keep();
     for (const p of mine) if (streams.some((s) => s.pts.some((q) => q[0] === p.x && q[2] === p.z))) pools.push(p);
+  }
+  /** Does the way run straight through (x, z) along (tx, tz) for `len` either side: air, a floor within a step of `lo` (the bank) and 3 m of head room, over a path 1.6 m wide? (A sump needs a clear dive.) */
+  function runsStraight(x: number, z: number, tx: number, tz: number, len: number, lo: number): boolean {
+    for (let u = -len; u <= len; u += 0.6) for (const v of [-0.8, 0, 0.8]) {
+      const sp = spanAt(x + u * tx - v * tz, lo + 0.3, z + u * tz + v * tx);
+      if (!sp || sp[0] < lo - 0.8 || sp[0] > lo + 1.2 || sp[1] - sp[0] < 3) return false;
+    }
+    return true;
+  }
+  /** Close a way with rock from the water's surface up (a sump's lid): a box `half` either side of (x, z) along (tx, tz) and `across` either side across it, from `top` up. */
+  function lid(x: number, z: number, tx: number, tz: number, half: number, across: number, top: number): void {
+    const R = Math.hypot(half, across) + step, i0 = Math.max(0, col(x - R)), i1 = Math.min(nx - 1, col(x + R)), k0 = Math.max(0, row(z - R)), k1 = Math.min(nz - 1, row(z + R));
+    const j0 = Math.max(0, Math.floor((top - 1 - oy) / step)), j1 = ny - 1;
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+      const X = ox + i * step - x, Z = oz + k * step - z, u = X * tx + Z * tz, v = -X * tz + Z * tx, qu = Math.abs(u) - half, qv = Math.abs(v) - across;
+      for (let j = j0; j <= j1; j++) {
+        if (!brickThere(i, j, k)) continue;
+        const qy = top - (oy + j * step), d3 = Math.hypot(Math.max(qu, 0), Math.max(qv, 0), Math.max(qy, 0)) + Math.min(Math.max(qu, qv, qy), 0);
+        if (d3 < sampleOf(f, i, j, k)) setSample(f, i, j, k, Math.max(-3, d3));
+      }
+    }
   }
   /**
    * Cut a pond: a bowl of radius r, `depth` deep in the middle, its slope gentlest at the rim and the bottom, and past the rim a beach that

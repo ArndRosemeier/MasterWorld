@@ -8,13 +8,13 @@ import { formedWorld } from '../src/game/formedWorld';
 import { Walker } from '../src/game/walker';
 import { caveWater } from '../src/world/cave/water';
 import { floorUnder, waterMesh } from '../src/world/cave/waterMesh';
-import type { BrickField } from '../src/world/dungeon/rockMesh';
+import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 import { caves, formedCave } from './support/formedCave';
 
 const { bed, poolDepth, ponds } = caves.dress.water;
 const { c, reading: R, dressing } = formedCave(1, 'thin-bedded');
 const field = c.field as BrickField, floor = floorUnder(field), water = caveWater(dressing, bed, poolDepth);
-const pond = dressing.pools.filter((p) => p.depth !== undefined).sort((a, b) => b.r - a.r)[0];
+const pond = dressing.pools.filter((p) => p.depth !== undefined && !p.lid).sort((a, b) => b.r - a.r)[0];
 
 test('cave ponds: a wide level stretch of a way holds a pond deep enough to swim in, sunk into the floor', () => {
   assert.ok(pond, 'a pond');
@@ -67,4 +67,39 @@ test('cave ponds: the water mesh draws the pond deep over its middle, whatever s
     if (Math.hypot(m.position[i * 3] - pond.x, m.position[i * 3 + 2] - pond.z) < pond.r * 0.5) deepest = Math.max(deepest, m.uv[i * 2]);
   }
   assert.ok(deepest >= 1.4, `${deepest.toFixed(2)} m deep in the middle`);
+});
+
+// A sump: a pond with rock over its middle down to the water (K6); the hero dives under it with the breath held.
+test('cave sumps: rock closes the way over a pond down to the water, the reader links the two sides by a swim, and the real walker dives through', () => {
+  const { c: sc, reading: SR, dressing: sd } = formedCave(4, 'massive'), sf = sc.field as BrickField, sw = caveWater(sd, bed, poolDepth);
+  const sump = sd.pools.find((p) => p.lid !== undefined);
+  assert.ok(sump?.lid, 'a sump');
+  const { tx, tz, half } = sump.lid, along = (x: number, z: number): number => (x - sump.x) * tx + (z - sump.z) * tz;
+  // The lid is solid over the middle at the water's surface; the water is open under it.
+  assert.ok(fieldAt(sf, sump.x, sump.y + 0.5, sump.z, -1) < 0, 'rock over the middle');
+  assert.ok(fieldAt(sf, sump.x, sump.y - 1, sump.z, -1) > 0.4, 'water under it');
+  // The reader: swim links from one side of the lid to the other.
+  const links: [number, number][] = [];
+  for (let a = 0; a < SR.count; a++) for (let e = SR.edgeStart[a]; e < SR.edgeStart[a + 1]; e++) {
+    const b = SR.edgeTo[e];
+    if (SR.edgeKind[e] === 3 && Math.hypot(SR.x[a] - sump.x, SR.z[a] - sump.z) < sump.r + 2 && along(SR.x[a], SR.z[a]) < -half && along(SR.x[b], SR.z[b]) > half) links.push([a, b]);
+  }
+  assert.ok(links.length >= 5, `${links.length} swim links under the lid`);
+  // The walker dives from one end of a link to the other, the head under for a few seconds only (the breath lasts 40 s).
+  const tries = links.filter((_, n) => n % Math.max(1, Math.floor(links.length / 6)) === 0).slice(0, 6), world = formedWorld(sf, undefined, sw);
+  let through = 0;
+  for (const [a, b] of tries) {
+    const w = new Walker(world);
+    w.place(SR.x[a], SR.z[a], SR.y[a] + 0.02);
+    let under = 0;
+    for (let s = 0; s < 60 * 20; s++) {
+      const ax = SR.x[b] - w.pos.x, az = SR.z[b] - w.pos.z, far = Math.hypot(ax, az);
+      if (far < 0.7) break;
+      const here = along(w.pos.x, w.pos.z), diving = here < half + 1;
+      w.step({ forward: 1, strafe: 0, heading: Math.atan2(-ax, -az), walk: false, up: !diving && far < 3, down: diving && w.mode === 'swim' && here > -half - 2 }, 1 / 60);
+      if (w.headUnder) under++;
+    }
+    if (Math.hypot(SR.x[b] - w.pos.x, SR.z[b] - w.pos.z) < 0.9 && under > 10 && under < 60 * 10) through++;
+  }
+  assert.ok(through >= tries.length * 0.6, `${through} of ${tries.length} dived through`);
 });
