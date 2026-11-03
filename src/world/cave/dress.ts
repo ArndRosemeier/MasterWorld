@@ -203,7 +203,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
       if (roomAround(p.x, p.fl, p.z, r) < po.depth + 0.8) continue;
       const ring = ringFloor(p.x, p.fl, p.z, r);
       if (!ring || ring.hi - ring.lo > po.bank || !brickThere(col(p.x), Math.floor((ring.lo - po.depth - 1 - oy) / step), row(p.z))) continue;
-      const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2, r * 0.33);
+      const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2.4, r * 0.38);
       bowl(p.x, top, p.z, r, depth);
       if (sump) lid(p.x, p.z, p.tx, p.tz, half, r + BEACH, top);
       // Like a stream's channel, the pond keeps silt, rocks and stones out of its bowl.
@@ -435,7 +435,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
         const thin = lrng.chance(0.3);
         speleos.push(thin
           ? { kind: 'straw', x, z, y0: top - len, y1: top, rb: 0.012, rt: 0.035, waist: 1, dead: false, glaze: true }
-          : { kind: 'stalactite', x, z, y0: top - len, y1: top, rb: 0.02, rt: Math.max(0.05, 0.05 + 0.12 * len), waist: 0.8, dead: false, glaze: true });
+          : { kind: 'stalactite', x, z, y0: top - len, y1: top, rb: 0.02, rt: Math.max(0.06, 0.06 + 0.16 * len), waist: 0.8, dead: false, glaze: true });
         n++;
       }
     }

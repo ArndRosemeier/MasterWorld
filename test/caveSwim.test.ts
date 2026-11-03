@@ -71,7 +71,7 @@ test('cave ponds: the water mesh draws the pond deep over its middle, whatever s
 
 // A sump: a pond with rock over its middle down to the water (K6); the hero dives under it with the breath held.
 test('cave sumps: rock closes the way over a pond down to the water, the reader links the two sides by a swim, and the real walker dives through', () => {
-  const { c: sc, reading: SR, dressing: sd } = formedCave(4, 'massive'), sf = sc.field as BrickField, sw = caveWater(sd, bed, poolDepth);
+  const { c: sc, reading: SR, dressing: sd } = formedCave(1, 'thin-bedded'), sf = sc.field as BrickField, sw = caveWater(sd, bed, poolDepth);
   const sump = sd.pools.find((p) => p.lid !== undefined);
   assert.ok(sump?.lid, 'a sump');
   const { tx, tz, half } = sump.lid, along = (x: number, z: number): number => (x - sump.x) * tx + (z - sump.z) * tz;

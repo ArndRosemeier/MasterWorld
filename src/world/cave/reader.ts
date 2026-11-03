@@ -156,10 +156,11 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
     const len = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(len / 0.4);
     // (The ends lie on the bank, where the swimmer has waded out: the line is clear between them.)
     for (let i = 0; i <= n; i++) {
-      if (i * 0.4 < 1.2 || (n - i) * 0.4 < 1.2) continue;
       const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n;
+      // (Under a sump's lid there is no bank: the diver needs the depth there too.)
+      if ((i * 0.4 < 1.2 || (n - i) * 0.4 < 1.2) && fieldAt(f, x, p.y + 0.5, z) >= 0) continue;
       const over = fieldAt(f, x, p.y + 0.4, z) >= way.radius && fieldAt(f, x, p.y + 1.2, z) >= way.radius;
-      if (!over && !(p.lid !== undefined && fieldAt(f, x, p.y - 1, z) >= way.radius && fieldAt(f, x, p.y - 0.6, z) >= way.radius)) return false;
+      if (!over && !(p.lid !== undefined && fieldAt(f, x, p.y - 1.4, z) >= way.radius && fieldAt(f, x, p.y - 0.6, z) >= way.radius)) return false;
     }
     return true;
   };
