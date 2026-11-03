@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { validateSetting } from '../src/setting/contract';
-import { groupDanger } from '../src/sim/wild';
+import { awake, extraOf, groupDanger } from '../src/sim/wild';
+import { WALK_R, radiusOf, walkRadius } from '../src/sim/creatures';
 import { territoryOf, wildFor } from '../src/vgm/wild';
 import { dangerAt } from '../src/vgm/dungeons';
 import { encounterFor, membersOf, typicalDanger } from '../src/vgm/encounters';
@@ -22,7 +23,7 @@ test('the giants are in the setting: their own creatures, with loot that fits, a
   for (const id of GIANTS) {
     const d = def(id);
     assert.equal(d.body.kind, 'beast', id);
-    assert.ok(d.body.kind === 'beast' && d.body.giant && d.body.giant > 0 && d.body.giant <= 1, `${id} is a giant by the Deform recipe`);
+    assert.ok(d.body.kind === 'beast' && d.body.giant && d.body.giant >= 5, `${id} is a giant by the Deform recipe, grown many times (not just a big one)`);
     assert.ok(d.loot && classic.items.treasure.some((t) => t.id === d.loot), `${id} has its own loot`);
   }
   // Their loot is theirs: no giant hide off a plain deer, and nothing from a person's pockets.
@@ -97,14 +98,49 @@ test('a giant wolf leads a pack of plain wolves, and is the only one of its kind
 });
 
 test('a giant is the Deform recipe, seeded: the same body for the same animal, another for another, none at strength 0', () => {
-  const a = giantPlan(0.6, 42), b = giantPlan(0.6, 42), c = giantPlan(0.6, 43);
+  const a = giantPlan(6, 42), b = giantPlan(6, 42), c = giantPlan(6, 43);
   assert.ok(a && b && c);
   assert.deepEqual(a, b);
   assert.notDeepEqual(a.parts, c.parts);
-  assert.ok(a.scale > 1.5 && a.scale < 2.6, `grown ${a.scale.toFixed(2)} times`);
-  assert.ok(a.gait.rate < 1, 'slower for its size');
+  assert.equal(a.scale, 6, 'grown six times');
+  assert.ok(Math.abs(a.gait.rate - 1 / Math.sqrt(6)) < 1e-6, 'slower for its size');
+  assert.ok(a.parts.leg.girth > 1.3, 'thick legs for the weight');
   assert.equal(giantPlan(undefined, 42), null);
+  assert.equal(giantPlan(1, 42), null);
   assert.equal(giantPlan(0, 42), null);
+});
+
+test('the giants awe: grown many times, as long as their length says, towering over a hero, and bigger than any other beast', () => {
+  // The normal animal's length as drawn (the library's elk 2.3 m, the tortoise 0.85 m x 1.3, the others the setting's own).
+  const base: Record<string, number> = { 'giant elk': 2.3, 'giant turtle': 1.1, 'giant boar': def('boar').body.kind === 'beast' ? (def('boar').body as { length: number }).length : 0, 'giant wolf': (def('wolf').body as { length: number }).length };
+  const others = classic.creatures.filter((c) => !GIANTS.includes(c.id) && c.body.kind === 'beast').map((c) => (c.body as { length: number }).length);
+  for (const id of GIANTS) {
+    const b = def(id).body as { length: number; giant: number };
+    assert.ok(Math.abs(b.length / (base[id] * b.giant) - 1) < 0.1, `${id}: ${b.length} m is about ${base[id]} x ${b.giant}`);
+    assert.ok(b.length >= 9, `${id} is ${b.length} m long: a house, not a horse`);
+    assert.ok(b.length > 2 * Math.max(...others), `${id} dwarfs every other beast`);
+  }
+});
+
+test('a giant keeps the room of its whole body from other bodies, and walks the land as a body no wider than a bear', () => {
+  for (const id of GIANTS) {
+    const d = def(id);
+    assert.ok(radiusOf(d) >= 2.5, `${id} blocks ${radiusOf(d)} m round`);
+    assert.equal(walkRadius(d), WALK_R, `${id} finds its way between trunks as a ${WALK_R} m body`);
+  }
+  assert.equal(radiusOf(def('giant turtle')), 6.2, 'the turtle is round: its shell is its footprint');
+  // Nothing else changes: every other creature walks the land at its own radius.
+  for (const c of classic.creatures.filter((c) => !GIANTS.includes(c.id))) assert.equal(walkRadius(c), radiusOf(c), c.id);
+  // Their blows reach from a head that high, past their body's room.
+  for (const id of GIANTS) assert.ok(def(id).attacks[0].reach >= 2, `${id} reaches ${def(id).attacks[0].reach} m`);
+});
+
+test('a giant is awake, and drawn, from afar: no popping up at 260 m', () => {
+  const far = extraOf(['giant elk'], classic.creatures), lone = extraOf(['wolf'], classic.creatures);
+  assert.ok(far >= 500 && lone === 0, `${far} m more, ${lone} m more`);
+  assert.equal(extraOf(['giant wolf', 'wolf', 'wolf'], classic.creatures), far, 'a pack with a giant in it');
+  // The hero 700 m from the territory's edge: a giant's group is awake (the distance less its extra), a deer herd is not.
+  assert.ok(awake(false, 700 - far) && !awake(false, 700 - lone), 'seen across a valley');
 });
 
 test('the giants have a library body with a clip for every doing', () => {

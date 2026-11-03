@@ -37,9 +37,10 @@ test('wild: deer, boar, a wolf pack and bandits live around the town, apart, on 
 
 test('wild: far groups rest; near ones are always busy; deer bolt from a hero, wolves come for them', () => {
   const wilds = new Wilds(places, land, classic.creatures);
-  // The hero in town: nobody out there is awake.
+  // The hero in town: nobody out there is awake, but a giant's group seen across the valley (extraOf: the giants are drawn from afar).
   wilds.step(0.1, hero(town.decision.x, town.decision.z));
-  assert.ok(wilds.bands.every((b) => !b.awake));
+  assert.ok(wilds.bands.every((b) => b.extra > 0 || !b.awake));
+  for (const b of wilds.bands) assert.equal(b.awake, Math.hypot(b.territory.x - town.decision.x, b.territory.z - town.decision.z) - b.territory.r <= 260 + b.extra, `${b.territory.id} wakes at 260 m and a giant's farther`);
   const deer = wilds.bands.find((b) => b.territory.kind === 'deer')!;
   const t = deer.territory;
   // Watching from a distance: they graze and wander, every one of them doing something.

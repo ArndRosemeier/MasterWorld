@@ -249,7 +249,7 @@ export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: 
       if (a && ONCE.includes(doing)) { a.time = 0; a.setLoop(LoopOnce, 1); a.clampWhenFinished = true; }
     });
   }
-  gaitPace(actor, speed, doing === 'walk' ? b.def.pace.walk : doing === 'run' ? b.def.pace.run : undefined);
+  gaitPace(actor, speed, doing === 'walk' ? b.def.pace.walk : doing === 'run' ? b.def.pace.run : undefined, b.place.scale.x);
   actor.update(dt);
 }
 
@@ -262,11 +262,11 @@ export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, 
     // The same one-shot again (already running, so not restarted by play): from its start.
     if (a && ONCE.includes(doing)) a.time = 0;
   }
-  // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times.
-  const a = lib.currentAction;
+  // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times (of a giant's slow step, `gaitRate`).
+  const a = lib.currentAction, g = lib.gaitRate;
   if (a) {
     const own = (doing === 'walk' || doing === 'run') && b.doing === doing ? lib.speedOf(a.getClip().name) * lib.object.scale.x : 0;
-    a.timeScale = own > 0 ? Math.min(1.6, Math.max(0.5, speed / own)) : lib.gaitRate;
+    a.timeScale = own > 0 ? Math.min(1.6 * g, Math.max(0.5 * g, speed / own)) : g;
   }
   lib.update(dt);
 }

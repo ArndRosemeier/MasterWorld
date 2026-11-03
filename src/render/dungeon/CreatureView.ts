@@ -16,7 +16,7 @@ import HumanWorker from '../../workers/human.worker?worker';
 import { grow, type BodyPlan, type CritterRole, type Integument } from '@futuremagic/creatures';
 import { CritterModel, ModelledCreature, type ClipUse, type CritterFigure, type ModelledFigure, type RigInput } from '@futuremagic/creatures/three';
 import type { CreatureDef } from '../../setting/contract';
-import { woundOf, type Creature, type Den } from '../../sim/creatures';
+import { radiusOf, woundOf, type Creature, type Den } from '../../sim/creatures';
 import { critterMaterials, ratMaterial } from '../materials/creatures';
 import { buildArm } from '../hero/arms';
 import { gripHeld } from '../hero/grips';
@@ -311,7 +311,9 @@ export class CreatureView {
       const along = px * dir.x + py * dir.y + pz * dir.z;
       if (along < 0) continue;
       const off = Math.hypot(px - dir.x * along, py - dir.y * along, pz - dir.z * along);
-      if (off < slack + (c.def.body.kind === 'humanoid' ? 0.2 : 0) && along < bd) { bd = along; best = c; }
+      // A giant is hit anywhere on its body: the click is let that far from the point it is taken at (its radius past the 1 m of a bear).
+      const room = Math.max(0, radiusOf(c.def) - 1);
+      if (off < slack + room + (c.def.body.kind === 'humanoid' ? 0.2 : 0) && along < bd) { bd = along; best = c; }
     }
     return best;
   }

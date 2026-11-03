@@ -236,12 +236,26 @@ export interface Band {
   readonly territory: Territory;
   readonly den: Den;
   awake: boolean;
+  /** How much farther off than the usual it is awake (extraOf). */
+  readonly extra: number;
 }
 
 /** Groups farther than this from the hero rest (at home, unstepped); nearer ones live. */
 const WAKE = 260;
 /** Hysteresis: a waking group sleeps again only this much farther off. */
 const SLEEP = 320;
+
+/** How much farther off a giant's group is awake and drawn (m): a beast of 14 m over a valley is no group to pop up at 260 (Arnd 2026-11-03: awe). */
+const GIANT_EXTRA = 640;
+
+/** How much farther than the usual a group is awake and drawn (and built, app/wildLand.ts): a giant's, else nothing. Taken off its distance from the hero. */
+export function extraOf(members: readonly string[], defs: readonly CreatureDef[]): number {
+  for (const m of members) {
+    const b = defs.find((d) => d.id === m)?.body;
+    if (b?.kind === 'beast' && b.giant) return GIANT_EXTRA;
+  }
+  return 0;
+}
 
 /** Is a group awake, `d` metres from the hero to its territory's edge (it was `was`)? */
 export function awake(was: boolean, d: number): boolean {
@@ -254,9 +268,10 @@ export class Wilds {
 
   constructor(readonly territories: readonly Territory[], land: Land, defs: readonly CreatureDef[], dead: Readonly<Record<string, readonly number[]>> = {}) {
     this.bands = territories.map((t) => {
+      const extra = extraOf(t.members, defs);
       const ground = new OpenGround(land, [t], () => null, bedOf(t.members, defs));
       const den = new Den(ground, t.members.map((creature) => ({ creature, room: 0 })), defs, deriveSeed(t.seed, 'den'), dead[t.id] ?? []);
-      return { territory: t, den, awake: false };
+      return { territory: t, den, awake: false, extra };
     });
   }
 
@@ -265,7 +280,7 @@ export class Wilds {
     const out: { band: Band; event: DenEvent }[] = [];
     for (const b of this.bands) {
       const t = b.territory;
-      b.awake = awake(b.awake, Math.hypot(q.x - t.x, q.z - t.z) - t.r);
+      b.awake = awake(b.awake, Math.hypot(q.x - t.x, q.z - t.z) - t.r - b.extra);
       if (!b.awake) continue;
       for (const event of b.den.step(dt, q)) out.push({ band: b, event });
     }

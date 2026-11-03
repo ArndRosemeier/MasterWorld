@@ -17,7 +17,7 @@ import { Delve, type DelveSave } from '../game/delve';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SettingModule } from '../setting/contract';
 import { Den } from '../sim/creatures';
-import { OpenGround, awake, bedOf, groupDanger, type Land, type Territory } from '../sim/wild';
+import { OpenGround, awake, bedOf, extraOf, groupDanger, type Land, type Territory } from '../sim/wild';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
 import type { WildGroup } from '../vgm/events';
@@ -58,6 +58,8 @@ const BUILD = 420;
 interface Group {
   readonly territory: Territory;
   awake: boolean;
+  /** How much farther off than the usual it is built and awake (extraOf), once known. */
+  extra?: number;
   built: Promise<void> | null;
   /** Once its bodies are warm. */
   encounter: Encounter | null;
@@ -101,11 +103,17 @@ export class WildLand {
   near(x: number, z: number): void {
     const light = this.host.light();
     for (const g of this.groups) {
-      const t = g.territory, d = Math.hypot(x - t.x, z - t.z) - t.r;
+      const d = this.away(g, x, z);
       if (!g.built && d < BUILD) g.built = this.raise(g);
       g.awake = awake(g.awake, d);
       if (g.delve) g.delve.fight.light = light;
     }
+  }
+
+  /** How far the hero at (x, z) is from a group's territory edge, less how much farther than the usual it is built and awake (a giant's, sim/wild.ts extraOf). */
+  private away(g: Group, x: number, z: number): number {
+    const t = g.territory;
+    return Math.hypot(x - t.x, z - t.z) - t.r - (g.extra ??= extraOf(t.members, this.host.setting.creatures));
   }
 
   /** Is the band of event `id` beaten or driven off (its bodies are all dead or beaten, or it is gone)? A band not built yet is not. */
