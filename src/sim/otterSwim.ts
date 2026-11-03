@@ -44,7 +44,7 @@ export class OtterSwim {
 
   /** The water's surface over it (null: none). */
   private surfaceAt(x = this.pos.x, z = this.pos.z): number | null {
-    return this.world.waterLevel(x, z);
+    return this.world.waterLevel(x, this.pos.y, z);
   }
 
   /** How deep the water is where it is (0: none). */

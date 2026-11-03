@@ -207,6 +207,8 @@ export interface CaveLavaDef {
   readonly wander: number;
   /** Skylights (the roof fell in) most, how far apart, and the roof thickness under which one may stand, metres. */
   readonly skylights: { readonly most: number; readonly apart: number; readonly thin: number };
+  /** Flow ledges: rings on the walls where the lava stood, how far each juts (m), how many levels, and the first one's and each next one's rise above the floor (m). */
+  readonly ledges: { readonly lip: number; readonly levels: number; readonly first: number; readonly rise: number };
 }
 
 /** Mines (K8): people followed the ore. A square-cut adit from the hillside to a vein, drifts along it on levels, crosscuts, stopes where the ore was taken and inclines between the levels. */
@@ -230,6 +232,8 @@ export interface CaveMineDef {
   readonly stopeLength: readonly [number, number];
   /** How steeply an incline between two levels climbs (rise per metre). */
   readonly incline: number;
+  /** Winzes (K8: a steep shaft with a ladder from a drift up to the level above): most between two levels, the shaft's half width (m) and how far it leans along the strike (run per metre of rise: it is climbed up its floor). */
+  readonly winzes: { readonly count: readonly [number, number]; readonly half: number; readonly lean: number };
   /** What people fitted in (world/cave/fittings.ts): timber sets every `posts` m (a post's half thickness, the beam's, the share of sets that stand), rails (gauge, rail thickness, sleeper spacing) and carts (most). */
   readonly fittings: { readonly posts: number; readonly post: number; readonly beam: number; readonly timbered: number; readonly gauge: number; readonly rail: number; readonly sleeper: number; readonly carts: number };
 }
@@ -386,7 +390,10 @@ export interface CaveDressDef {
   /** Fallen rock: stones along the walls' feet (per 100 m of way), under a collapse (per hall) and their size (half-size, least and most). */
   readonly rocks: { readonly along: number; readonly perHall: readonly [number, number]; readonly size: readonly [number, number] };
   /** The stream of the live level: its width (least, most) and how deep the bed is cut, and the most it is cut into a floor that stands higher over the water (where the floor stands higher there is no stream); pools along it (per 100 m) and their depth. */
-  readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number; readonly cutMost: number };
+  readonly water: { readonly width: readonly [number, number]; readonly bed: number; readonly pools: number; readonly poolDepth: number; readonly cutMost: number;
+    /** A plunge pool deep enough to swim in (K6, the first water of the sump): how many in 100 m of way, their depth (m) the least half-width of the way it lies in (it fills half of it, so a bank is left) and the most the floor round its rim may vary (m: a bank higher than a step cannot be climbed out onto); a pond whose radius is `sumpWide` or more is a sump (rock over its middle down to the water, so the hero dives under it) with this chance, `sumpDepth` deep. */
+    readonly ponds: { readonly chance: number; readonly per100: number; readonly depth: number; readonly wide: number; readonly bank: number; readonly sump: number; readonly sumpWide: number; readonly sumpDepth: number };
+  };
   /** Drips fall along the cracks that cross a way's roof: chance at each spacing metres along the crack, the drips still running (the rest are dead), the crack's spacing; and drips from the roof away from any crack, per 100 m of way. */
   readonly drips: { readonly chance: number; readonly live: number; readonly spacing: number; readonly scatter: number };
   /** Loose stones, per 100 m of way: their half-size (least, most; most are small: a power law), how many gather in heaps, and the most in a cave. */
@@ -395,6 +402,8 @@ export interface CaveDressDef {
   readonly crystals: { readonly per100: number; readonly count: readonly [number, number]; readonly len: readonly [number, number]; readonly oreTries: number };
   /** Formations: stalactite length (least, most), how much longer old levels grow, a column forms where roof and floor are closer than `column`, the share of drips with a straw, at most this many in a cave. */
   readonly formations: { readonly length: readonly [number, number]; readonly age: number; readonly column: number; readonly straws: number; readonly most: number };
+  /** A lava tube's own dressing (K7c): lava drips (glazed, dark) per 100 m of way, how long they hang (least, most, a power law), how many hang together (least, most) and the most in a cave. (The floor keeps its silt: it fills the dents a flat set-lava floor would have.) */
+  readonly lava: { readonly drips: number; readonly length: readonly [number, number]; readonly cluster: readonly [number, number]; readonly most: number };
 }
 
 /** The ore in the rock (K8's mines follow it; in K1 to K7 it only shows). */
@@ -2422,6 +2431,7 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
       const l = r.lava;
       range(l.halfWidth, `${w} lava tube half width`, 1.2); range(l.halfHeight, `${w} lava tube half height`, 1.5); range(l.gradient, `${w} lava gradient`); range(l.length, `${w} lava length`, 0.1); range(l.branches, `${w} lava branches`); range(l.branchLength, `${w} lava branch length`, 8);
       if (!(l.roof >= 2 && l.wander >= 0 && l.wander <= 1 && l.skylights.most >= 0 && l.skylights.apart > 0 && l.skylights.thin > 0)) out.push(`${where}: ${w} lava needs a roof of 2 m or more, a wander in 0..1 and skylights`);
+      if (!(l.ledges.lip >= 0 && l.ledges.lip <= 0.8 && l.ledges.levels >= 0 && l.ledges.first >= 0.5 && l.ledges.rise >= 0.6)) out.push(`${where}: ${w} lava ledges need a lip of 0 to 0.8 m, levels, a first rise of 0.5 m or more and a rise of 0.6 m or more`);
     }
     if (r.mine) {
       const m = r.mine;
@@ -2449,6 +2459,8 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length'); span(d.stones.size, 'stone size'); span(d.crystals.count, 'crystal count'); span(d.crystals.len, 'crystal length');
   if (!(d.stones.per100 >= 0 && d.stones.most >= 0 && d.stones.heaps >= 0 && d.stones.heaps <= 1 && d.crystals.per100 >= 0 && d.crystals.oreTries >= 0)) out.push(`${where}: cave stones and crystals need counts, and heaps a share`);
   if (!(d.floor.relief >= 0 && d.floor.relief <= 1)) out.push(`${where}: cave floor relief must be 0 to 1 m`);
+  span(d.lava.length, 'lava drip length'); span(d.lava.cluster, 'lava drip cluster');
+  if (!(d.lava.drips >= 0 && d.lava.most >= 0)) out.push(`${where}: cave lava drips need counts`);
   if (!(d.drips.chance >= 0 && d.drips.chance <= 1 && d.drips.live >= 0 && d.drips.live <= 1 && d.drips.spacing > 0.3 && d.drips.scatter >= 0)) out.push(`${where}: cave drips need chances 0 to 1 and a crack spacing over 0.3 m`);
   if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0 && d.water.cutMost > 0)) out.push(`${where}: cave formations and water need positive sizes`);
   range(c.ore.bodies, 'ore bodies');

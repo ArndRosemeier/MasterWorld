@@ -15,11 +15,11 @@
 import { MinHeap } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import { brickColumns, fieldAt, type BrickField } from '../dungeon/rockMesh';
-import { columnSpans, type Dressing } from './dress';
+import { columnSpans, type Dressing, type Pool } from './dress';
 import type { Skeleton } from './skeleton';
 
-export type LinkKind = 'walk' | 'climb' | 'drop';
-const KIND: readonly LinkKind[] = ['walk', 'climb', 'drop'];
+export type LinkKind = 'walk' | 'climb' | 'drop' | 'swim' | 'ladder';
+const KIND: readonly LinkKind[] = ['walk', 'climb', 'drop', 'swim', 'ladder'];
 
 export type PlaceKind = 'entry' | 'skylight' | 'void' | 'deadEnd' | 'alcove' | 'junction' | 'ledge' | 'bank';
 
@@ -59,7 +59,7 @@ export interface Reading {
 
 export interface ReadingStats {
   readonly cells: number;
-  readonly links: { readonly walk: number; readonly climb: number; readonly drop: number };
+  readonly links: { readonly walk: number; readonly climb: number; readonly drop: number; readonly swim: number; readonly ladder: number };
   readonly parts: number;
   readonly reached: number;
   /** Cells that can be reached but not left (drops into a pit). */
@@ -68,6 +68,9 @@ export interface ReadingStats {
   readonly cutOff: number;
   readonly ms: number;
 }
+
+/** The hero wades water up to this deep (m); in deeper water there is no standing ground. */
+const WADE = 0.5;
 
 /** Parts of fewer cells than this are pockets, not parts (about 22 m2 of floor). */
 export const PART_MIN = 60;
@@ -102,6 +105,10 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   // The body's width where the walker tests it: the knee, the waist and the head (its radius clear of rock at each).
   const bodyFits = (x: number, fl: number, z: number): boolean => [0.75, 1.3, way.stand - way.radius].every((h) => fieldAt(f, x, fl + h, z) >= way.radius);
 
+  // A pond's bowl is no ground to stand on: below the wading depth under its surface the hero swims (and the creatures keep out).
+  const ponds = (dressing?.pools ?? []).filter((p) => p.depth !== undefined);
+  const flooded = (x: number, fl: number, z: number): boolean => ponds.some((p) => fl < p.y - WADE && Math.hypot(x - p.x, z - p.z) < p.r);
+
   // Cells: each column's spans with room to stand and body width at the waist.
   const first = new Int32Array(nx * nz + 1);
   const cx: number[] = [], cy: number[] = [], cz: number[] = [], cr: number[] = [], cc: number[] = [];
@@ -113,7 +120,7 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
     const x = f.ox + i * step, z = f.oz + k * step;
     for (let n = 0; n < sp.length; n += 2) {
       const fl = sp[n], ce = sp[n + 1];
-      if (ce - fl < stand || !bodyFits(x, fl, z)) continue;
+      if (ce - fl < stand || !bodyFits(x, fl, z) || flooded(x, fl, z)) continue;
       cx.push(x); cy.push(fl); cz.push(z); cr.push(ce - fl); cc.push(ce);
     }
   }
@@ -144,18 +151,62 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
     }
   }
 
+  // (The swimmer's way across the water is clear: no rock stands out of it along the line, at the chest and at the head; under a sump's lid, at the depths the diver is at.)
+  const clearOver = (p: Pool, x0: number, z0: number, x1: number, z1: number): boolean => {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.ceil(len / 0.4);
+    // (The ends lie on the bank, where the swimmer has waded out: the line is clear between them.)
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n;
+      // (Under a sump's lid there is no bank: the diver needs the depth there too.)
+      if ((i * 0.4 < 1.2 || (n - i) * 0.4 < 1.2) && fieldAt(f, x, p.y + 0.5, z) >= 0) continue;
+      const over = fieldAt(f, x, p.y + 0.4, z) >= way.radius && fieldAt(f, x, p.y + 1.2, z) >= way.radius;
+      if (!over && !(p.lid !== undefined && fieldAt(f, x, p.y - 1.4, z) >= way.radius && fieldAt(f, x, p.y - 0.6, z) >= way.radius)) return false;
+    }
+    return true;
+  };
+  // Swims: across a pond, between the cells round its rim (the hero swims, creatures do not: sim/formedGround.ts).
+  for (const p of ponds) {
+    const rim: number[] = [];
+    for (let a = 0; a < count; a++) { const h = Math.hypot(cx[a] - p.x, cz[a] - p.z); if (h >= p.r - 0.4 && h <= p.r + 1.4 && Math.abs(cy[a] - p.y) <= 1.4) rim.push(a); }
+    for (let m = 0; m < rim.length; m++) for (let n = m + 1; n < rim.length; n++) {
+      const a = rim[m], b = rim[n], across = Math.hypot(cx[a] - cx[b], cz[a] - cz[b]);
+      if (across >= p.r && Math.min(cc[a], cc[b]) - Math.max(cy[a], cy[b]) >= stand && clearOver(p, cx[a], cz[a], cx[b], cz[b])) link(a, b, 3, true);
+    }
+  }
+
+  /** The cell nearest to (px, py, pz) within `reach` metres (straight line), or -1. */
+  const cellNear = (px: number, py: number, pz: number, reach = 6): number => {
+    const ci = Math.round((px - f.ox) / step), ck = Math.round((pz - f.oz) / step), R = Math.ceil(reach / step);
+    let best = -1, bd = reach * reach;
+    for (let dk = -R; dk <= R; dk++) for (let di = -R; di <= R; di++) {
+      const i = ci + di, kk = ck + dk;
+      if (i < 0 || i >= nx || kk < 0 || kk >= nz) continue;
+      for (let c = first[i + nx * kk]; c < first[i + nx * kk + 1]; c++) {
+        const d = (cx[c] - px) ** 2 + (cy[c] - py) ** 2 + (cz[c] - pz) ** 2;
+        if (d < bd) { bd = d; best = c; }
+      }
+    }
+    return best;
+  };
+  // Ladders (K8): a winze's ladder joins the lower drift's floor at its foot to the floor above at its head, however tall (the hero climbs a ladder
+  // without tiring; creatures do not). The cells are the ones nearest the two ends, within a body's reach.
+  for (const l of dressing?.ladders ?? []) {
+    const a = cellNear(l.x0, l.y0, l.z0, 2.6), b = cellNear(l.x1, l.y1, l.z1, 2.6);
+    if (a >= 0 && b >= 0 && a !== b) link(a, b, 4, true);
+  }
+
   // The graph as arrays (edges grouped by their cell).
   const edgeStart = new Int32Array(count + 1), edgeTo = new Int32Array(eFrom.length), edgeKind = new Uint8Array(eFrom.length);
   for (const a of eFrom) edgeStart[a + 1]++;
   for (let c = 0; c < count; c++) edgeStart[c + 1] += edgeStart[c];
   const fill = edgeStart.slice(0, count);
-  const counts = { walk: 0, climb: 0, drop: 0 };
+  const counts = { walk: 0, climb: 0, drop: 0, swim: 0, ladder: 0 };
   for (let e = 0; e < eFrom.length; e++) { const at = fill[eFrom[e]]++; edgeTo[at] = eTo[e]; edgeKind[at] = eKind[e]; counts[KIND[eKind[e]]]++; }
 
   const x = Float32Array.from(cx), y = Float32Array.from(cy), z = Float32Array.from(cz), room = Float32Array.from(cr);
   const linkCost = (a: number, b: number, kind: number): number => {
     const h = Math.hypot(x[a] - x[b], z[a] - z[b]), dy = Math.abs(y[a] - y[b]);
-    return kind === 1 ? h + dy * 2.5 : kind === 2 ? h + dy * 0.5 : Math.hypot(h, dy);
+    return kind === 1 ? h + dy * 2.5 : kind === 2 ? h + dy * 0.5 : kind === 3 ? h * 1.6 : Math.hypot(h, dy);
   };
 
   // Parts: cells joined by links (union-find).
@@ -166,20 +217,6 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   for (let a = 0; a < count; a++) { const r = root(a); let id = partId.get(r); if (id === undefined) partId.set(r, id = partId.size); partOf[a] = id; }
 
   // The ways in: where a spring's mouth reaches the valley side, and under each skylight (the hero drops in onto the heap).
-  const R = Math.ceil(6 / step);
-  const cellNear = (px: number, py: number, pz: number): number => {
-    const ci = Math.round((px - f.ox) / step), ck = Math.round((pz - f.oz) / step);
-    let best = -1, bd = 36;
-    for (let dk = -R; dk <= R; dk++) for (let di = -R; di <= R; di++) {
-      const i = ci + di, kk = ck + dk;
-      if (i < 0 || i >= nx || kk < 0 || kk >= nz) continue;
-      for (let c = first[i + nx * kk]; c < first[i + nx * kk + 1]; c++) {
-        const d = (x[c] - px) ** 2 + (z[c] - pz) ** 2 + (y[c] - py) ** 2;
-        if (d < bd) { bd = d; best = c; }
-      }
-    }
-    return best;
-  };
   const entries: number[] = [], places: Place[] = [];
   const addEntry = (kind: PlaceKind, c: number): void => { if (c >= 0 && !entries.includes(c)) { entries.push(c); places.push({ kind, cell: c, x: x[c], y: y[c], z: z[c], depth: 0, radius: 0 }); } };
   // The way in from the land: the throat's floor a metre inside its portal plane (cut by form.ts); else the end of the first mouth.
@@ -273,7 +310,7 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   for (let a = 0; a < count; a++) {
     if (depth[a] === Infinity) continue;
     let face = 0;
-    for (let e = edgeStart[a]; e < edgeStart[a + 1]; e++) { const b = edgeTo[e]; if (edgeKind[e] !== 0 && y[a] - y[b] > face) face = y[a] - y[b]; }
+    for (let e = edgeStart[a]; e < edgeStart[a + 1]; e++) { const b = edgeTo[e]; if (edgeKind[e] !== 0 && edgeKind[e] !== 3 && edgeKind[e] !== 4 && y[a] - y[b] > face) face = y[a] - y[b]; }
     if (face >= 3 && !ledges.some((b) => (x[a] - x[b]) ** 2 + (z[a] - z[b]) ** 2 + (y[a] - y[b]) ** 2 < 64)) ledges.push(a);
   }
   for (const a of ledges.slice(0, 40)) places.push({ kind: 'ledge', cell: a, x: x[a], y: y[a], z: z[a], depth: depth[a], radius: 0 });
@@ -287,7 +324,7 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
 
   return {
     count, x, y, z, room, depth, back, from: tree, part: partOf, edgeStart, edgeTo, edgeKind, entries, places,
-    stats: { cells: count, links: { walk: counts.walk, climb: counts.climb, drop: counts.drop }, parts: partId.size, reached, trapped, cutOff, ms: ticker() - t0 },
+    stats: { cells: count, links: { walk: counts.walk, climb: counts.climb, drop: counts.drop, swim: counts.swim, ladder: counts.ladder }, parts: partId.size, reached, trapped, cutOff, ms: ticker() - t0 },
   };
 }
 

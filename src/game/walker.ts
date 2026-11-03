@@ -16,8 +16,12 @@ export interface WalkWorld {
   height(x: number, z: number): number;
   /** Rock volumes with their ground as a signed distance (positive in air); null away from them. */
   rockSurface(x: number, y: number, z: number): number | null;
-  /** Calm water surface level here, or null where there is no water. */
-  waterLevel(x: number, z: number): number | null;
+  /**
+   * The water surface the body at (x, y, z) is in or over (`y`: its feet), or null where there is none. Overland it depends on
+   * (x, z) alone and `y` is ignored; in a cave, where pools lie under ledges and streams over them, the answer is the surface of
+   * the water that holds that height.
+   */
+  waterLevel(x: number, y: number, z: number): number | null;
   /**
    * Built floors to stand on (steps, porches), world y, or null: climbed a step at a time, unlike a steep slope. With
    * `y` (the feet's height) a floor that has another over it (a ship's cabin under its castle's deck) is the one a step
@@ -32,6 +36,8 @@ export interface WalkWorld {
   climbable?(x: number, z: number): { readonly nx: number; readonly nz: number } | null;
   /** The rock itself offers holds wherever it stands as a wall (a cave's broken rock): climbed by its faces in `rockSurface`. */
   rockHolds?(): boolean;
+  /** Is (x, y, z) at a ladder? Climbed without tiring, and quicker than a rock face (a winze's, in a mine). */
+  ladderAt?(x: number, y: number, z: number): boolean;
   /**
    * Living bodies (foes, wardens): does a body of radius `r` at (x, z), feet at `y`, press into one? One already
    * touching where the asker stands now, (ax, az), lets it go, so a walker is never stuck in another.
@@ -202,7 +208,7 @@ export class Walker {
 
   /** Where the water surface is, if the body is in it deep enough to swim; else null. */
   private swimLevel(x: number, z: number, feet: number): number | null {
-    const w = this.world.waterLevel(x, z);
+    const w = this.world.waterLevel(x, feet, z);
     return w !== null && w > feet + this.height * 0.6 ? w : null;
   }
 
@@ -321,7 +327,7 @@ export class Walker {
         this.airTop = -Infinity;
       }
     }
-    const level = this.world.waterLevel(p.x, p.z);
+    const level = this.world.waterLevel(p.x, p.y, p.z);
     if (this.mode !== 'swim') {
       const w = this.swimLevel(p.x, p.z, p.y);
       if (w !== null) { this.mode = 'swim'; v.y *= 0.3; }
@@ -441,8 +447,9 @@ export class Walker {
     }
     // Spent, or jumping off: let go.
     const moving = Math.abs(intent.forward) > 0.1 || Math.abs(intent.strafe) > 0.1;
-    if (intent.up || (this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
-    const v = this.spec.climb ?? 0.8;
+    const ladder = this.world.ladderAt?.(p.x, p.y, p.z) ?? false;
+    if (intent.up || (!ladder && this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
+    const v = ladder ? Math.max(1.1, this.spec.climb ?? 0.8) : (this.spec.climb ?? 0.8);
     // The feet on the face again after the move: up or down, and along it (right of one facing it: (-nz, nx)).
     const y = p.y + intent.forward * v * dt;
     const ax = p.x + F.nx * OFF_FACE - F.nz * intent.strafe * v * 0.7 * dt, az = p.z + F.nz * OFF_FACE + F.nx * intent.strafe * v * 0.7 * dt;
@@ -499,7 +506,7 @@ export class Walker {
 
   /** The head is under the water (diving): the hero holds their breath (game/breath.ts). */
   get headUnder(): boolean {
-    const w = this.mode === 'swim' ? this.world.waterLevel(this.pos.x, this.pos.z) : null;
+    const w = this.mode === 'swim' ? this.world.waterLevel(this.pos.x, this.pos.y, this.pos.z) : null;
     return w !== null && this.pos.y + this.height * 0.9 < w;
   }
 

@@ -10,6 +10,8 @@ import { PartBuilder, type PartMesh } from './parts';
 
 const CREAM = [0xece3cf, 0xdccaa6, 0xcda76c, 0xe6d8bd, 0xbf9159, 0xf1e9d8] as const;
 const GREY = [0x9d998e, 0x86827a, 0xaaa59a, 0x76726b] as const;
+/** Lava drips: black glass, a rust-red one where the lava was oxidised. */
+const GLAZE = [0x1c1b1d, 0x262426, 0x302c2b, 0x1a1a1c, 0x4a3029, 0x3a3234] as const;
 const hexBytes = (c: number): [number, number, number] => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 const frac = (v: number): number => v - Math.floor(v);
 
@@ -29,7 +31,7 @@ function grow(b: PartBuilder, noise: Noise, s: Speleo, seed: number): void {
   const sides = mean < 0.08 ? 6 : mean < 0.2 ? 8 : 12;
   const layers = hang ? Math.max(4, Math.round(len * 9)) : Math.max(3, Math.round(len * 5.5));
   const phase = rng.float(), oval = rng.range(0.82, 1.18), turn = rng.range(0, Math.PI), lean = rng.range(-1, 1) * Math.min(len, 2.2) * (hang ? 0.07 : 0.1), leanDir = rng.range(0, Math.PI * 2);
-  const palette = s.dead ? GREY : CREAM, bandSeed = rng.int(0, 99999), v0 = b.vertexCount, i0 = b.idx.length;
+  const palette = s.glaze ? GLAZE : s.dead ? GREY : CREAM, bandSeed = rng.int(0, 99999), v0 = b.vertexCount, i0 = b.idx.length;
   const ring: number[] = [];
   for (let i = 0; i <= rings; i++) {
     const t = i / rings, y = s.y0 + t * len;

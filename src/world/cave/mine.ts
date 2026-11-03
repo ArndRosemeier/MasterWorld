@@ -56,9 +56,9 @@ export function formMine(block: RockBlock, caves: CavesDef, scale: number, since
   let length = 0, points = 0, junctions = 0;
   /** A hand-cut course varies a little: the walls and the floor wander by a few decimetres. */
   const point = (x: number, y: number, z: number, a = A, b = B): CondPoint => ({ x: x + noise.n3(x / 9, 1.3, z / 9) * 0.25, y, z: z + noise.n3(x / 9, 7.1, z / 9) * 0.25, A: a, B: b, C: a * 0.8, D: 0, flow: 0, sq: mine.square });
-  const addPassage = (pts: CondPoint[], mouth = false, yaw = 0): void => {
+  const addPassage = (pts: CondPoint[], mouth = false, yaw = 0, ladder?: Conduit['ladder']): void => {
     if (pts.length < 2) return;
-    conduits.push({ kind: 'passage', points: pts, level: 0, active: false });
+    conduits.push({ kind: 'passage', points: pts, level: 0, active: false, ...(ladder ? { ladder } : {}) });
     points += pts.length;
     for (let i = 1; i < pts.length; i++) length += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z, pts[i].y - pts[i - 1].y);
     if (mouth) {
@@ -166,6 +166,38 @@ export function formMine(block: RockBlock, caves: CavesDef, scale: number, since
       pts.push(point(px, floor + B, pz));
     }
     if (pts.length >= 4) { addPassage(pts); junctions += 2; }
+  }
+
+  // Winzes: a steep shaft between two levels along the vein's dip, in a niche at the drift's side (the drift's floor is left to walk by), a ladder up its
+  // floor; the climber faces the slope and pulls over at the top onto the upper drift's floor. A vertical vein would give a plumb shaft that cannot be
+  // climbed over its top, so the shaft always leans along the strike by `lean` metres of run for each metre of rise.
+  for (let k = 0; k + 1 < drifts.length; k++) {
+    const lo = drifts[k], hi = drifts[k + 1], r = Math.max(mine.winzes.half, way.minWidth / 2 + 0.1, way.minHeight / 2 + 0.1), wanted = rng.int(mine.winzes.count[0], mine.winzes.count[1]);
+    const y0 = floors[lo.level] + r, y1 = floors[hi.level] + r, side = A + 0.3;
+    for (let q = 0; q < wanted; q++) {
+      // (A few tries for a place: the stopes and the other winzes take up much of the drift.)
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const dir: 1 | -1 = rng.chance(0.5) ? 1 : -1, run = (floors[hi.level] - floors[lo.level]) * mine.winzes.lean;
+        const from = Math.max(lo.sMin, hi.sMin) + 4, to = Math.min(lo.sMax, hi.sMax) - 4 - run;
+        if (to - from < 3) break;
+        const s = rng.range(from, to), s1 = s + run * dir;
+        const [xl, zl] = planeAt(y0, s), [xu, zu] = planeAt(y1, s1), ax = xl + hx * side, az = zl + hz * side, bx = xu + hx * side, bz = zu + hz * side;
+        const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, bz - az, y1 - y0) / STEP)), pts: CondPoint[] = [];
+        for (let t = 0; t <= n; t++) {
+          const u = t / n, y = lerp(y0, y1, u), p = point(lerp(ax, bx, u), y, lerp(az, bz, u), r, r);
+          if (!inside(p.x, p.z) || land.surface(p.x, p.z) - (y + r) < mine.roof) { pts.length = 0; break; }
+          pts.push({ ...p, C: 0 });
+        }
+        // The shaft comes out at the top into a landing: a level, wider stretch of the niche, its floor flush with the drift's, so the climber pulls up over the lip onto ground.
+        if (pts.length) {
+          const e = pts[pts.length - 1], hor = Math.hypot(bx - ax, bz - az) || 1;
+          for (const m of [STEP, 2 * STEP]) { const x = e.x + (bx - ax) / hor * m, z = e.z + (bz - az) / hor * m; if (!inside(x, z) || land.surface(x, z) - (floors[hi.level] + 2 * B) < mine.roof) { pts.length = 0; break; } pts.push({ ...point(x, floors[hi.level] + B, z, r + 0.5, B), C: 0 }); }
+        }
+        // Not in a stope, and not beside another winze (a shaft in a chamber is no shaft; two side by side are one).
+        const clear = pts.length >= 3 && pts.every((p) => voids.every((v) => Math.hypot(p.x - v.x, p.z - v.z) > Math.max(v.rx, v.rz) + 3 || p.y > v.floor + v.height + 2 || p.y < v.floor - 3) && conduits.every((c) => !c.ladder || c.points.every((o) => Math.hypot(o.x - p.x, o.z - p.z) > 6)));
+        if (clear) { addPassage(pts, false, 0, { foot: floors[lo.level], head: floors[hi.level], top: pts.length - 3 }); junctions += 2; break; }
+      }
+    }
   }
 
   return {

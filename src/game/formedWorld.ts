@@ -5,15 +5,19 @@
  */
 import { fieldAt, type BrickField } from '../world/dungeon/rockMesh';
 import type { WalkWorld } from './walker';
+import type { CaveWaterAt } from '../world/cave/water';
+import { onLadder, type Ladder } from '../world/cave/dress';
+import { caveLevel } from './dungeonWorld';
 
-export function formedWorld(field: BrickField, origin: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 }): WalkWorld {
+export function formedWorld(field: BrickField, origin: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 }, water: CaveWaterAt | null = null, ladders: readonly Ladder[] = []): WalkWorld {
   // No height field down here: far below everything.
   const farBelow = (): number => origin.y - 1000;
   return {
     height: farBelow,
     // Outside the field is rock.
     rockSurface: (x, y, z) => fieldAt(field, x - origin.x, y - origin.y, z - origin.z, -1),
-    waterLevel: () => null,
+    waterLevel: water ? caveLevel(water, origin) : () => null,
     rockHolds: () => true,
+    ladderAt: ladders.length ? (x, y, z) => onLadder(ladders, x - origin.x, y - origin.y, z - origin.z) : undefined,
   };
 }

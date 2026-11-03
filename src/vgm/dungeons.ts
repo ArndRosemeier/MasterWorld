@@ -10,6 +10,7 @@ import { farmlandReach, type TownBuilding } from '@futuremagic/settlement';
 import type { CellarLore, DungeonForm, SettingModule } from '../setting/contract';
 import { sitesIn, type DecisionLog, type DungeonDecision, type DungeonTemplate, type RetakeDecision, type RetreatDecision, type TownDecision } from '../world/decisions';
 import { woodsOf } from '../world/flora';
+import { pitWall } from '../world/pit';
 import { CLIFF_FACE, CLIFF_RISE } from '../world/dungeon/caveMouth';
 import type { DungeonPlace } from '../world/dungeon/cellar';
 import { setPiecesFor } from '../world/dungeon/setPieces';
@@ -132,6 +133,9 @@ export function compass(dx: number, dz: number): string {
  */
 type Fit = (x: number, z: number, k: number) => { score: number; yaw?: number; x?: number; z?: number } | null;
 
+/** The kinds of country whose land is pitted with sinkholes: a cave there may open at the foot of a pit's wall (world/pit.ts). */
+const PITTED: readonly string[] = ['karst', 'volcanic'];
+
 /** A cave's mouth in a cliff stands this far out from where the face begins (m): its way in and crag before it. */
 const CLIFF_OUT = CLIFF_FACE;
 /** How deep a cliff's way in reaches (m): the ground up to there stays low. */
@@ -188,6 +192,10 @@ const GROUND: Readonly<Record<Exclude<DungeonForm['stands'], 'house'>, (t: Terra
             return { score: 2 + Math.min(1, behind / 30) - woods(px, pz) + hash2f(s, k, 3) * 0.3, yaw: Math.atan2(-w.nx, -w.nz), x: px, z: pz };
           }
         }
+        // In pitted country (karst, volcanic ground): the foot of a pit's wall, a cave in a sinkhole; it rates over a plain hillside.
+        const kw = sk.kindWeights(x, z), pitted = sk.kinds.some((kd, i) => PITTED.includes(kd.id) && kw[i] >= 0.5);
+        const pit = pitted ? pitWall((px, pz) => t.height(px, pz), x, z) : null, fp = pit && slope(pit.x, pit.z, k);
+        if (pit && fp) return { score: fp.score - 0.5 + Math.min(1, pit.depth / 10), yaw: pit.yaw, x: pit.x, z: pit.z };
         // No cliff here: a hillside will do, but any cliff on the ring is better.
         const f = slope(x, z, k);
         return f && { ...f, score: f.score - 3 };

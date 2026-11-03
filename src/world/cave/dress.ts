@@ -13,7 +13,7 @@
 import { Noise, Rng, deriveSeed, lerp } from '@futuremagic/core';
 import type { CavesDef } from '../../setting/contract';
 import { jointDistance, oreAt, type RockBlock } from './block';
-import { fitMine, type Box } from './fittings';
+import { fitMine, ladderBoxes, type Box } from './fittings';
 import type { Crystal, Stone } from './loose';
 import { BRICK, brickColumns, brickIndex, fieldAt, sampleOf, setSample, type BrickField } from '../dungeon/rockMesh';
 import type { CondPoint, Conduit, Skeleton } from './skeleton';
@@ -30,6 +30,8 @@ export interface Speleo {
   readonly waist: number;
   /** Dry: no water runs here any more (dusty, grey). */
   readonly dead: boolean;
+  /** Set lava, not dripstone (a lava drip): black and glazed. */
+  readonly glaze?: true;
 }
 
 /** Water falling from a roof: where it leaves the tip, and the height it lands at. */
@@ -39,7 +41,28 @@ export interface Drip { readonly x: number; readonly y: number; readonly z: numb
 export interface Stream { readonly pts: readonly (readonly [number, number, number, number])[] }
 
 /** A pool: a basin cut into the floor, its surface and radius. */
-export interface Pool { readonly x: number; readonly y: number; readonly z: number; readonly r: number }
+export interface Pool {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly r: number;
+  /** A pond (the setting's `water.ponds`): cut this deep in the middle, deep enough to swim in. Shallow pools have none. */
+  readonly depth?: number;
+  /** A sump: rock closes the way over the pond's middle down to the water, `half` either side of its middle along (tx, tz) (the way's direction); the hero dives under it. */
+  readonly lid?: { readonly tx: number; readonly tz: number; readonly half: number };
+}
+
+/** A winze's ladder (K8): the line its rails run along, up the shaft's floor, from the foot (at the lower drift's floor) to the head (at the floor above). */
+export interface Ladder { readonly x0: number; readonly y0: number; readonly z0: number; readonly x1: number; readonly y1: number; readonly z1: number }
+
+/** Is (x, y, z) at a ladder (within a body's reach of its line, between its foot and head)? The hero climbs there without tiring. */
+export function onLadder(ladders: readonly Ladder[], x: number, y: number, z: number): boolean {
+  return ladders.some((l) => {
+    if (y < l.y0 - 0.5 || y > l.y1 + 0.5) return false;
+    const dx = l.x1 - l.x0, dy = l.y1 - l.y0, dz = l.z1 - l.z0, t = Math.max(0, Math.min(1, ((x - l.x0) * dx + (y - l.y0) * dy + (z - l.z0) * dz) / (dx * dx + dy * dy + dz * dz || 1)));
+    return Math.hypot(x - l.x0 - dx * t, y - l.y0 - dy * t, z - l.z0 - dz * t) < 1.1;
+  });
+}
 
 /** A fallen rock: an ellipsoid turned by its yaw. */
 export interface Rock { readonly x: number; readonly y: number; readonly z: number; readonly rx: number; readonly ry: number; readonly rz: number; readonly yaw: number }
@@ -47,6 +70,8 @@ export interface Rock { readonly x: number; readonly y: number; readonly z: numb
 export interface Dressing {
   readonly speleos: readonly Speleo[];
   readonly drips: readonly Drip[];
+  /** The ladders of a mine's winzes. */
+  readonly ladders: readonly Ladder[];
   readonly streams: readonly Stream[];
   readonly pools: readonly Pool[];
   readonly rocks: readonly Rock[];
@@ -87,12 +112,15 @@ export function columnSpans(f: BrickField, i: number, k: number, out: number[] =
   return out;
 }
 
+/** How far past a pond's rim its beach runs out (m). */
+const BEACH = 3.2;
+
 const smooth01 = (t: number): number => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
 
 /** Dress a carved cave: edits `f` (silt, the stream, pools, rocks) and lists the rest. */
 export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: CavesDef, timer: () => number = Date.now): Dressing {
   const t0 = timer(), d = caves.dress, head = caves.way.minHeight + 0.1, half = caves.way.minWidth / 2;
-  const rng = new Rng(deriveSeed(block.seed, 'cave', 'dress')), noise = new Noise(deriveSeed(block.seed, 'cave', 'silt'));
+  const rng = new Rng(deriveSeed(block.seed, 'cave', 'dress')), pondRng = new Rng(deriveSeed(block.seed, 'cave', 'ponds')), noise = new Noise(deriveSeed(block.seed, 'cave', 'silt'));
   const { ox, oy, oz, step, nx, ny, nz } = f;
   const col = (x: number) => Math.round((x - ox) / step), row = (z: number) => Math.round((z - oz) / step);
   const wayHalf = (p: CondPoint) => (p.C > 0 ? p.C : p.A);
@@ -111,6 +139,17 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
       if (gap < bd) { bd = gap; best = [s[n], s[n + 1]]; }
     }
     return best;
+  };
+  /** The lowest floor round a disc of radius r about (x, z) (its outer rim, 0.8 to 1.0 of r) and the highest anywhere in it, near height y; null where there is no floor at some point of it. */
+  const ringFloor = (x: number, y: number, z: number, r: number): { lo: number; hi: number } | null => {
+    let lo = Infinity, hi = -Infinity;
+    for (const k of [0.3, 0.6, 0.8, 1]) for (let a = 0; a < 12; a++) {
+      const sp = spanAt(x + Math.cos(a * Math.PI / 6) * r * k, y, z + Math.sin(a * Math.PI / 6) * r * k);
+      if (!sp) return null;
+      if (k >= 0.8) lo = Math.min(lo, sp[0]);
+      hi = Math.max(hi, sp[0]);
+    }
+    return { lo, hi };
   };
   /** The least head room (metres) over the floor of a disc of radius r about (x, z), -1 where its middle is no floor near y (the rock's wall side is ignored). */
   const roomAround = (x: number, y: number, z: number, r: number): number => {
@@ -132,6 +171,52 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   for (const sm of streams) for (const [x, , z, w] of sm.pts) {
     const r = w + 1.6, i0 = Math.max(0, col(x - r)), i1 = Math.min(nx - 1, col(x + r)), k0 = Math.max(0, row(z - r)), k1 = Math.min(nz - 1, row(z + r));
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) chan[i + nx * k] = Math.min(chan[i + nx * k], Math.hypot(ox + i * step - x, oz + k * step - z) - w);
+  }
+
+  // --- ponds: standing water deep enough to swim in (K6, the first water of the sump) ---
+  // In a wide, level, high stretch of a way: the floor is cut into a smooth bowl and the water stands at the floor's level round it, so it fills
+  // half of the way's width at most and a bank is left on both sides. A big one may be a sump: rock closes the way over its middle down to the
+  // water, so the hero dives under it (held breath, game/breath.ts) and comes up on the far side.
+  const po = d.water.ponds;
+  if (po.chance > 0) {
+    const spots: { x: number; z: number; fl: number; hh: number; at: number; tx: number; tz: number }[][] = [];
+    for (const c of passages) {
+      const row_: { x: number; z: number; fl: number; hh: number; at: number; tx: number; tz: number }[] = [];
+      for (let s = 0; s + 1 < c.points.length; s++) {
+        const a = c.points[s], b = c.points[s + 1], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 1.1));
+        for (let m = 0; m < n; m++) {
+          const t = m / n, x = lerp(a.x, b.x, t), z = lerp(a.z, b.z, t), hh = lerp(wayHalf(a), wayHalf(b), t), sp = spanAt(x, lerp(a.y - a.B - a.D, b.y - b.B - b.D, t) + 1, z);
+          if (sp) row_.push({ x, z, fl: sp[0], hh, at: row_.length, tx: 0, tz: 0 });
+        }
+      }
+      // (The way's direction at each point, from the points either side.)
+      row_.forEach((q, i) => { const a = row_[Math.max(0, i - 2)], b = row_[Math.min(row_.length - 1, i + 2)], l = Math.hypot(b.x - a.x, b.z - a.z) || 1; q.tx = (b.x - a.x) / l; q.tz = (b.z - a.z) / l; });
+      spots.push(row_);
+    }
+    const level = (r: { fl: number }[], i: number, o: number): number => r[Math.max(0, Math.min(r.length - 1, i + o))].fl;
+    const found = spots.flatMap((r) => r.filter((p, i) => p.hh >= po.wide && Math.abs(level(r, i, -3) - p.fl) <= 0.35 && Math.abs(level(r, i, 3) - p.fl) <= 0.35 && i >= 3 && i + 3 < r.length));
+    const want = Math.round(sk.stats.length / 100 * po.per100 + pondRng.float() * 0.8);
+    let made = 0;
+    for (let tries = 0; made < want && tries < 80 && found.length; tries++) {
+      const p = found.splice(Math.floor(pondRng.float() * found.length), 1)[0], r = Math.min(4.5, p.hh * 0.5);
+      if (pools.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < q.r + r + 1)) continue;
+      if (roomAround(p.x, p.fl, p.z, r) < po.depth + 0.8) continue;
+      const ring = ringFloor(p.x, p.fl, p.z, r);
+      if (!ring || ring.hi - ring.lo > po.bank || !brickThere(col(p.x), Math.floor((ring.lo - po.depth - 1 - oy) / step), row(p.z))) continue;
+      const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2.4, r * 0.38);
+      bowl(p.x, top, p.z, r, depth);
+      if (sump) lid(p.x, p.z, p.tx, p.tz, half, r + BEACH, top);
+      // Like a stream's channel, the pond keeps silt, rocks and stones out of its bowl.
+      const reach = r + BEACH + 0.6, i0 = Math.max(0, col(p.x - reach)), i1 = Math.min(nx - 1, col(p.x + reach)), k0 = Math.max(0, row(p.z - reach)), k1 = Math.min(nz - 1, row(p.z + reach));
+      for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) chan[i + nx * k] = Math.min(chan[i + nx * k], Math.hypot(ox + i * step - p.x, oz + k * step - p.z) - r);
+      // A stream through it comes in at the pond's level: its surface eases to the pond's over the last few metres (no step where the two waters meet).
+      for (const sm of streams) for (const q of sm.pts as [number, number, number, number][]) {
+        const dd = Math.hypot(q[0] - p.x, q[2] - p.z);
+        if (dd < r + 4) q[1] = lerp(top, q[1], smooth01((dd - r) / 4));
+      }
+      pools.push({ x: p.x, y: top, z: p.z, r, depth, ...(sump ? { lid: { tx: p.tx, tz: p.tz, half } } : {}) });
+      made++;
+    }
   }
 
   function streamOf(c: Conduit): void {
@@ -190,6 +275,47 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     });
     keep();
     for (const p of mine) if (streams.some((s) => s.pts.some((q) => q[0] === p.x && q[2] === p.z))) pools.push(p);
+  }
+  /** Does the way run straight through (x, z) along (tx, tz) for `len` either side: air, a floor within a step of `lo` (the bank) and 3 m of head room, over a path 1.6 m wide? (A sump needs a clear dive.) */
+  function runsStraight(x: number, z: number, tx: number, tz: number, len: number, lo: number): boolean {
+    for (let u = -len; u <= len; u += 0.6) for (const v of [-0.8, 0, 0.8]) {
+      const sp = spanAt(x + u * tx - v * tz, lo + 0.3, z + u * tz + v * tx);
+      if (!sp || sp[0] < lo - 0.8 || sp[0] > lo + 1.2 || sp[1] - sp[0] < 3) return false;
+    }
+    return true;
+  }
+  /** Close a way with rock from the water's surface up (a sump's lid): a box `half` either side of (x, z) along (tx, tz) and `across` either side across it, from `top` up. */
+  function lid(x: number, z: number, tx: number, tz: number, half: number, across: number, top: number): void {
+    const R = Math.hypot(half, across) + step, i0 = Math.max(0, col(x - R)), i1 = Math.min(nx - 1, col(x + R)), k0 = Math.max(0, row(z - R)), k1 = Math.min(nz - 1, row(z + R));
+    const j0 = Math.max(0, Math.floor((top - 1 - oy) / step)), j1 = ny - 1;
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+      const X = ox + i * step - x, Z = oz + k * step - z, u = X * tx + Z * tz, v = -X * tz + Z * tx, qu = Math.abs(u) - half, qv = Math.abs(v) - across;
+      for (let j = j0; j <= j1; j++) {
+        if (!brickThere(i, j, k)) continue;
+        const qy = top - (oy + j * step), d3 = Math.hypot(Math.max(qu, 0), Math.max(qv, 0), Math.max(qy, 0)) + Math.min(Math.max(qu, qv, qy), 0);
+        if (d3 < sampleOf(f, i, j, k)) setSample(f, i, j, k, Math.max(-3, d3));
+      }
+    }
+  }
+  /**
+   * Cut a pond: a bowl of radius r, `depth` deep in the middle, its slope gentlest at the rim and the bottom, and past the rim a beach that
+   * rises from the surface at 24 degrees to the floor round it (a swimmer cannot pull up out of the water onto a ledge, but wades onto a slope).
+   */
+  function bowl(x: number, top: number, z: number, r: number, depth: number): void {
+    const R = r + BEACH, i0 = Math.max(0, col(x - R - step)), i1 = Math.min(nx - 1, col(x + R + step)), k0 = Math.max(0, row(z - R - step)), k1 = Math.min(nz - 1, row(z + R + step));
+    const j0 = Math.max(0, Math.floor((top - depth - 1 - oy) / step)), j1 = Math.min(ny - 1, Math.ceil((top + 1.4 - oy) / step));
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+      const dd = Math.hypot(ox + i * step - x, oz + k * step - z);
+      if (dd > R + step) continue;
+      // Down from the floor that is there (the surface is the lowest of it round the rim): a pond cut into a bank leaves the bank's foot where it was.
+      const here = spanAt(ox + i * step, top + 0.4, oz + k * step), floor = here ? here[0] : top;
+      const bed = dd <= r ? Math.min(floor, top) - depth * smooth01(1 - dd / r) : top + (dd - r) * 0.45;
+      for (let j = j0; j <= j1; j++) {
+        if (!brickThere(i, j, k)) continue;
+        const y = oy + j * step, v = Math.min((R - dd) * 0.8, y - bed, top + 1.4 - y);
+        if (v > sampleOf(f, i, j, k)) setSample(f, i, j, k, Math.min(v, 3));
+      }
+    }
   }
   /** Cut a basin of radius r into the floor, its surface at `top`, `depth` deep in the middle. */
   function basin(x: number, top: number, z: number, r: number, depth: number): void {
@@ -292,6 +418,27 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     const { p, q } = passagePts[rng.int(0, passagePts.length - 1)], t = rng.float(), c = passages.find((k) => k.points.includes(p))!;
     const x = lerp(p.x, q.x, t) + rng.range(-0.75, 0.75) * p.A, z = lerp(p.z, q.z, t) + rng.range(-0.75, 0.75) * p.A, span = spanAt(x, lerp(p.y, q.y, t), z);
     if (span && span[1] - span[0] >= head + 0.3 && p.B >= 1.4) dripAt(x, z, span[0], span[1], c, 1 + d.formations.age * (1 - (lastLevel ? c.level / lastLevel : 0)), wayHalf(p));
+  }
+  // A lava tube's own drips: lava that seeped through the crust and set as it hung, short, black and glazed, in clusters over the roof
+  // (no water, no sound). A few thin ones among them.
+  if (block.rock.lava && passagePts.length) {
+    const lrng = new Rng(deriveSeed(block.seed, 'cave', 'lavadrips')), ld = d.lava, want = Math.min(ld.most, Math.round(sk.stats.length / 100 * ld.drips));
+    for (let n = 0, tries = 0; n < want && tries < want * 6; tries++) {
+      const { p, q } = passagePts[lrng.int(0, passagePts.length - 1)], t = lrng.float();
+      const cx = lerp(p.x, q.x, t) + lrng.range(-0.8, 0.8) * p.A, cz = lerp(p.z, q.z, t) + lrng.range(-0.8, 0.8) * p.A, cy = lerp(p.y, q.y, t);
+      for (let m = lrng.int(ld.cluster[0], ld.cluster[1]); m > 0 && n < want; m--) {
+        const x = cx + lrng.range(-0.7, 0.7), z = cz + lrng.range(-0.7, 0.7), span = spanAt(x, cy, z);
+        if (!span || span[1] - span[0] < head + 0.3) continue;
+        // Short ones are many, long ones few; the tip stays above the hero's head.
+        const len = Math.min(lerp(ld.length[0], ld.length[1], lrng.float() ** 2.2), span[1] - span[0] - head), top = span[1];
+        if (len < 0.05) continue;
+        const thin = lrng.chance(0.3);
+        speleos.push(thin
+          ? { kind: 'straw', x, z, y0: top - len, y1: top, rb: 0.012, rt: 0.035, waist: 1, dead: false, glaze: true }
+          : { kind: 'stalactite', x, z, y0: top - len, y1: top, rb: 0.02, rt: Math.max(0.06, 0.06 + 0.16 * len), waist: 0.8, dead: false, glaze: true });
+        n++;
+      }
+    }
   }
   function dripAt(x: number, z: number, floor: number, ceil: number, c: Conduit, age: number, hh: number): void {
     const live = c.active || c.level >= lastLevel || rng.chance(d.drips.live), dead = !live, gap = ceil - floor;
@@ -408,6 +555,16 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
   }
   const { stones, crystals } = scatter();
   // --- a mine's timber, rails and carts ---
-  const fittings = block.rock.mine ? fitMine(sk.conduits, block.rock.mine, spanAt, rng.fork('fittings')) : [];
-  return { speleos, drips, streams, pools, rocks, stones, crystals, fittings, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
+  const ladders: Ladder[] = [];
+  for (const c of sk.conduits) if (c.ladder) {
+    // The rails lie on the shaft's floor: the shaft's axis, set down by its radius (square to the axis) and up a hand's width.
+    const a = c.points[0], b = c.points[c.ladder.top], { foot, head } = c.ladder, hor = Math.hypot(b.x - a.x, b.z - a.z), len = Math.hypot(hor, b.y - a.y) || 1, sn = (b.y - a.y) / len, cs = hor / len;
+    const dx = hor > 1e-6 ? (b.x - a.x) / hor : 0, dz = hor > 1e-6 ? (b.z - a.z) / hor : 0, lift = a.B - 0.1;
+    // (The floor's normal points up and back down the slope, (−d sin, cos); the ladder point is the axis point set down by `lift` along it.)
+    const axisAt = (y: number): [number, number] => { const u = (y + cs * lift - a.y) / ((b.y - a.y) || 1); return [a.x + (b.x - a.x) * u + dx * sn * lift, a.z + (b.z - a.z) * u + dz * sn * lift]; };
+    const [x0, z0] = axisAt(foot), [x1, z1] = axisAt(head);
+    ladders.push({ x0, y0: foot, z0, x1, y1: head, z1 });
+  }
+  const fittings = block.rock.mine ? [...fitMine(sk.conduits, block.rock.mine, spanAt, rng.fork('fittings')), ...ladders.flatMap((l) => ladderBoxes(l))] : [];
+  return { speleos, drips, ladders, streams, pools, rocks, stones, crystals, fittings, stats: { standable, level: standable ? level / standable : 0, ms: timer() - t0 } };
 }

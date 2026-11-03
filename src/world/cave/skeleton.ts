@@ -36,6 +36,8 @@ export interface Conduit {
   readonly level: number;
   /** Does the water run in it today? */
   readonly active: boolean;
+  /** A winze (K8): a steep shaft with a ladder up its floor; `foot` and `head` are the heights of the floors it joins, `top` the index of the point where the slope ends (a level stretch follows). */
+  readonly ladder?: { readonly foot: number; readonly head: number; readonly top: number };
 }
 
 /** A collapse void: the ceiling fell in a dome over (x, z), up from the floor `floor`, and a heap of rubble lies under it. */
@@ -62,6 +64,8 @@ export interface Skeleton {
   readonly throat?: ThroatFrame;
   /** How much of the usual wall scalloping the carver keeps (default 1): a mine's walls are tooled, not water-worn. */
   readonly rough?: number;
+  /** Flow ledges on the walls of a lava tube (a lip in metres, levels, the first one's rise above the floor and each next one's), cut by the carver. */
+  readonly ledges?: { readonly lip: number; readonly levels: number; readonly first: number; readonly rise: number };
   readonly conduits: readonly Conduit[];
   readonly voids: readonly Void[];
   /** Where the water came in (the lattice nodes' positions) and went out. */

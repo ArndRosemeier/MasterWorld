@@ -44,6 +44,7 @@ import { caveSpecFor, type CaveSpec } from '../vgm/caves';
 import { inhabit } from '../vgm/inhabit';
 import { FormedSpace } from '../sim/formedSpace';
 import { lockSites, type CaveLock } from '../world/cave/locks';
+import { caveWater } from '../world/cave/water';
 import { lockPiece } from '../world/cave/lockMesh';
 import { keyMesh } from '../world/dungeon/cellarMesh';
 import type { BuildingMesh } from '@futuremagic/settlement';
@@ -554,7 +555,7 @@ export class Cellars {
     const d = res.dressing, sounds = { drips: d?.drips.map((p): [number, number, number] => [p.x, p.floor, p.z]) ?? [], streams: d?.streams.flatMap((st) => st.pts.filter((_, i) => i % 2 === 0).map((q): [number, number, number] => [q[0], q[1], q[2]])) ?? [] };
     // Its story's shut ways, set where the cave narrows (K6): solid for the walker and the creatures, drawn as pieces that open on screen.
     const locks = lockSites(first.cellar, res.field, res.read.reading, first.cells, caves.way);
-    return { res, locks, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes, sounds, locks) };
+    return { res, locks, space: new FormedSpace(first.cellar.layout, res.field, first.ground, first.cellar.formed!.homes, sounds, locks, d ? caveWater(d, caves.dress.water.bed, caves.dress.water.poolDepth) : null, d?.ladders) };
   }
 
   /** Its dwellers now: the den, their bodies and the fight (again after a move-in). */

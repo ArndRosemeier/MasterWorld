@@ -46,7 +46,7 @@ const CELL = 0.3, BEYOND = 0.5;
 const SLACK = 0.35;
 
 /** A point of water: where the surface stands, how it runs, and how deep the bed beneath it is cut. */
-interface Source { readonly x: number; readonly z: number; readonly y: number; readonly speed: number; readonly fx: number; readonly fz: number; readonly cap: number; readonly reach: number }
+interface Source { readonly x: number; readonly z: number; readonly y: number; readonly speed: number; readonly fx: number; readonly fz: number; readonly cap: number; readonly reach: number; readonly pond?: boolean }
 
 /**
  * The water mesh of a dressing; `bed` is how deep the stream's bed is cut (the setting's `dress.water.bed`), `poolDepth` a
@@ -68,11 +68,12 @@ export function waterMesh(d: Dressing, bed: number, poolDepth: number, floor?: F
       sources.push({ x: p[0], z: p[2], y: p[1], speed, fx: dx / l, fz: dz / l, cap: bed + SLACK, reach: p[3] * 1.15 + BEYOND });
     });
   }
-  for (const p of d.pools) sources.push({ x: p.x, z: p.z, y: p.y, speed: 0, fx: 0, fz: 0, cap: poolDepth + SLACK, reach: p.r * 1.15 + BEYOND });
+  for (const p of d.pools) sources.push({ x: p.x, z: p.z, y: p.y, speed: 0, fx: 0, fz: 0, cap: (p.depth ?? poolDepth) + SLACK, reach: p.r * 1.15 + BEYOND, pond: p.depth !== undefined });
   if (!sources.length) return { position: new Float32Array(0), normal: new Float32Array(0), uv: new Float32Array(0), flow: new Float32Array(0), index: new Uint32Array(0) };
 
   // Each grid corner within reach of a source belongs to the nearest one (its level, speed and direction).
   const owner = new Map<number, { src: Source; d2: number }>();
+  const inPond = (s: Source, d2: number): boolean => !!s.pond && d2 <= ((s.reach - BEYOND) / 1.15) ** 2;
   const KEY = 1 << 15;
   const cornerKey = (i: number, k: number): number => (i + KEY) * 65536 + (k + KEY);
   for (const s of sources) {
@@ -81,7 +82,9 @@ export function waterMesh(d: Dressing, bed: number, poolDepth: number, floor?: F
       const d2 = (i * CELL - s.x) ** 2 + (k * CELL - s.z) ** 2;
       if (d2 > s.reach * s.reach) continue;
       const key = cornerKey(i, k), was = owner.get(key);
-      if (!was || d2 < was.d2) owner.set(key, { src: s, d2 });
+      // A pond owns the water over its own bowl: the stream's bed through it is shallow, the pond's is deep.
+      const wins = !was || (inPond(s, d2) !== inPond(was.src, was.d2) ? inPond(s, d2) : d2 < was.d2);
+      if (wins) owner.set(key, { src: s, d2 });
     }
   }
   // The depth of the water at each corner: the surface over the floor, down to the cap as it is, then falling away to nothing (negative: no water).
