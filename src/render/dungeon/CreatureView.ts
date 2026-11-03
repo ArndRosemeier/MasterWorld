@@ -27,6 +27,8 @@ import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './ani
 import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { limp, limpOf } from '../limp';
 import { PACE } from '../hero/clips';
+import { ORIGIN } from '../origin';
+import { renderGround } from './renderGround';
 import { Held, Steady } from '../steady';
 import { AURAS } from '../aura/marks';
 import { FAINT, STRONG, auraReach, auraSize, healthLook } from '../../sim/aura';
@@ -121,8 +123,7 @@ export class CreatureView {
       return ch;
     };
     // The rig plants feet in the world: the cellar's floor under them (near the storey the creature is on).
-    const O = v.group.position;
-    const ground = (x: number, z: number) => (den.ground.floorAt(x - O.x, z - O.z, v.near + 0.8) ?? v.near) + O.y;
+    const ground = renderGround((x, z, y) => den.ground.floorAt(x, z, y), v.group.position, ORIGIN.at, () => v.near + 0.8, () => v.near);
     for (const c of den.creatures) {
       const b = c.def.body;
       let body: Body;
