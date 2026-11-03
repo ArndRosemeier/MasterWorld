@@ -73,7 +73,7 @@ export const caves: CavesDef = {
       lava: {
         halfWidth: [2.6, 6.2], halfHeight: [2, 3.6], gradient: [0.02, 0.07], length: [1, 1.8], roof: 4,
         branches: [0, 2], branchLength: [28, 70], wander: 0.7, skylights: { most: 3, apart: 38, thin: 7 },
-        ledges: { lip: 0.7, levels: 2, first: 2.0, rise: 1.3 },
+        ledges: { lip: 0.8, levels: 2, first: 2.0, rise: 1.3 },
       },
     },
     {
@@ -115,7 +115,7 @@ export const caves: CavesDef = {
     stones: { per100: 520, size: [0.06, 0.7], heaps: 0.3, most: 4500 },
     crystals: { per100: 9, count: [3, 9], len: [0.1, 0.5], oreTries: 5000 },
     formations: { length: [0.2, 2.6], age: 0.5, column: 7, straws: 0.12, most: 3000 },
-    lava: { drips: 110, length: [0.15, 1.1], cluster: [2, 6], most: 2400 },
+    lava: { drips: 110, length: [0.3, 1.7], cluster: [2, 6], most: 2400 },
   },
   // Ore is for show (no mining, ever): veins on faults and joints, seams along a bed, pockets.
   ore: {

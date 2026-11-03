@@ -55,13 +55,22 @@ export interface Pool {
 /** A winze's ladder (K8): the line its rails run along, up the shaft's floor, from the foot (at the lower drift's floor) to the head (at the floor above). */
 export interface Ladder { readonly x0: number; readonly y0: number; readonly z0: number; readonly x1: number; readonly y1: number; readonly z1: number }
 
-/** Is (x, y, z) at a ladder (within a body's reach of its line, between its foot and head)? The hero climbs there without tiring. */
-export function onLadder(ladders: readonly Ladder[], x: number, y: number, z: number): boolean {
-  return ladders.some((l) => {
-    if (y < l.y0 - 0.5 || y > l.y1 + 0.5) return false;
+/**
+ * Where a climber at (x, y, z) takes hold of a ladder (within a body's reach of its line, between its foot and head), or null: the ladder's point at that
+ * height (x, z, in the world's coordinates, the cave standing at `origin`), the horizontal way up the shaft leans (nx, nz: the climber faces it), and whether the foot and the head are near (the hero boards at the foot
+ * and pulls over at the head). A ladder carries its climber by itself, whatever the rock beside it is like.
+ */
+export interface LadderGrip { readonly x: number; readonly z: number; readonly nx: number; readonly nz: number; readonly foot: boolean; readonly head: boolean }
+export function ladderGrip(ladders: readonly Ladder[], origin: { readonly x: number; readonly y: number; readonly z: number }, wx: number, wy: number, wz: number): LadderGrip | null {
+  const x = wx - origin.x, y = wy - origin.y, z = wz - origin.z;
+  for (const l of ladders) {
+    if (y < l.y0 - 0.5 || y > l.y1 + 0.5) continue;
     const dx = l.x1 - l.x0, dy = l.y1 - l.y0, dz = l.z1 - l.z0, t = Math.max(0, Math.min(1, ((x - l.x0) * dx + (y - l.y0) * dy + (z - l.z0) * dz) / (dx * dx + dy * dy + dz * dz || 1)));
-    return Math.hypot(x - l.x0 - dx * t, y - l.y0 - dy * t, z - l.z0 - dz * t) < 1.1;
-  });
+    if (Math.hypot(x - l.x0 - dx * t, y - l.y0 - dy * t, z - l.z0 - dz * t) >= 1.1) continue;
+    const f = Math.max(0, Math.min(1, (y - l.y0) / (dy || 1))), hor = Math.hypot(dx, dz) || 1;
+    return { x: l.x0 + dx * f + origin.x, z: l.z0 + dz * f + origin.z, nx: dx / hor, nz: dz / hor, foot: y < l.y0 + 0.6, head: y > l.y1 - 1.2 };
+  }
+  return null;
 }
 
 /** A fallen rock: an ellipsoid turned by its yaw. */
@@ -114,6 +123,8 @@ export function columnSpans(f: BrickField, i: number, k: number, out: number[] =
 
 /** How far past a pond's rim its beach runs out (m). */
 const BEACH = 3.2;
+/** The gap of air between a sump's water and its lid (m): the water is seen to run on under a low arch of rock, a way under (GPU look: a plain wall at the water read as a dead end). */
+const DUCK = 0.4;
 
 const smooth01 = (t: number): number => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
 
@@ -205,7 +216,7 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
       if (!ring || ring.hi - ring.lo > po.bank || !brickThere(col(p.x), Math.floor((ring.lo - po.depth - 1 - oy) / step), row(p.z))) continue;
       const top = ring.lo - 0.05, sump = r >= po.sumpWide && pondRng.float() < po.sump && runsStraight(p.x, p.z, p.tx, p.tz, r + 1.5, ring.lo), depth = sump ? po.sumpDepth : po.depth, half = Math.min(2.4, r * 0.38);
       bowl(p.x, top, p.z, r, depth);
-      if (sump) lid(p.x, p.z, p.tx, p.tz, half, r + BEACH, top);
+      if (sump) lid(p.x, p.z, p.tx, p.tz, half, r + BEACH, top + DUCK);
       // Like a stream's channel, the pond keeps silt, rocks and stones out of its bowl.
       const reach = r + BEACH + 0.6, i0 = Math.max(0, col(p.x - reach)), i1 = Math.min(nx - 1, col(p.x + reach)), k0 = Math.max(0, row(p.z - reach)), k1 = Math.min(nz - 1, row(p.z + reach));
       for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) chan[i + nx * k] = Math.min(chan[i + nx * k], Math.hypot(ox + i * step - p.x, oz + k * step - p.z) - r);
