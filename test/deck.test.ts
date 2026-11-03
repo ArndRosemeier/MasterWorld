@@ -13,7 +13,7 @@ function sea(decks: Decks): WalkWorld {
   return {
     height: (_x, z) => (z < pierEdge ? mooring.landY : -12),
     rockSurface: () => null,
-    waterLevel: (_x, z) => (z < pierEdge ? null : 0),
+    waterLevel: (_x, _y, z) => (z < pierEdge ? null : 0),
     floor: (x, z, y) => decks.underfoot(x, z, y),
     wall: (x, z, r, y) => decks.hull(x, z, r, y ?? 0),
   };

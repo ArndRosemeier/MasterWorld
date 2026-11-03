@@ -24,7 +24,7 @@ export interface FlightIntent {
 /** The land under the bird. */
 export interface FlightWorld {
   height(x: number, z: number): number;
-  waterLevel(x: number, z: number): number | null;
+  waterLevel(x: number, y: number, z: number): number | null;
   /** Walls (buildings): does a body of radius `r` at (x, z) touch one? */
   wall?(x: number, z: number, r: number): boolean;
 }
@@ -79,14 +79,19 @@ export class BirdFlight {
 
   /** The ground (or water) the bird would stand on at (x, z). */
   floor(x: number, z: number): number {
-    const g = this.world.height(x, z), w = this.world.waterLevel(x, z);
-    return w !== null && w > g ? w + FLIGHT.overWater : g;
+    const g = this.world.height(x, z), w = this.waterOver(x, z);
+    return w === null ? g : w + FLIGHT.overWater;
+  }
+
+  /** The water's surface where it lies over the ground at (x, z), else null. */
+  private waterOver(x: number, z: number): number | null {
+    const g = this.world.height(x, z), w = this.world.waterLevel(x, g, z);
+    return w !== null && w > g ? w : null;
   }
 
   /** Over water (it cannot land there). */
   private wet(x: number, z: number): boolean {
-    const w = this.world.waterLevel(x, z);
-    return w !== null && w > this.world.height(x, z);
+    return this.waterOver(x, z) !== null;
   }
 
   get overGround(): number { return Math.hypot(this.vel.x, this.vel.z); }

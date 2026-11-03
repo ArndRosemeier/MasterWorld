@@ -7,7 +7,11 @@ import { inFrame } from '../world/dungeon/site';
 import type { DungeonSpace } from '../world/dungeon/space';
 import { CaveSpace } from '../world/dungeon/caveRock';
 import { FormedSpace } from '../sim/formedSpace';
+import type { CaveWaterAt } from '../world/cave/water';
 import type { WalkWorld } from './walker';
+
+/** A cave's water as the walker asks it: the cave's frame (its origin in the world) and back. */
+export const caveLevel = (water: CaveWaterAt, origin: { x: number; y: number; z: number }): WalkWorld['waterLevel'] => (x, y, z) => { const s = water(x - origin.x, y - origin.y, z - origin.z); return s === null ? null : s + origin.y; };
 
 /** A tower's way out (a door prop against the wall): the part of it the camera keeps out of, in its frame (m: across; along its facing, the wall at about +0.55 and the pane at -0.5; up). */
 const DOOR_ACROSS = 1.0, DOOR_FRONT = -0.65, DOOR_BACK = 1.0, DOOR_UP = 2.7;
@@ -25,7 +29,8 @@ export function dungeonWorld(space: DungeonSpace, origin: { x: number; y: number
     rockSurface: spaceSdf,
     sightSurface: door ? (x, y, z) => Math.min(spaceSdf(x, y, z), doorBox(door, x - origin.x, y - origin.y, z - origin.z)) : undefined,
     // A drowned lowest storey (a sea cave): one still surface over all of it (the rock above keeps it to its rooms).
-    waterLevel: space.layout?.flood === undefined ? () => null : () => origin.y + space.layout.flood!,
+    // A formed cave's streams and pools (world/cave/water.ts) stand at their own levels, and stack: the question carries the height.
+    waterLevel: space instanceof FormedSpace && space.water ? caveLevel(space.water, origin) : space.layout?.flood === undefined ? () => null : () => origin.y + space.layout.flood!,
     // A cave's broken rock is climbed wherever it stands as a wall (a drop's face back up); built walls are not.
     rockHolds: () => space instanceof CaveSpace || space instanceof FormedSpace,
   };
