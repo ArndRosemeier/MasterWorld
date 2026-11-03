@@ -62,6 +62,8 @@ export interface Skeleton {
   readonly throat?: ThroatFrame;
   /** How much of the usual wall scalloping the carver keeps (default 1): a mine's walls are tooled, not water-worn. */
   readonly rough?: number;
+  /** Flow ledges on the walls of a lava tube (a lip in metres, levels, the first one's rise above the floor and each next one's), cut by the carver. */
+  readonly ledges?: { readonly lip: number; readonly levels: number; readonly first: number; readonly rise: number };
   readonly conduits: readonly Conduit[];
   readonly voids: readonly Void[];
   /** Where the water came in (the lattice nodes' positions) and went out. */

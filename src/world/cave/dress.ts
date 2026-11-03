@@ -30,6 +30,8 @@ export interface Speleo {
   readonly waist: number;
   /** Dry: no water runs here any more (dusty, grey). */
   readonly dead: boolean;
+  /** Set lava, not dripstone (a lava drip): black and glazed. */
+  readonly glaze?: true;
 }
 
 /** Water falling from a roof: where it leaves the tip, and the height it lands at. */
@@ -402,6 +404,27 @@ export function dressCave(sk: Skeleton, block: RockBlock, f: BrickField, caves: 
     const { p, q } = passagePts[rng.int(0, passagePts.length - 1)], t = rng.float(), c = passages.find((k) => k.points.includes(p))!;
     const x = lerp(p.x, q.x, t) + rng.range(-0.75, 0.75) * p.A, z = lerp(p.z, q.z, t) + rng.range(-0.75, 0.75) * p.A, span = spanAt(x, lerp(p.y, q.y, t), z);
     if (span && span[1] - span[0] >= head + 0.3 && p.B >= 1.4) dripAt(x, z, span[0], span[1], c, 1 + d.formations.age * (1 - (lastLevel ? c.level / lastLevel : 0)), wayHalf(p));
+  }
+  // A lava tube's own drips: lava that seeped through the crust and set as it hung, short, black and glazed, in clusters over the roof
+  // (no water, no sound). A few thin ones among them.
+  if (block.rock.lava && passagePts.length) {
+    const lrng = new Rng(deriveSeed(block.seed, 'cave', 'lavadrips')), ld = d.lava, want = Math.min(ld.most, Math.round(sk.stats.length / 100 * ld.drips));
+    for (let n = 0, tries = 0; n < want && tries < want * 6; tries++) {
+      const { p, q } = passagePts[lrng.int(0, passagePts.length - 1)], t = lrng.float();
+      const cx = lerp(p.x, q.x, t) + lrng.range(-0.8, 0.8) * p.A, cz = lerp(p.z, q.z, t) + lrng.range(-0.8, 0.8) * p.A, cy = lerp(p.y, q.y, t);
+      for (let m = lrng.int(ld.cluster[0], ld.cluster[1]); m > 0 && n < want; m--) {
+        const x = cx + lrng.range(-0.7, 0.7), z = cz + lrng.range(-0.7, 0.7), span = spanAt(x, cy, z);
+        if (!span || span[1] - span[0] < head + 0.3) continue;
+        // Short ones are many, long ones few; the tip stays above the hero's head.
+        const len = Math.min(lerp(ld.length[0], ld.length[1], lrng.float() ** 2.2), span[1] - span[0] - head), top = span[1];
+        if (len < 0.05) continue;
+        const thin = lrng.chance(0.3);
+        speleos.push(thin
+          ? { kind: 'straw', x, z, y0: top - len, y1: top, rb: 0.012, rt: 0.035, waist: 1, dead: false, glaze: true }
+          : { kind: 'stalactite', x, z, y0: top - len, y1: top, rb: 0.02, rt: Math.max(0.05, 0.05 + 0.12 * len), waist: 0.8, dead: false, glaze: true });
+        n++;
+      }
+    }
   }
   function dripAt(x: number, z: number, floor: number, ceil: number, c: Conduit, age: number, hh: number): void {
     const live = c.active || c.level >= lastLevel || rng.chance(d.drips.live), dead = !live, gap = ceil - floor;
