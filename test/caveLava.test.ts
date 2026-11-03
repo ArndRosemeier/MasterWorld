@@ -5,7 +5,8 @@ import { formCave } from '../src/world/cave/form';
 import { rockFor, sharesFor } from '../src/world/cave/choose';
 import { Walker } from '../src/game/walker';
 import { formedWorld } from '../src/game/formedWorld';
-import type { BrickField } from '../src/world/dungeon/rockMesh';
+import { carveSkeleton } from '../src/world/cave/carve';
+import { fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 
 test('lava tubes (K7): volcanic country holds basalt and lava, the flow forms the same twice from a vent down the land, and its tube is a way in', () => {
   assert.equal(rockFor(caves, 'volcanic', 5)!.id, 'basalt');
@@ -26,7 +27,9 @@ test('lava tubes (K7): volcanic country holds basalt and lava, the flow forms th
 
 test('lava tubes (K7): dressed with no dripstone and no crystals, read as one network from the way in, and the real walker goes in along its course', () => {
   const { c, reading, dressing } = formedCave(2, 'basalt');
-  assert.equal(dressing.speleos.length, 0, 'no stalactites in a lava tube');
+  assert.ok(dressing.speleos.every((s) => s.glaze && s.kind !== 'stalagmite' && s.kind !== 'column'), 'no dripstone in a lava tube: only its own glazed drips');
+  assert.equal(dressing.drips.length, 0, 'no water falls');
+  assert.equal(dressing.crystals.length, 0, 'no crystals');
   assert.equal(dressing.streams.length, 0, 'no stream');
   assert.ok(reading.stats.reached >= 0.95 * reading.stats.cells && reading.stats.cutOff === 0, `reached ${reading.stats.reached} of ${reading.stats.cells}`);
   const t = c.skeleton.throat!, f = c.field as BrickField, w = new Walker(formedWorld(f));
@@ -41,4 +44,40 @@ test('lava tubes (K7): dressed with no dripstone and no crystals, read as one ne
     w.step({ forward: 1, strafe: 0, heading: Math.atan2(-(p.x - w.pos.x), -(p.z - w.pos.z)), walk: false, up: false, down: false }, 1 / 60);
   }
   assert.ok(k < tube.length - 1 - 8, `walked ${Math.hypot(w.pos.x - t.x, w.pos.z - t.z).toFixed(1)} m of the way, short of ${goal.x.toFixed(0)}, ${goal.z.toFixed(0)}`);
+});
+
+test('lava tubes (K7c): lava drips hang short from the roof over the hero\'s head', () => {
+  const { c, dressing } = formedCave(2, 'basalt'), f = c.field as BrickField, ld = caves.dress.lava;
+  const drips = dressing.speleos;
+  assert.ok(drips.length >= 40, `${drips.length} lava drips`);
+  const head = caves.way.minHeight + 0.1;
+  for (const s of drips) {
+    assert.ok(s.y1 - s.y0 <= ld.length[1] + 1e-6, 'short');
+    assert.ok(fieldAt(f, s.x, s.y1 + 0.35, s.z, -1) < 0.3, 'hangs from rock');
+  }
+  // The tips stay above the head of a hero standing under them.
+  const low = drips.filter((s) => { for (let y = s.y0 - 0.1; y > s.y0 - head + 0.1; y -= 0.2) if (fieldAt(f, s.x, y, s.z, -1) <= 0) return true; return false; });
+  assert.ok(low.length <= drips.length * 0.05, `${low.length} of ${drips.length} drips hang lower than a hero stands`);
+});
+
+test('lava tubes (K7c): flow ledges jut from the walls high over the floor and leave the floor and the middle alone', () => {
+  const { c } = formedCave(2, 'basalt'), sk = c.skeleton;
+  assert.ok(sk.ledges && sk.ledges.lip > 0, 'the lava former hands the carver its ledges');
+  // (The carved field before the dressing, with the ledges and without.)
+  const f = carveSkeleton(sk, c.block, caves, (c.field as BrickField).step), plain = carveSkeleton({ ...sk, ledges: undefined }, c.block, caves, f.step);
+  const ups: number[] = [];
+  const tube = sk.conduits[0].points;
+  for (let n = 0; n + 1 < tube.length; n += 1) {
+    const p = tube[n];
+    // The floor of the tube and its middle are as they were.
+    assert.ok(Math.abs(fieldAt(f, p.x, p.y - p.B + 0.4, p.z, -1) - fieldAt(plain, p.x, p.y - p.B + 0.4, p.z, -1)) < 0.05);
+    for (let a = 0; a < 16; a++) for (let d = -p.A * 1.1; d <= p.A * 1.1; d += 0.3) for (let y = p.y - p.B; y < p.y + p.B; y += 0.25) {
+      const x = p.x + Math.cos(a * 0.4) * d, z = p.z + Math.sin(a * 0.4) * d, g = fieldAt(f, x, y, z, -1), h = fieldAt(plain, x, y, z, -1);
+      if (g < h - 0.1) ups.push(y - (p.y - p.B));
+    }
+  }
+  ups.sort((a, b) => a - b);
+  assert.ok(ups.length > 30, `${ups.length} samples of ledge`);
+  const low = ups[Math.floor(ups.length * 0.05)];
+  assert.ok(low >= sk.ledges!.first - 0.8, `5% of the ledge lies below ${low.toFixed(2)} m over the floor`);
 });

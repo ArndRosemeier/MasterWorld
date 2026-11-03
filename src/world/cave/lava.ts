@@ -154,7 +154,7 @@ export function formLava(block: RockBlock, caves: CavesDef, scale: number, since
   }
 
   return {
-    conduits, voids, sinks: [], springs: [], tables: [0],
+    conduits, voids, sinks: [], springs: [], tables: [0], ledges: lava.ledges,
     stats: { nodes: points, runs: conduits.length, length, junctions, loops: 0, ms: { prep: 0, flow: 0, chains: since() - t0 } },
   };
 }

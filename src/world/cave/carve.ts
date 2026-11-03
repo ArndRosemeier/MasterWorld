@@ -5,7 +5,7 @@
  * canyon (a slot cut below), smoothly; a collapse void is a noisy dome over a heap of rubble. The walls are roughened
  * with scallops that only widen a little more than they narrow (the least way stays: no squeezing, D63).
  */
-import { Noise, deriveSeed, smax } from '@futuremagic/core';
+import { Noise, deriveSeed, smax, smoothstep } from '@futuremagic/core';
 import type { BuildingMesh } from '@futuremagic/settlement';
 import type { CavesDef } from '../../setting/contract';
 import { WildMat } from '../dungeon/meshKit';
@@ -37,7 +37,21 @@ export function carveSkeleton(sk: Skeleton, block: RockBlock, caves: CavesDef, s
   /** Scallops: how much the wall bulges out (little goes in). */
   const wall = (x: number, y: number, z: number) => rough * Math.max(-0.2, noise.n3(x / 2.6, y / 2.6, z / 2.6));
 
-  for (const c of sk.conduits) for (let s = 0; s + 1 < c.points.length; s++) stampTube(f, c.points[s], c.points[s + 1], rough, wall);
+  /**
+   * Flow ledges (K7c): the lava stood at a few heights as the tube drained and left a lip of set lava on the walls, high over the
+   * floor, here and there broken. `up` is the height over the floor; the lip (metres) is how far the wall is pushed in there.
+   */
+  const lg = sk.ledges, ledgeNoise = new Noise(deriveSeed(block.seed, 'cave', 'ledges'));
+  const ledgeOf = (x: number, z: number, up: number): number => {
+    if (!lg) return 0;
+    let lip = 0;
+    for (let k = 0; k < lg.levels; k++) {
+      const at = lg.first + k * lg.rise + 0.18 * ledgeNoise.n3(x / 9, k * 3.7, z / 9), dz = (up - at) / 0.42;
+      if (dz > -1 && dz < 1) lip = Math.max(lip, lg.lip * (1 - dz * dz) ** 2 * smoothstep(0.1, 0.6, 0.5 + 0.5 * ledgeNoise.n3(x / 6 + k * 11, 1.9, z / 6)));
+    }
+    return lip;
+  };
+  for (const c of sk.conduits) for (let s = 0; s + 1 < c.points.length; s++) stampTube(f, c.points[s], c.points[s + 1], rough, wall, sk.ledges ? ledgeOf : undefined);
   for (const v of sk.voids) stampVoid(v);
   return f;
 
@@ -84,7 +98,7 @@ export function sampleRange(f: BrickField, lo: number, hi: number, axis: 'x' | '
 }
 
 /** Stamp one stretch of conduit (from a to b) into the field as a tube joined with its canyon; `wall` adds the scallops near the surface. */
-export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, wall: (x: number, y: number, z: number) => number = () => 0): void {
+export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, wall: (x: number, y: number, z: number) => number = () => 0, ledge?: (x: number, z: number, up: number) => number): void {
   const { step } = f;
   const rh = Math.max(a.A, b.A, a.C, b.C) + 1.5, down = Math.max(a.B + a.D, b.B + b.D) + 1.5, up = Math.max(a.B, b.B) + 1.5;
   const [i0, i1] = sampleRange(f, Math.min(a.x, b.x) - rh, Math.max(a.x, b.x) + rh, 'x'), [j0, j1] = sampleRange(f, Math.min(a.y, b.y) - down, Math.max(a.y, b.y) + up, 'y'), [k0, k1] = sampleRange(f, Math.min(a.z, b.z) - rh, Math.max(a.z, b.z) + rh, 'z');
@@ -108,6 +122,8 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
     if (v < -1.4) continue;
     // (A lava tube's floor is level: its flat bottom takes hardly any scallops, or the hero would stand in dents.)
     if (v < rough + 0.3 && v > -rough - 0.3) v += wall(x, y, z) * (a.D === 0 && C > 0 && dy < -0.4 * B ? 0.15 : 1);
+    // (A flow ledge: the wall juts in where the lava stood, fading out into the air and the rock.)
+    if (ledge && v < 1.6) v -= ledge(x, z, y - (qy - B)) * Math.min(1, (1.6 - v) / 0.8);
     putSample(f, i, j, k, v);
   }
 }

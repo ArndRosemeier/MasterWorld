@@ -207,6 +207,8 @@ export interface CaveLavaDef {
   readonly wander: number;
   /** Skylights (the roof fell in) most, how far apart, and the roof thickness under which one may stand, metres. */
   readonly skylights: { readonly most: number; readonly apart: number; readonly thin: number };
+  /** Flow ledges: rings on the walls where the lava stood, how far each juts (m), how many levels, and the first one's and each next one's rise above the floor (m). */
+  readonly ledges: { readonly lip: number; readonly levels: number; readonly first: number; readonly rise: number };
 }
 
 /** Mines (K8): people followed the ore. A square-cut adit from the hillside to a vein, drifts along it on levels, crosscuts, stopes where the ore was taken and inclines between the levels. */
@@ -398,6 +400,8 @@ export interface CaveDressDef {
   readonly crystals: { readonly per100: number; readonly count: readonly [number, number]; readonly len: readonly [number, number]; readonly oreTries: number };
   /** Formations: stalactite length (least, most), how much longer old levels grow, a column forms where roof and floor are closer than `column`, the share of drips with a straw, at most this many in a cave. */
   readonly formations: { readonly length: readonly [number, number]; readonly age: number; readonly column: number; readonly straws: number; readonly most: number };
+  /** A lava tube's own dressing (K7c): lava drips (glazed, dark) per 100 m of way, how long they hang (least, most, a power law), how many hang together (least, most) and the most in a cave. (The floor keeps its silt: it fills the dents a flat set-lava floor would have.) */
+  readonly lava: { readonly drips: number; readonly length: readonly [number, number]; readonly cluster: readonly [number, number]; readonly most: number };
 }
 
 /** The ore in the rock (K8's mines follow it; in K1 to K7 it only shows). */
@@ -2425,6 +2429,7 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
       const l = r.lava;
       range(l.halfWidth, `${w} lava tube half width`, 1.2); range(l.halfHeight, `${w} lava tube half height`, 1.5); range(l.gradient, `${w} lava gradient`); range(l.length, `${w} lava length`, 0.1); range(l.branches, `${w} lava branches`); range(l.branchLength, `${w} lava branch length`, 8);
       if (!(l.roof >= 2 && l.wander >= 0 && l.wander <= 1 && l.skylights.most >= 0 && l.skylights.apart > 0 && l.skylights.thin > 0)) out.push(`${where}: ${w} lava needs a roof of 2 m or more, a wander in 0..1 and skylights`);
+      if (!(l.ledges.lip >= 0 && l.ledges.lip <= 0.8 && l.ledges.levels >= 0 && l.ledges.first >= 0.5 && l.ledges.rise >= 0.6)) out.push(`${where}: ${w} lava ledges need a lip of 0 to 0.8 m, levels, a first rise of 0.5 m or more and a rise of 0.6 m or more`);
     }
     if (r.mine) {
       const m = r.mine;
@@ -2452,6 +2457,8 @@ export function validateCaves(c: CavesDef, kinds: readonly string[], where: stri
   span(d.floor.silt, 'silt depth'); span(d.rocks.perHall, 'rocks per hall'); span(d.rocks.size, 'rock size'); span(d.water.width, 'stream width'); span(d.formations.length, 'stalactite length'); span(d.stones.size, 'stone size'); span(d.crystals.count, 'crystal count'); span(d.crystals.len, 'crystal length');
   if (!(d.stones.per100 >= 0 && d.stones.most >= 0 && d.stones.heaps >= 0 && d.stones.heaps <= 1 && d.crystals.per100 >= 0 && d.crystals.oreTries >= 0)) out.push(`${where}: cave stones and crystals need counts, and heaps a share`);
   if (!(d.floor.relief >= 0 && d.floor.relief <= 1)) out.push(`${where}: cave floor relief must be 0 to 1 m`);
+  span(d.lava.length, 'lava drip length'); span(d.lava.cluster, 'lava drip cluster');
+  if (!(d.lava.drips >= 0 && d.lava.most >= 0)) out.push(`${where}: cave lava drips need counts`);
   if (!(d.drips.chance >= 0 && d.drips.chance <= 1 && d.drips.live >= 0 && d.drips.live <= 1 && d.drips.spacing > 0.3 && d.drips.scatter >= 0)) out.push(`${where}: cave drips need chances 0 to 1 and a crack spacing over 0.3 m`);
   if (!(d.formations.most > 0 && d.formations.column > 0 && d.water.bed >= 0 && d.water.poolDepth >= 0 && d.water.cutMost > 0)) out.push(`${where}: cave formations and water need positive sizes`);
   range(c.ore.bodies, 'ore bodies');
