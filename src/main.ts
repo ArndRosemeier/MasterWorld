@@ -496,7 +496,7 @@ export async function start(b: Boot): Promise<void> {
     void roadWork.start(later);
     // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
     // chunks build while the hero and the town load; it is shown once its shader is warm.
-    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
+    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z), { bundle: params.bundles });
     // (Once the ground's textures are made: their workers come first, as the warm-up waits for them.)
     // (And once every river and brook tile under the land drawn at the start is traced, each once, side by side.)
     const rootSide = chunkSize(ROOT_LEVEL), cam = view.camera.position;

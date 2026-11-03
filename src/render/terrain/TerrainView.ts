@@ -4,7 +4,7 @@
  * the scene through the Stage and shares the TERRAIN kind's one shader.
  */
 import { BufferAttribute, BufferGeometry, type Camera, type Mesh } from 'three/webgpu';
-import type { Stage } from '@futuremagic/stage';
+import { StaticBundle, type Stage } from '@futuremagic/stage';
 import { CANOPY_RISE, TERRAIN, kindMesh } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
 import { until, type TerrainJobs } from '../../workers/pool';
@@ -29,7 +29,29 @@ export class TerrainView {
   /** Each built or building chunk's key, by id. */
   private readonly keys = new Map<string, ChunkKey>();
 
-  constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs, private readonly groundAt: (x: number, z: number) => number) {}
+  /** With `bundle` (URL `bundles=1`), the chunks are drawn as one WebGPU render bundle (StaticBundle): recorded once, replayed each frame. */
+  private readonly bundle: StaticBundle | null;
+
+  constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs, private readonly groundAt: (x: number, z: number) => number, opts: { bundle?: boolean } = {}) {
+    this.bundle = opts.bundle ? new StaticBundle('terrain') : null;
+    if (this.bundle) void stage.add(this.bundle);
+  }
+
+  /** A chunk into the view, once its shader is built. */
+  private async putChunk(m: Mesh): Promise<void> {
+    if (!this.bundle) return this.stage.add(m);
+    await this.stage.prepare(m);
+    m.frustumCulled = false; // a recording keeps what was in view when it was made: the GPU drops what is off screen
+    this.bundle.add(m);
+    this.bundle.changed();
+  }
+
+  /** A chunk out of the view. */
+  private takeChunk(m: Mesh): void {
+    if (!this.bundle) return this.stage.remove(m);
+    this.bundle.remove(m);
+    this.bundle.changed();
+  }
 
   /** Chunks drawn now, and chunks being built. */
   get stats(): { shown: number; building: number; built: number } {
@@ -84,8 +106,8 @@ export class TerrainView {
       if (old && this.shown.has(id)) {
         // A chunk in view built anew: the new one goes in before the old one comes out (no hole); no swap meanwhile.
         this.swapping = true;
-        await this.stage.add(fresh);
-        this.stage.remove(old);
+        await this.putChunk(fresh);
+        this.takeChunk(old);
         this.swapping = false;
       }
       if (old) freeChunk(old);
@@ -123,8 +145,8 @@ export class TerrainView {
   private async swap(): Promise<void> {
     this.swapping = true;
     const next = new Set(this.wanted.map(chunkId));
-    await Promise.all([...next].filter((id) => !this.shown.has(id)).map((id) => this.stage.add(this.built.get(id)!)));
-    for (const id of this.shown) if (!next.has(id)) this.stage.remove(this.built.get(id)!);
+    await Promise.all([...next].filter((id) => !this.shown.has(id)).map((id) => this.putChunk(this.built.get(id)!)));
+    for (const id of this.shown) if (!next.has(id)) this.takeChunk(this.built.get(id)!);
     this.shown = next;
     this.evict();
     this.swapping = false;

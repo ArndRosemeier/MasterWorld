@@ -47,6 +47,8 @@ export const params = {
   horizon: q.get('horizon') !== '0',
   /** `origin=0`: no floating origin, everything drawn relative to zero as before plan B0 (for comparing). */
   origin: q.get('origin') !== '0',
+  /** `bundles=1`: static parts (the terrain) drawn as WebGPU render bundles (StaticBundle), for measuring. */
+  bundles: q.get('bundles') === '1',
   /** `post=0`: no post chain (bloom), straight to the screen (for comparing). */
   post: q.get('post') !== '0',
   /** Post chain checks: `postSamples=4` multisampling in its scene target (default none; black on WebGL2), `postDepth=int` a fixed-point depth buffer. */
