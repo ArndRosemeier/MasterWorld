@@ -372,6 +372,8 @@ export async function start(b: Boot): Promise<void> {
       climbable: (x, z) => (below() ? null : landWorld.climbable!(x, z)),
       // Down in a cave its rock walls (D56, P1): a drop is climbed back up, not jumped.
       rockHolds: () => !!below()?.rockHolds?.(),
+      // A winze's ladder carries its climber (cave worlds only).
+      ladderAt: (x, y, z) => below()?.ladderAt?.(x, y, z) ?? null,
       wall: (x, z, r, y) => { const b = below(); return b ? !!b.wall?.(x, z, r) : landWorld.wall!(x, z, r, y); },
       // The living bodies of every encounter (foes, wardens): walked round, never through (set once they stand).
       bodies: (x, z, r, y, ax, az) => bodiesBlock(x, z, r, y, ax, az),

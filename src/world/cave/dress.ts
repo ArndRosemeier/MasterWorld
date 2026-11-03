@@ -66,7 +66,8 @@ export function ladderGrip(ladders: readonly Ladder[], origin: { readonly x: num
   for (const l of ladders) {
     if (y < l.y0 - 0.5 || y > l.y1 + 0.5) continue;
     const dx = l.x1 - l.x0, dy = l.y1 - l.y0, dz = l.z1 - l.z0, t = Math.max(0, Math.min(1, ((x - l.x0) * dx + (y - l.y0) * dy + (z - l.z0) * dz) / (dx * dx + dy * dy + dz * dz || 1)));
-    if (Math.hypot(x - l.x0 - dx * t, y - l.y0 - dy * t, z - l.z0 - dz * t) >= 1.1) continue;
+    // (At the foot the hero comes in from the drift beside it, so the reach there is longer.)
+    if (Math.hypot(x - l.x0 - dx * t, y - l.y0 - dy * t, z - l.z0 - dz * t) >= (y < l.y0 + 0.6 ? 1.8 : 1.1)) continue;
     const f = Math.max(0, Math.min(1, (y - l.y0) / (dy || 1))), hor = Math.hypot(dx, dz) || 1;
     return { x: l.x0 + dx * f + origin.x, z: l.z0 + dz * f + origin.z, nx: dx / hor, nz: dz / hor, foot: y < l.y0 + 0.6, head: y > l.y1 - 1.2 };
   }

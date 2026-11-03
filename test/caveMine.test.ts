@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { formedCave, caves, small } from './support/formedCave';
 import { dressFormed, formCave, readFormed } from '../src/world/cave/form';
 import { formedWorld } from '../src/game/formedWorld';
@@ -59,14 +60,20 @@ test('mines (K8): the lumps of ore lie on the wall they show in, none hung in th
   }
 });
 
-/** The real walker at a winze's foot, pushing up it, until it stands on the landing (or 25 s are up); the ladder alone must carry it (`tire` refuses). */
-function climbWinze(world: ReturnType<typeof formedWorld>, l: { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number }): { walker: Walker; climbed: boolean } {
+/**
+ * The real walker pushing on towards a winze's foot, until it stands on the landing (or 25 s are up); the ladder alone must carry it (`tire` refuses).
+ * It starts 0.5 m behind the foot in line with the slope, or `aside` metres beside the foot (the way a player comes from the drift) facing it.
+ */
+function climbWinze(world: ReturnType<typeof formedWorld>, l: { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number }, aside = 0): { walker: Walker; climbed: boolean } {
   const hor = Math.hypot(l.x1 - l.x0, l.z1 - l.z0), ux = (l.x1 - l.x0) / hor, uz = (l.z1 - l.z0) / hor, walker = new Walker(world);
+  const sx = aside ? l.x0 - uz * aside : l.x0 - ux * 0.5, sz = aside ? l.z0 + ux * aside : l.z0 - uz * 0.5;
   walker.tire = () => false;
-  walker.place(l.x0 - ux * 0.5, l.z0 - uz * 0.5, l.y0 + 0.02);
+  walker.place(sx, sz, l.y0 + 0.02);
   let climbed = false;
   for (let s = 0; s < 60 * 25 && !(climbed && walker.mode === 'ground' && walker.pos.y > l.y1 - 0.5); s++) {
-    walker.step({ forward: 1, strafe: 0, heading: Math.atan2(-ux, -uz), walk: false, up: false, down: false }, 1 / 60);
+    // (Facing the foot until on the ladder, then up the slope.)
+    const heading = aside && !climbed ? Math.atan2(sx - l.x0, sz - l.z0) : Math.atan2(-ux, -uz);
+    walker.step({ forward: 1, strafe: 0, heading, walk: false, up: false, down: false }, 1 / 60);
     if (walker.mode === 'climb') climbed = true;
   }
   return { walker, climbed };
@@ -100,9 +107,13 @@ test('mines (K8): the ladder carries the climber up medium mines whose rock besi
   for (const seed of [7, 15]) {
     const c = formCave(caves, seed, 'hard-rock', 'medium'), d = dressFormed(c, caves), l = d.ladders[0];
     assert.ok(l, `seed ${seed}: a winze`);
-    const w = climbWinze(formedWorld(c.field as BrickField, undefined, null, d.ladders), l);
-    assert.ok(w.climbed && w.walker.mode === 'ground' && w.walker.pos.y > l.y1 - 0.5, `seed ${seed}: ended ${w.walker.mode} at ${w.walker.pos.y.toFixed(1)}, the head is at ${l.y1.toFixed(1)}`);
+    for (const aside of [0, 1.6]) {
+      const w = climbWinze(formedWorld(c.field as BrickField, undefined, null, d.ladders), l, aside);
+      assert.ok(w.climbed && w.walker.mode === 'ground' && w.walker.pos.y > l.y1 - 0.5, `seed ${seed}, ${aside ? `${aside} m beside the foot` : 'in line'}: ended ${w.walker.mode} at ${w.walker.pos.y.toFixed(1)}, the head is at ${l.y1.toFixed(1)}`);
+    }
   }
+  // (The game's combined world must hand the walker the cave's ladders: it forwarded every other question but this one, and the hero climbed the bare rock.)
+  assert.match(readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), /ladderAt: \(x, y, z\) => below\(\)\?\.ladderAt/);
 });
 
 test('mines (K8): winzes keep out of the stopes and from each other, and a mine of one level has none', () => {
