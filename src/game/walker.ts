@@ -41,9 +41,10 @@ export interface WalkWorld {
   ladderAt?(x: number, y: number, z: number): LadderGrip | null;
   /**
    * Living bodies (foes, wardens): does a body of radius `r` at (x, z), feet at `y`, press into one? One already
-   * touching where the asker stands now, (ax, az), lets it go, so a walker is never stuck in another.
+   * touching where the asker stands now, (ax, az), lets it go, so a walker is never stuck in another. With `bigger`, only bodies of
+   * at least that radius count (the camera keeps out of a giant, not out of every wolf).
    */
-  bodies?(x: number, z: number, r: number, y: number, ax: number, az: number): boolean;
+  bodies?(x: number, z: number, r: number, y: number, ax: number, az: number, bigger?: number): boolean;
 }
 
 /** What the player wants this frame. */

@@ -218,8 +218,14 @@ export type { BreakCause, WarnTurn };
 
 /** Body radius by kind and size, metres. */
 export function radiusOf(def: CreatureDef): number {
-  return def.body.kind === 'humanoid' ? 0.32 : def.body.kind === 'spider' ? def.body.length * 0.4 : def.body.length * 0.3;
+  const b = def.body;
+  return b.kind === 'humanoid' ? 0.32 : b.kind === 'spider' ? b.length * 0.4 : b.kind === 'beast' && b.radius ? b.radius : b.length * 0.3;
 }
+
+/** The widest a body is for walking the land (m): a giant steps between the trunks and over the fences it shoulders by, as a wolf would, its bulk kept for the bodies about it. */
+export const WALK_R = 1.3;
+/** The radius a body takes to the ground (the walls, the trunks, the water's edge): its own, to WALK_R. */
+export function walkRadius(def: CreatureDef): number { return Math.min(radiusOf(def), WALK_R); }
 
 /** Hero's body radius, metres. */
 export const HERO_R = 0.35;
@@ -1142,7 +1148,7 @@ export class Den {
       return true;
     }
     let left = c.def.speed * pace * paceOf(c) * (1 - c.slow) * dt;
-    const r = radiusOf(c.def);
+    const r = walkRadius(c.def);
     for (let n = 0; left > 1e-4 && c.pi < c.path.length && n < 8; n++) {
       const p = c.path[c.pi], dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz);
       if (d < 1e-3) { c.pi++; continue; }
@@ -1185,7 +1191,7 @@ export class Den {
     else c.pushing = Math.max(0, c.pushing - dt * 0.25);
     if (c.pushing < STUCK.time || c.hopIn > 0 || c.stagger > 0 || c.windup > 0 || !this.ground.hop) return;
     const goal = c.path.length ? c.path[c.path.length - 1] : c.state === 'fight' ? c.seen : null;
-    const to = this.ground.hop(c, goal, radiusOf(c.def));
+    const to = this.ground.hop(c, goal, walkRadius(c.def));
     if (!to) { c.hopIn = HOP_EVERY.retry; return; }
     const len = Math.hypot(to.x - c.x, to.z - c.z);
     c.hop = { from: { x: c.x, y: c.y, z: c.z }, to, dur: 0.35 + len * 0.08, high: 0.3 + len * 0.12 + Math.max(0, to.y - c.y), t: 0 };
@@ -1250,9 +1256,9 @@ export class Den {
    * Does a body of radius `r` at (x, z), feet at `y`, press into one of the den that blocks the hero? One it
    * already touches where it stands now, (ax, az), lets it go (never stuck in another).
    */
-  pressedBy(x: number, y: number, z: number, r: number, ax: number, az: number): boolean {
+  pressedBy(x: number, y: number, z: number, r: number, ax: number, az: number, bigger = 0): boolean {
     for (const c of this.creatures) {
-      if (c.state === 'dead' || c.hop || !blocksHero(c.def) || Math.abs(c.y - y) > ABOVE) continue;
+      if (c.state === 'dead' || c.hop || !blocksHero(c.def) || Math.abs(c.y - y) > ABOVE || radiusOf(c.def) < bigger) continue;
       const min = r + radiusOf(c.def);
       if (Math.hypot(c.x - x, c.z - z) < min && Math.hypot(c.x - ax, c.z - az) >= min) return true;
     }
@@ -1268,7 +1274,7 @@ export class Den {
   /** Pushed by (dx, dz), if there is room there (bodies apart: never into a wall). */
   nudge(c: Creature, dx: number, dz: number): void {
     const x = c.x + dx, z = c.z + dz;
-    if (this.ground.clearance(x, c.y, z) > radiusOf(c.def) * 0.5) { c.x = x; c.z = z; }
+    if (this.ground.clearance(x, c.y, z) > walkRadius(c.def) * 0.5) { c.x = x; c.z = z; }
   }
 }
 

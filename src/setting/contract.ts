@@ -754,10 +754,12 @@ export type CreatureBody =
   | { readonly kind: 'rat' | 'spider'; readonly length: number; readonly color: string }
   /**
    * An animal of the land: Actors' wolf and deer, a boar grown by @futuremagic/creatures, a giant crab of the strand (S9), the elk and
-   * the turtle (M2). `length` nose to rump, as drawn. `giant`: the strength 0..1 of Actors' Deform "giant" recipe (D67, phase M): the
-   * body is grown by it (thicker legs and neck, an old coat, a slow gait), not just scaled; `length` is the size it ends up.
+   * the turtle (M2). `length` nose to rump, as drawn. `giant`: how many times the animal's normal size it is grown (D67, phase M; Actors'
+   * Deform "giant" recipe with a `size`: thicker legs and neck for the weight, an old coat, a slow gait, not just scaled up); `length` is the size
+   * it ends up, so a giant's is its normal length times `giant`. `radius`: the ground it keeps clear of other bodies (m), where
+   * a third of its length is not its footprint (a turtle's shell is round).
    */
-  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle'; readonly length: number; readonly color: string; readonly giant?: number };
+  | { readonly kind: 'beast'; readonly species: 'wolf' | 'deer' | 'boar' | 'crab' | 'shark' | 'elk' | 'turtle'; readonly length: number; readonly color: string; readonly giant?: number; readonly radius?: number };
 
 /** Where an encounter is met: in a place below, under thick trees, on open land, by a road, on the strand (S9). */
 export type EncounterWhere = 'below' | 'wood' | 'open' | 'road' | 'shore' | 'water' | 'sea';

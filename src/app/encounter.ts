@@ -184,10 +184,10 @@ export class Encounter {
    * Does a walker of radius `r` at (x, z) in the world, feet at `y`, press into one of its living bodies (those
    * shown)? One it already touches where it stands, (ax, az), lets it go.
    */
-  pressedBy(x: number, z: number, r: number, y: number, ax: number, az: number): boolean {
+  pressedBy(x: number, z: number, r: number, y: number, ax: number, az: number, bigger = 0): boolean {
     if (this.retired || !this.arena.shown) return false;
     const O = this.creatures.group.position;
-    return this.delve.den.pressedBy(x - O.x, y - O.y, z - O.z, r, ax - O.x, az - O.z);
+    return this.delve.den.pressedBy(x - O.x, y - O.y, z - O.z, r, ax - O.x, az - O.z, bigger);
   }
 
   /** It owns the keys and the HUD now (the one playing). */

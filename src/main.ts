@@ -376,7 +376,7 @@ export async function start(b: Boot): Promise<void> {
       ladderAt: (x, y, z) => below()?.ladderAt?.(x, y, z) ?? null,
       wall: (x, z, r, y) => { const b = below(); return b ? !!b.wall?.(x, z, r) : landWorld.wall!(x, z, r, y); },
       // The living bodies of every encounter (foes, wardens): walked round, never through (set once they stand).
-      bodies: (x, z, r, y, ax, az) => bodiesBlock(x, z, r, y, ax, az),
+      bodies: (x, z, r, y, ax, az, bigger) => bodiesBlock(x, z, r, y, ax, az, bigger),
     };
     let bodiesBlock: NonNullable<WalkWorld['bodies']> = () => false;
     const player = new Player(view.camera, canvas, world, params.fly);
@@ -1637,7 +1637,7 @@ export async function start(b: Boot): Promise<void> {
     });
     // The action bar (plan 17.1): always there in play, its keys 1 to 0; the ability book (K) arranges it.
     const encounters = () => [...cellars.encounters, ...(wild?.encounters ?? []), ...(hold?.encounters ?? [])];
-    bodiesBlock = (x, z, r, y, ax, az) => encounters().some((e) => e.pressedBy(x, z, r, y, ax, az));
+    bodiesBlock = (x, z, r, y, ax, az, bigger) => encounters().some((e) => e.pressedBy(x, z, r, y, ax, az, bigger));
     const leading = () => encounters().find((e) => e.leading) ?? null;
     const potions = () => character.remedies.length;
     // Out of a fight the hero's own spells still work (healing, wards): the recipe runner with nobody else about.

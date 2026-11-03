@@ -17,6 +17,8 @@ const TURN = 2.6;
 const LOOK = 0.0035;
 /** Zoom range (m from the head); below FIRST it is first person. */
 const NEAR = 0, FAR = 18, FIRST = 0.6;
+/** The camera's own reach as a body (m), the radius from which a body counts as a giant's, and how far under the head the hero's feet are. */
+const CAM_R = 0.3, GIANT_R = 2, HERO_EYE = 1.6;
 /** A talk's view (m): this far above the aim (about eye height, under a room's wall tops), and at least this far above the hero's head. */
 const TALK_UP = 0.3, TALK_OVER_HEAD = 0.1;
 /** The top of a hood or helmet above the head point (m), and how far a talk's view may rise to leave it out of the shot. */
@@ -266,6 +268,8 @@ export class HeroCamera {
       const far = this.lens?.(head, at), w = far?.world ?? this.world, { x, y, z } = far?.p ?? at;
       const rock = (w.sightSurface ?? w.rockSurface)(x, y, z);
       if (y < w.height(x, z) + 0.35 || (rock !== null && rock < 0.35)) { free = Math.max(0, d - 0.3); break; }
+      // Nor inside a giant: a body wider than a bear's that the hero stands against has the camera in front of it (feet: the hero's, the body is judged by its footprint).
+      if (!far && w.bodies?.(x, z, CAM_R, head.y - HERO_EYE, head.x, head.z, GIANT_R)) { free = Math.max(0, d - 0.3); break; }
     }
     this.dist = free < this.dist ? free : this.dist + (free - this.dist) * damp(3, dt);
     this.eye.copy(head).addScaledVector(dir, -this.dist);

@@ -30,8 +30,11 @@ export async function furActor(animal: Animal<object, object>, renderer: WebGPUR
   return { actor, place };
 }
 
-/** The clip playing at its own pace when the animal goes `pace` m/s (none: as it is), within half to 1.6 times. */
-export function gaitPace(actor: ThreeActor, speed: number, pace: number | undefined): void {
-  const a = actor.currentAction;
-  if (a) a.timeScale = pace ? Math.min(1.6, Math.max(0.5, speed / pace)) : 1;
+/**
+ * The clip playing at its own pace when the animal goes `pace` m/s (none: as it is), within half to 1.6 times. A body grown `grown` times
+ * (a giant) strides that much farther at the same step and steps slower by its square root: its pace is `grown` times, its steps slow.
+ */
+export function gaitPace(actor: ThreeActor, speed: number, pace: number | undefined, grown = 1): void {
+  const a = actor.currentAction, g = 1 / Math.sqrt(Math.max(1, grown));
+  if (a) a.timeScale = pace ? Math.min(1.6 * g, Math.max(0.5 * g, speed / (pace * Math.max(1, grown)))) : g;
 }

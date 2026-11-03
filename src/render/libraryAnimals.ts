@@ -117,7 +117,7 @@ export function libraryClip(lib: { readonly clipNames: readonly string[]; clipFo
   return motion ? lib.clipFor(motion) : undefined;
 }
 
-/** The Deform plan of a giant animal: strength 0..1 of Actors' "giant" recipe, seeded by the animal's own seed (null: not a giant). */
+/** The Deform plan of a giant animal: Actors' "giant" recipe grown `giant` times the normal size (null: not a giant), seeded by the animal's own seed. */
 export function giantPlan(giant: number | undefined, seed: number): DeformPlan | null {
-  return giant && giant > 0 ? deform({ recipe: 'giant', seed: deriveSeed(seed, 'giant'), strength: giant }) : null;
+  return giant && giant > 1 ? deform({ recipe: 'giant', seed: deriveSeed(seed, 'giant'), strength: 1, size: giant }) : null;
 }

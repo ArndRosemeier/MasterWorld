@@ -116,31 +116,33 @@ export const creatures: readonly CreatureDef[] = [
     loot: 'shark', tell: 'A fin cutting the swell farther out, and then nothing.',
   },
   // The first world's leak makes giants (D67, phase M; Actors' Deform "giant" recipe, never a scaled copy: thicker legs and neck, an old coat, a slow
-  // gait). Two are a promise, peaceful and near: a giant elk of the open land and a giant turtle on the strand. They are the great beasts' own
+  // gait). They are meant to awe (Arnd 2026-11-03: "not just a bigger one"): `giant` is how many times the normal animal they are grown, and `length` that
+  // times its own (the elk 2.3 m, the tortoise 1.1 m, the wolf 1.15 m, the boar 1.4 m), so an elk stands 8 m at the shoulder with antlers over 14 m, a turtle
+  // is a house of a shell, and their blows reach from a head that high. Two are a promise, peaceful and near: a giant elk of the open land and a giant turtle on the strand. They are the great beasts' own
   // faction, at feud with nobody, and a shy one runs when struck; cornered it fights. The two that hunt live only far out (D29), at the
   // danger the land there holds, and never below.
   {
-    id: 'giant elk', name: 'giant elk', plural: 'giant elk', body: { kind: 'beast', species: 'elk', length: 4.2, color: '#6e5238', giant: 0.55 },
-    health: 110, armour: 2, defence: 16, speed: 8, senses: { sight: 34, hearing: 40 }, faction: 'great', temper: 'skittish', wary: 16, morale: 0.5, pack: false, role: 'melee', danger: 14,
-    attacks: [{ name: 'antlers', damage: [6, 12], kind: 'pierce', reach: 1.6, time: 2.2, prowess: 30 }],
+    id: 'giant elk', name: 'giant elk', plural: 'giant elk', body: { kind: 'beast', species: 'elk', length: 13.8, color: '#6e5238', giant: 6 },
+    health: 110, armour: 2, defence: 16, speed: 12, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'skittish', wary: 24, morale: 0.5, pack: false, role: 'melee', danger: 14,
+    attacks: [{ name: 'antlers', damage: [6, 12], kind: 'pierce', reach: 3.5, time: 3, prowess: 30 }],
     loot: 'giant-elk', tell: 'Antlers like a dead tree above the grass, and the grass does not move for the wind.',
   },
   {
-    id: 'giant turtle', name: 'giant turtle', plural: 'giant turtles', body: { kind: 'beast', species: 'turtle', length: 2.9, color: '#5a6a40', giant: 1 },
-    health: 140, armour: 7, defence: 6, speed: 1.6, senses: { sight: 14, hearing: 18 }, faction: 'great', temper: 'skittish', wary: 8, morale: 0.7, pack: false, role: 'melee', danger: 12,
-    attacks: [{ name: 'beak', damage: [5, 10], kind: 'bite', reach: 1.1, time: 2.8, prowess: 24 }],
+    id: 'giant turtle', name: 'giant turtle', plural: 'giant turtles', body: { kind: 'beast', species: 'turtle', length: 14, color: '#5a6a40', giant: 12.7, radius: 6.2 },
+    health: 140, armour: 7, defence: 6, speed: 2.4, senses: { sight: 30, hearing: 30 }, faction: 'great', temper: 'skittish', wary: 12, morale: 0.7, pack: false, role: 'melee', danger: 12,
+    attacks: [{ name: 'beak', damage: [5, 10], kind: 'bite', reach: 2.4, time: 3.5, prowess: 24 }],
     loot: 'giant-turtle', tell: 'A boulder by the water that is, on a closer look, breathing.',
   },
   {
-    id: 'giant boar', name: 'giant boar', plural: 'giant boars', body: { kind: 'beast', species: 'boar', length: 3.1, color: '#3a2e24', giant: 0.6 },
+    id: 'giant boar', name: 'giant boar', plural: 'giant boars', body: { kind: 'beast', species: 'boar', length: 9.1, color: '#3a2e24', giant: 6.5 },
     health: 150, armour: 4, defence: 12, speed: 6.6, senses: { sight: 12, hearing: 24 }, faction: 'beasts', temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 26,
-    attacks: [{ name: 'tusks', damage: [9, 18], kind: 'pierce', reach: 1.5, time: 2.0, prowess: 40 }],
+    attacks: [{ name: 'tusks', damage: [9, 18], kind: 'pierce', reach: 3, time: 2.8, prowess: 40 }],
     loot: 'giant-boar', tell: 'Whole oaks rooted up, and a smell like a midden at noon.',
   },
   {
-    id: 'giant wolf', name: 'giant wolf', plural: 'giant wolves', body: { kind: 'beast', species: 'wolf', length: 3.2, color: '#5c564c', giant: 0.7 },
+    id: 'giant wolf', name: 'giant wolf', plural: 'giant wolves', body: { kind: 'beast', species: 'wolf', length: 9.2, color: '#5c564c', giant: 8 },
     health: 120, armour: 2, defence: 28, speed: 8.4, senses: { sight: 30, hearing: 38 }, faction: 'predators', temper: 'hostile', morale: 0.9, pack: true, role: 'leader', danger: 26,
-    attacks: [{ name: 'bite', damage: [8, 16], kind: 'bite', reach: 1.4, time: 1.6, prowess: 42 }],
+    attacks: [{ name: 'bite', damage: [8, 16], kind: 'bite', reach: 3.2, time: 2.2, prowess: 42 }],
     loot: 'giant-wolf', tell: 'A howl that comes up through the soles of your feet.',
   },
   {
