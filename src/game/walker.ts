@@ -17,8 +17,9 @@ export interface WalkWorld {
   /** Rock volumes with their ground as a signed distance (positive in air); null away from them. */
   rockSurface(x: number, y: number, z: number): number | null;
   /**
-   * Calm water surface level for a body at (x, y, z), or null where there is no water. `y` is the body's height (the
-   * feet's): overland there is one surface per (x, z) and `y` is ignored; underground, where floors stack, it picks the storey.
+   * The water surface the body at (x, y, z) is in or over (`y`: its feet), or null where there is none. Overland it depends on
+   * (x, z) alone and `y` is ignored; in a cave, where pools lie under ledges and streams over them, the answer is the surface of
+   * the water that holds that height.
    */
   waterLevel(x: number, y: number, z: number): number | null;
   /**

@@ -910,5 +910,9 @@
   {
     "key": "same name: masterworld/sim/formedSpace.ts#touch + masterworld/world/dungeon/space.ts#touch",
     "reason": "FormedSpace overrides DungeonSpace.touch: a formed cave's keys and locks instead of the built layout's doors; the name is the override's."
+  },
+  {
+    "key": "same name: masterworld/main.ts#floor + masterworld/sim/birdFlight.ts#floor",
+    "reason": "Only the name matches: main.ts's is the walk world's `floor` adapter (decks, steps, cellars); the bird's is the height it would land at (the ground, or the water's surface over it)."
   }
 ]
