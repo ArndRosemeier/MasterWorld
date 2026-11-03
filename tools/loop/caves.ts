@@ -67,7 +67,7 @@ for (const rock of rocks) {
     // Back out: the way from the deepest place to a way in (drops cannot be climbed, so it is not the inward way reversed).
     const home = reachFree(g, caves.way.ramp.above, [deep]), out = g.entries.filter((e) => home.reached[e]).sort((a, b) => g.depth[a] - g.depth[b])[0];
     const outward = out === undefined ? null : wayTo(home.from, out);
-    const entry = inward[0], w = new Walker(formedWorld(c.field as BrickField, undefined, caveWater(r.dressing, caves.dress.water.bed, caves.dress.water.poolDepth)));
+    const entry = inward[0], w = new Walker(formedWorld(c.field as BrickField, undefined, caveWater(r.dressing, caves.dress.water.bed, caves.dress.water.poolDepth), r.dressing.ladders));
     w.place(g.x[entry], g.z[entry], g.y[entry] + 0.02);
     const went = follow(w, g, inward);
         const ok = went && outward !== null && follow(w, g, outward);

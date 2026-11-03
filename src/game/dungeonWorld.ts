@@ -8,6 +8,7 @@ import type { DungeonSpace } from '../world/dungeon/space';
 import { CaveSpace } from '../world/dungeon/caveRock';
 import { FormedSpace } from '../sim/formedSpace';
 import type { CaveWaterAt } from '../world/cave/water';
+import { onLadder } from '../world/cave/dress';
 import type { WalkWorld } from './walker';
 
 /** A cave's water as the walker asks it: the cave's frame (its origin in the world) and back. */
@@ -33,6 +34,7 @@ export function dungeonWorld(space: DungeonSpace, origin: { x: number; y: number
     waterLevel: space instanceof FormedSpace && space.water ? caveLevel(space.water, origin) : space.layout?.flood === undefined ? () => null : () => origin.y + space.layout.flood!,
     // A cave's broken rock is climbed wherever it stands as a wall (a drop's face back up); built walls are not.
     rockHolds: () => space instanceof CaveSpace || space instanceof FormedSpace,
+    ladderAt: space instanceof FormedSpace && space.ladders.length ? (x, y, z) => onLadder(space.ladders, x - origin.x, y - origin.y, z - origin.z) : undefined,
   };
 }
 

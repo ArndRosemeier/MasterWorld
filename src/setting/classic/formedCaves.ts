@@ -89,7 +89,7 @@ export const caves: CavesDef = {
       collapse: { junction: 0, span: 6, most: 0 },
       mine: {
         halfWidth: [1.3, 1.8], halfHeight: [1.6, 2.1], square: 0.85, levels: [1, 3], gap: 10, adit: 28, roof: 3,
-        crosscuts: [1, 3], crosscutLength: [8, 22], stopes: 2, stopeLength: [4, 9], incline: 0.3,
+        crosscuts: [1, 3], crosscutLength: [8, 22], stopes: 2, stopeLength: [4, 9], incline: 0.3, winzes: { count: [0, 2], half: 0.95, lean: 0.2 },
         fittings: { posts: 4.5, post: 0.13, beam: 0.14, timbered: 0.7, gauge: 0.9, rail: 0.06, sleeper: 1.1, carts: 2 },
       },
     },
