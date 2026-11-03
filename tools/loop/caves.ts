@@ -13,6 +13,7 @@
  */
 import { classic } from '../../src/setting/classic/index';
 import { Walker } from '../../src/game/walker';
+import { caveWater } from '../../src/world/cave/water';
 import { formedWorld } from '../../src/game/formedWorld';
 import { dressFormed, formCave, readFormed } from '../../src/world/cave/form';
 import { reachFree, type Reading } from '../../src/world/cave/reader';
@@ -31,7 +32,7 @@ const wayTo = (from: Int32Array, to: number): number[] => { const out: number[] 
 
 /** Walk `w` along the cells of a path (reader cells), true when it reached the last one. */
 function follow(w: Walker, r: Reading, cells: readonly number[]): boolean {
-  const stuck = (k: number, why: string): false => { if (process.env.WHY) { const a = cells[k - 1], c = cells[k], e = [...Array(r.edgeStart[a + 1] - r.edgeStart[a]).keys()].map((n) => r.edgeStart[a] + n).find((n) => r.edgeTo[n] === c); console.log(`    stuck ${why} at step ${k}/${cells.length}: link ${e === undefined ? '?' : ['walk', 'climb', 'drop'][r.edgeKind[e]]}, rise ${(r.y[c] - r.y[a]).toFixed(2)}, run ${Math.hypot(r.x[c] - r.x[a], r.z[c] - r.z[a]).toFixed(2)}, hero at ${(w.pos.y - r.y[a]).toFixed(2)} above the cell, ${near(r.x[c], r.y[c], r.z[c]).toFixed(1)} m from an opened way`); } if (process.env.WHY === '2') for (let q = Math.max(0, k - 4); q <= Math.min(cells.length - 1, k + 1); q++) console.log(`      cell ${q}: ${r.x[cells[q]].toFixed(1)} ${r.y[cells[q]].toFixed(2)} ${r.z[cells[q]].toFixed(1)} room ${r.room[cells[q]].toFixed(1)}`); if (process.env.WHY === '2') console.log(`      hero ${w.pos.x.toFixed(1)} ${w.pos.y.toFixed(2)} ${w.pos.z.toFixed(1)}`); return false; };
+  const stuck = (k: number, why: string): false => { if (process.env.WHY) { const a = cells[k - 1], c = cells[k], e = [...Array(r.edgeStart[a + 1] - r.edgeStart[a]).keys()].map((n) => r.edgeStart[a] + n).find((n) => r.edgeTo[n] === c); console.log(`    stuck ${why} at step ${k}/${cells.length}: link ${e === undefined ? '?' : ['walk', 'climb', 'drop', 'swim'][r.edgeKind[e]]}, rise ${(r.y[c] - r.y[a]).toFixed(2)}, run ${Math.hypot(r.x[c] - r.x[a], r.z[c] - r.z[a]).toFixed(2)}, hero at ${(w.pos.y - r.y[a]).toFixed(2)} above the cell, ${near(r.x[c], r.y[c], r.z[c]).toFixed(1)} m from an opened way`); } if (process.env.WHY === '2') for (let q = Math.max(0, k - 4); q <= Math.min(cells.length - 1, k + 1); q++) console.log(`      cell ${q}: ${r.x[cells[q]].toFixed(1)} ${r.y[cells[q]].toFixed(2)} ${r.z[cells[q]].toFixed(1)} room ${r.room[cells[q]].toFixed(1)}`); if (process.env.WHY === '2') console.log(`      hero ${w.pos.x.toFixed(1)} ${w.pos.y.toFixed(2)} ${w.pos.z.toFixed(1)}`); return false; };
   let t = 0;
   for (let k = 1; k < cells.length; k++) {
     const c = cells[k];
@@ -64,7 +65,7 @@ for (const rock of rocks) {
     // Back out: the way from the deepest place to a way in (drops cannot be climbed, so it is not the inward way reversed).
     const home = reachFree(g, caves.way.ramp.above, [deep]), out = g.entries.filter((e) => home.reached[e]).sort((a, b) => g.depth[a] - g.depth[b])[0];
     const outward = out === undefined ? null : wayTo(home.from, out);
-    const entry = inward[0], w = new Walker(formedWorld(c.field as BrickField));
+    const entry = inward[0], w = new Walker(formedWorld(c.field as BrickField, undefined, caveWater(r.dressing, caves.dress.water.bed, caves.dress.water.poolDepth)));
     w.place(g.x[entry], g.z[entry], g.y[entry] + 0.02);
     const went = follow(w, g, inward);
         const ok = went && outward !== null && follow(w, g, outward);

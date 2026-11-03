@@ -21,7 +21,7 @@ interface Disc { readonly x: number; readonly z: number; readonly r: number; rea
 export function caveWater(d: Pick<Dressing, 'streams' | 'pools'>, bed: number, poolDepth: number): CaveWaterAt | null {
   const discs: Disc[] = [];
   for (const s of d.streams) for (const [x, y, z, w] of s.pts) discs.push({ x, z, r: w, surface: y, bed: y - bed });
-  for (const p of d.pools) discs.push({ x: p.x, z: p.z, r: p.r, surface: p.y, bed: p.y - poolDepth });
+  for (const p of d.pools) discs.push({ x: p.x, z: p.z, r: p.r, surface: p.y, bed: p.y - (p.depth ?? poolDepth) });
   if (!discs.length) return null;
   const cells = new Map<number, Disc[]>(), cellKey = (i: number, k: number): number => i * 65_537 + k;
   for (const c of discs) {

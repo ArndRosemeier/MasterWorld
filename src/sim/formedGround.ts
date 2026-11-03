@@ -57,10 +57,10 @@ export class FormedGround implements DenGround {
     return best;
   }
 
-  /** Does a link from cell a to cell b suit a creature: a walk, a short scramble up, a drop of a few metres. */
+  /** Does a link from cell a to cell b suit a creature: a walk, a short scramble up, a drop of a few metres (not a swim). */
   private creatureGoes(a: number, b: number, kind: number): boolean {
     const dy = this.r.y[b] - this.r.y[a];
-    return !this.shutCells.has(b) && (kind === 0 || (kind === 1 ? Math.abs(dy) <= UP : dy >= -DOWN));
+    return !this.shutCells.has(b) && (kind === 0 || (kind === 1 ? Math.abs(dy) <= UP : kind === 2 && dy >= -DOWN));
   }
 
   /** The locks standing shut (K6): solid to a body, and the cells they shut are not gone to. */
