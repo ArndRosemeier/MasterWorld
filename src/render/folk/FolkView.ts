@@ -4,7 +4,7 @@
  * the shape worker) and shown once ready; until then, and everyone farther off, is a plain figure
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
-import { Frustum, Group, Matrix4, Sphere, Vector3, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Frustum, Group, Matrix4, Sphere, Vector3, type Camera, type DirectionalLight, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
@@ -51,13 +51,26 @@ const SHADOW_RANGE = 35;
 const ALOFT = 120;
 /** Nearer than this a plain figure in view stands out in a picture (`undressed` counts these), m. */
 const CLOSE = 40;
-const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), BALL = new Sphere(), HEAD = new Vector3(), FEET = new Vector3(), FOOT = new Vector3();
+const VIEW = new Frustum(), SCRATCH = new Matrix4(), AT = new Vector3(), TO_LIGHT = new Vector3(), BALL = new Sphere(), HEAD = new Vector3(), FEET = new Vector3(), FOOT = new Vector3();
 /** A room's benches are 0.3 m deep: the seat bones this far behind the middle, near the rear edge (m). */
 const SIT_BACK = 0.1;
 /** Lying in bed: the head and the hips this far over the bedding (their bones are in the body, not on its back). */
 const ABED = 0.1;
 /** Round a person's middle, the sphere that tells whether they are in view (m: arms, a carried load, a clip's reach). */
 const REACH = 1.6;
+/**
+ * Out of view, a character still casts into the sun's shadow map if its shadow may fall into the view: within this
+ * much (m) of the camera, or its sphere grown by the shadow's length still touching the view. The rest of those out
+ * of view are not drawn at all (each cast a dozen shadow draws when detailed, two in the Crowd level).
+ */
+const SHADOW_NEAR = 12;
+/** A standing figure's height for the length of its shadow (m), and the longest shadow allowed for (a low sun). */
+const SHADOW_HEIGHT = 2, SHADOW_LONGEST = 40;
+/**
+ * Farther than this (m) in the Crowd level, a character's clip advances every other frame (the time it skipped goes
+ * with the next): at that distance the step cannot be told apart, and it halves what those animations cost.
+ */
+const SLOW_RANGE = 25;
 /** Seconds between two checks of every character's layers, for meshes Actors made since (a merged crowd mesh). */
 const RELAYER = 0.5;
 /** Seconds a sitter takes to settle onto the bench (about the clip's fade from walking). */
@@ -95,6 +108,9 @@ export interface Placed {
   puppet?: HeroPuppet;
 }
 
+/** How a character is drawn: in the view (and the shadow map), into the shadow map only, or not at all. */
+type Sight = 'view' | 'shadow' | 'none';
+
 interface Slot {
   ch: Character;
   /** Where the character stands: its own object keeps the height Actors gives it (feet on y = 0). */
@@ -116,8 +132,10 @@ interface Slot {
   shadow: boolean;
   /** Dressed for somebody before (a new dressing takes it over: DRESS_GAP). */
   used: boolean;
-  /** In the camera's view as its layers were set last (null: set them on the next frame). */
-  seen: boolean | null;
+  /** Drawn in the view, into the shadow map only, or not at all, as its layers were set last (null: set them on the next frame). */
+  seen: Sight | null;
+  /** Seconds of clip not yet played (SLOW_RANGE: a far character's clip advances every other frame). */
+  lag: number;
   /** Seconds since the clip began (a sitter settles onto the bench as the clip fades in). */
   since: number;
   /** What is drawn follows the agent smoothly, and its clip changes only once wanted a moment (render/steady.ts). */
@@ -152,7 +170,7 @@ export class FolkView {
       place.add(ch.object);
       place.name = 'townsfolk';
       place.visible = false;
-      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, since: 0, st: new Steady(), held: new Held<ActivityKind>('wait'), rep: new Repertoire(0), gait: 'walk', rig: new BodyRig(place), rigged: false, goals: limbGoals() };
+      const slot: Slot = { ch, place, agent: null, ready: false, clip: '', busy: false, look: '', detailed: false, shadow: false, used: false, seen: null, lag: 0, since: 0, st: new Steady(), held: new Held<ActivityKind>('wait'), rep: new Repertoire(0), gait: 'walk', rig: new BodyRig(place), rigged: false, goals: limbGoals() };
       this.slots.push(slot);
     }
   }
@@ -327,6 +345,8 @@ export class FolkView {
     // Detail and shadows go by how far each is from the camera itself: while the title's fly-over is far up over the
     // town (dressing for `focus`), everyone is far off and draws as Crowd without a shadow.
     const ranked: [number, Slot][] = [], c = cam.position;
+    this.frame++;
+    const reach = this.shadowReach();
     for (const s of this.shown.values()) {
       const at = s.place.position;
       if (s.ready) ranked.push([this.focus ? Math.hypot(at.x - c.x, at.y - c.y, at.z - c.z) : Math.hypot(at.x - cx, at.z - cz), s]);
@@ -352,7 +372,9 @@ export class FolkView {
       const st = p?.puppet ? { x: p.x, y: p.y, z: p.z, yaw: Math.PI / 2 - p.dir } : p ? s.st.ease(dt, p.x, p.y, p.z, Math.PI / 2 - p.dir) : s.st.ease(dt, a.x, this.height(a.x, a.z), a.z, Math.PI / 2 - a.dir);
       o.position.set(st.x, st.y, st.z);
       o.rotation.y = st.yaw;
-      this.inView(s, VIEW.intersectsSphere(BALL.set(AT.set(o.position.x, o.position.y + 0.9, o.position.z), REACH)), relayer);
+      const far = AT.set(o.position.x, o.position.y + 0.9, o.position.z).distanceTo(c);
+      const sight: Sight = VIEW.intersectsSphere(BALL.set(AT, REACH)) ? 'view' : far < SHADOW_NEAR || VIEW.intersectsSphere(BALL.set(AT, REACH + reach)) ? 'shadow' : 'none';
+      this.inView(s, sight, relayer);
       const act = s.held.pick(dt, p ? p.act : waitsInWay(a) ? 'wait' : a.act);
       const own = s.rep.play(dt, act) ?? clipOf(act, a.person.id, !!a.held);
       // On the way: their own walk, or a run (children at a feast).
@@ -371,7 +393,11 @@ export class FolkView {
       // A walk keeps step with their pace (their own walk at its own speed would slide its feet).
       const going = s.ch.actor.currentAction;
       if (going) going.timeScale = clip === LIE || p?.puppet ? 1 : gaitScale(clip, paceOf(a));
-      s.ch.update(dt);
+      // Out of doors, a character drawn nowhere waits, and one far off in the Crowd level advances every other frame
+      // (half of them on each); the time skipped goes with its next step. A new clip starts at once.
+      s.lag += dt;
+      const wait = !p && s.since > 0 && (sight === 'none' || (!s.detailed && far > SLOW_RANGE && ((this.frame + s.place.id) & 1) === 1));
+      if (!wait) { s.ch.update(s.lag); s.lag = 0; }
       if (p?.puppet) { const rig = s.rig.of(s.ch, s.ch.height || 1.75); if (rig) s.rigged = applyPuppet(rig, o, s.goals, p.puppet); }
       // On a room's bench they sit back on its rear edge, so a long coat's tail hangs down behind it, not through it.
       if (p?.seat !== undefined && clip.startsWith('sit')) this.seatOn(s, p.x - Math.cos(p.dir) * SIT_BACK, p.seat, p.z - Math.sin(p.dir) * SIT_BACK);
@@ -469,17 +495,31 @@ export class FolkView {
   }
 
   /**
-   * Out of view, a character is drawn into the sun's shadow map only (its shadow may fall into the view): Actors'
-   * meshes are never frustum culled (skinned, their bounds do not follow the pose), so everyone round the camera,
-   * behind it too, cost the view a dozen draws a head.
+   * Out of view, a character is drawn into the sun's shadow map only, if its shadow may fall into the view
+   * (SHADOW_NEAR), else not at all: Actors' meshes are never frustum culled (skinned, their bounds do not follow the
+   * pose), so everyone round the camera, behind it too, cost the view a dozen draws a head.
    */
-  private inView(s: Slot, seen: boolean, again: boolean): void {
+  private inView(s: Slot, seen: Sight, again: boolean): void {
     if (seen === s.seen && !again) return;
     s.seen = seen;
-    const mask = seen ? 1 : 1 << SHADOW_ONLY;
+    const mask = seen === 'view' ? 1 : seen === 'shadow' ? 1 << SHADOW_ONLY : 0;
     eachMesh(s.place, (m) => { m.layers.mask = mask; });
   }
   private relayer = 0;
+  private frame = 0;
+  /** The light that casts the shadows (the sun's, the moon's at night), found once. */
+  private caster: DirectionalLight | null = null;
+
+  /** How long a standing figure's shadow is now (m): longer as the light sinks, at most SHADOW_LONGEST. */
+  private shadowReach(): number {
+    if (!this.caster?.parent || !this.caster.castShadow) {
+      this.caster = null;
+      for (const o of this.stage.scene.children) if ((o as DirectionalLight).isDirectionalLight && (o as DirectionalLight).castShadow) { this.caster = o as DirectionalLight; break; }
+    }
+    if (!this.caster) return SHADOW_LONGEST;
+    const d = TO_LIGHT.subVectors(this.caster.position, this.caster.target.position);
+    return d.y <= 0 ? SHADOW_LONGEST : Math.min(SHADOW_LONGEST, (SHADOW_HEIGHT * Math.hypot(d.x, d.z)) / d.y);
+  }
 
   /**
    * Puts a sitter's seat on the bench top at (x, y, z): the sit clip lowers the hips by a share of their height (Actors
