@@ -51,7 +51,7 @@ before it fails. When a warning shows up, find the cause then, not when it fails
 
 | Step | Time (Oct 2026) | Warn | Fail |
 |---|---|---|---|
-| `npm test` | ~42 s here, ~1.4 times that on CI's runner | 55 s | 70 s |
+| `npm test` | ~46 s on CI's runner (4 cores, Nov 2026; was 68-72 s before the files were dealt out as processes finish) | 55 s | 70 s |
 | `npm run variety` | ~12 s | 30 s | 5 min |
 | `npm run loop` (its runs side by side, one process each) | ~30 s | 60 s | 5 min |
 | `npm run walk:landforms` (three worlds) | ~20 s | 30 s | 5 min |
