@@ -6,7 +6,8 @@
  * `shadow.shadowNode`); the second map's light lights nothing, it only lends its shadow.
  *
  * Which map draws a mover goes by where it is: within MOVER_RANGE of the box's middle the movers' map, beyond it
- * the still map (far off a late shadow does not show), so nobody is drawn into both.
+ * the still map (far off a late shadow does not show), so nobody is drawn into both. WebGPU only (Sky.movers: on
+ * WebGL 2 the second sampler is one more than the busiest shader has).
  */
 import { DirectionalLight, type Node, type Object3D, type OrthographicCamera, type Scene } from 'three/webgpu';
 import { shadow } from 'three/tsl';

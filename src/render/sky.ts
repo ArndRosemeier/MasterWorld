@@ -164,8 +164,12 @@ export class SkyView {
    * as they walk, Arnd 2026-11-04): movers near the camera have their own map, drawn every frame (MoverShadow).
    */
   shadowEvery = 3;
-  /** The movers' shadow map (the hero, townsfolk, creatures near the camera), drawn every frame. */
-  readonly movers: MoverShadow;
+  /**
+   * The movers' shadow map (the hero, townsfolk, creatures near the camera), drawn every frame. WebGPU only: on
+   * WebGL 2 its sampler made the town ground's shader read 17 textures of the 16 there are (check:units); there the
+   * movers stay in the one map, every third frame.
+   */
+  readonly movers: MoverShadow | null;
   private shadowFrame = 0;
   private readonly shadowAt = { x: Infinity, z: Infinity };
   private shadowSteps = -1;
@@ -175,7 +179,7 @@ export class SkyView {
     private readonly scene: Scene,
     private readonly sun: DirectionalLight,
     private readonly hemi: HemisphereLight,
-    opts: { hour: number; dayMinutes: number; exposure?: number; envGround?: number },
+    opts: { hour: number; dayMinutes: number; exposure?: number; envGround?: number; moverShadow?: boolean },
   ) {
     this.exposure = EXPOSURE * (opts.exposure ?? 1);
     this.hour = opts.hour;
@@ -228,7 +232,7 @@ export class SkyView {
     sc.near = 1; sc.far = SHADOW_EXTENT * 12;
     sc.updateProjectionMatrix();
     sun.shadow.normalBias = 0.02 * SHADOW_EXTENT / 60;
-    this.movers = new MoverShadow(sun);
+    this.movers = opts.moverShadow === false ? null : new MoverShadow(sun);
     this.update(0, null);
   }
 
