@@ -1052,9 +1052,11 @@ export class HydroTile {
       const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
       const t = clamp(((x - ax) * dx + (z - az) * dz) / l2, 0, 1);
       const ex = x - (ax + dx * t), ez = z - (az + dz * t);
-      const d = Math.hypot(ex, ez);
       const half = r.half[k] + (r.half[k + 1] - r.half[k]) * t;
       const valley = r.reach ? r.reach[k] + (r.reach[k + 1] - r.reach[k]) * t : valleyOf(half);
+      // (Most segments of a bucket lie farther than their valley: told by squares, as `Math.hypot` is slow.)
+      if (ex * ex + ez * ez > valley * valley * 1.000001) continue;
+      const d = Math.hypot(ex, ez);
       // Nearest relative to its valley, so a big river's banks win over a brook's.
       const score = d / valley;
       if (d > valley || score >= best) continue;
@@ -1221,6 +1223,17 @@ export function adoptTiles(tiles: readonly TracedTile[]): void {
   for (const t of tiles) adopted.set(t.key, t.data);
 }
 
+/** Somewhere tiles traced in one process wait for another (the tests' processes: tools/test/tileStore.mjs). */
+export interface TileStore {
+  get(key: string): Float64Array | null;
+  put(key: string, packed: Float64Array): void;
+}
+let store: TileStore | null = null;
+/** Takes tiles from `s` and puts the ones this thread traces there (null: none). The game has none. */
+export function useTileStore(s: TileStore | null): void {
+  store = s;
+}
+
 /** Tiles traced in this thread so far and the time it took (ms): the load probe reads a worker's (serve stats). */
 export const traced = { rivers: 0, riverMs: 0, brooks: 0, brookMs: 0 };
 
@@ -1313,12 +1326,13 @@ export class Hydrology {
     if (!t) {
       const k = this.keyOf(tiles === this.brookTiles, key);
       t = shared.get(k);
-      const given = t ? undefined : adopted.get(k);
+      const given = t ? undefined : adopted.get(k) ?? store?.get(k);
       if (t) shared.delete(k);
       else if (given) { adopted.delete(k); t = new HydroTile(this.skeleton, tx, tz, o, null, unpackTile(given, (o.core + 2 * o.margin) ** 2)); }
       else {
         const t0 = performance.now();
         t = new HydroTile(this.skeleton, tx, tz, o, feed(tx, tz));
+        store?.put(k, packTile(t));
         if (tiles === this.tiles) { traced.rivers++; traced.riverMs += performance.now() - t0; } else { traced.brooks++; traced.brookMs += performance.now() - t0; }
       }
       shared.set(k, t);

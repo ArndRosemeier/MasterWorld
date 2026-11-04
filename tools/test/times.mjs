@@ -1,17 +1,17 @@
 /**
- * A test reporter for tools/test/run.mjs: the seconds each test file's tests took (its top-level tests' times; what
- * it sets up at its top is not counted), and how many tests passed and failed. One line of JSON.
+ * A test reporter for tools/test/run.mjs: how many tests passed and failed. A test file's top-level tests sit one level
+ * inside its wrapper (tools/test/claim.mjs), so those count; a wrapper counts only when it failed by itself (the file
+ * would not load), not because a test in it failed. One line of JSON.
  */
-import path from 'node:path';
-
 export default async function* times(source) {
-  const per = {};
   let pass = 0, fail = 0;
   for await (const e of source) {
-    if ((e.type !== 'test:pass' && e.type !== 'test:fail') || e.data.nesting !== 0 || !e.data.file) continue;
-    if (e.type === 'test:pass') pass++; else fail++;
-    const file = path.relative(process.cwd(), e.data.file).split(path.sep).join('/');
-    per[file] = (per[file] ?? 0) + (e.data.details.duration_ms ?? 0) / 1000;
+    if (e.type !== 'test:pass' && e.type !== 'test:fail') continue;
+    const d = e.data;
+    if (d.nesting === 1) {
+      if (d.name === 'barrier') continue;
+      if (e.type === 'test:pass') pass++; else fail++;
+    } else if (d.nesting === 0 && e.type === 'test:fail' && d.details?.error?.failureType !== 'subtestsFailed') fail++;
   }
-  yield JSON.stringify({ per, pass, fail }) + '\n';
+  yield JSON.stringify({ pass, fail }) + '\n';
 }
