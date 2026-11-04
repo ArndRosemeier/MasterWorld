@@ -45,6 +45,11 @@ const DETAILED = 6;
  * the same distance must not trade places every frame.
  */
 const STICK = 4;
+/**
+ * Parts whose shadow falls inside the body's and the clothes' own (a belt, shoes): at the sun's shadow map's 8 cm a texel
+ * they add nothing to a person's shadow, and each was a skinned draw in every redraw of it.
+ */
+const INSIDE_SHADOW = /belt|shoes|boots/;
 /** People farther than this (m) cast no shadow (in the Crowd level only the body casts one). */
 const SHADOW_RANGE = 35;
 /** The title's fly-over this far (m) from the place it dresses for draws everyone as a plain figure. */
@@ -434,7 +439,7 @@ export class FolkView {
     const crowd = s.ch.lods.length - 1;
     s.ch.setLod(detailed ? 'auto' : crowd);
     castShadows(s.place);
-    eachMesh(s.place, (m) => { if (!shadow || (!detailed && m.name !== 'crowd')) m.castShadow = false; });
+    eachMesh(s.place, (m) => { if (!shadow || (!detailed && m.name !== 'crowd') || INSIDE_SHADOW.test(m.name)) m.castShadow = false; });
   }
 
   private dress(s: Slot, a: Agent): void {
