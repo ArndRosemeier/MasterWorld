@@ -22,7 +22,7 @@ const regions = { ...land.regions, fills: land.regions.fills.filter((f) => !f.ha
 test('capital: one, a few km out, a decision in the log; walled, with its ruler, guild halls and shops', () => {
   // Walking south-east until it is founded (the walk stops there). (South, the capital founded since the sea cliffs'
   // gullies were widened has no road out ending in a brook, which the bridge tests below need.)
-  const log = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, Math.PI / 4, 9, (d) => settlementOf(d, regions.fills)?.size === 'capital')];
+  const log = [...first, ...walkFrontier({ seed, log: first, terrain, regions, home }, Math.PI / 3, 9, (d) => settlementOf(d, regions.fills)?.size === 'capital')];
   const caps = regionDecisions(log).filter((d) => settlementOf(d, regions.fills)?.size === 'capital');
   assert.equal(caps.length, 1, 'one capital');
   const d = caps[0], t = settlementOf(d, regions.fills)!;
