@@ -69,6 +69,7 @@ export class TerrainView {
   }
 
   update(camera: Camera, show = true): void {
+    if (this.bundle) keepRecorded(this.bundle);
     const p = camera.position;
     if (Math.hypot(p.x - this.last.x, p.z - this.last.z) > MOVE || Math.abs(p.y - this.last.y) > MOVE) {
       this.last = { x: p.x, z: p.z, y: p.y };
