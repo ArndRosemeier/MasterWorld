@@ -14,7 +14,8 @@ test('MoverShadow: the whole map leaves the near movers out and is kept; every f
   };
   const proto = ShadowNode.prototype as unknown as { renderShadow(frame: ShadowFrame): void };
   const was = proto.renderShadow;
-  proto.renderShadow = function (frame) { log.push(`whole: ${seen(frame.scene)}`); };
+  const bundleOf = (frame: ShadowFrame): string => (frame.renderer._currentRenderBundle ? ' (into a bundle!)' : '');
+  proto.renderShadow = function (frame) { log.push(`whole${bundleOf(frame)}: ${seen(frame.scene)}`); };
   // As at the start town: the origin far out, the sun's target in world space, the bodies relative to the origin.
   ORIGIN.moveTo(25600, 33280);
   try {
@@ -44,9 +45,11 @@ test('MoverShadow: the whole map leaves the near movers out and is kept; every f
     assert.equal((sun.shadow as unknown as { shadowNode?: unknown }).shadowNode, split.node, 'the sun shades with this node');
     const map = new DepthTexture(8, 8, FloatType);
     split.node.shadowMap = { depthTexture: map };
-    const renderer = {
+    // The frame's own draw is recording a bundle when the map is asked for.
+    const renderer: ShadowFrame['renderer'] = {
       autoClear: true,
-      render(s: Scene) { log.push(`movers${this.autoClear ? ' (cleared!)' : ''}: ${seen(s)}`); },
+      _currentRenderBundle: 'bundle',
+      render(s: Scene) { log.push(`movers${this.autoClear ? ' (cleared!)' : ''}${this._currentRenderBundle ? ' (into a bundle!)' : ''}: ${seen(s)}`); },
       copyTextureToTexture(src: DepthTexture, dst: DepthTexture) { log.push(`copy ${src === map ? 'map' : 'kept'} to ${dst === map ? 'map' : 'kept'}`); },
       lighting: { getNode: () => ({ getLights: () => lights }) },
     };
@@ -69,6 +72,7 @@ test('MoverShadow: the whole map leaves the near movers out and is kept; every f
       'movers: hero heroBody lamp lantern people plainFolk torch world',
     ]);
     assert.equal(renderer.autoClear, true, 'the renderer clears again afterwards');
+    assert.equal(renderer._currentRenderBundle, 'bundle', 'the recording goes on afterwards');
     // Everything shown as it was afterwards.
     assert.equal(seen(scene), 'cart farFolk hero heroBody house lamp lantern people plainFolk torch world');
     assert.equal(hidden.visible, false);

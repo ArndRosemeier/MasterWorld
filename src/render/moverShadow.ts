@@ -60,6 +60,8 @@ export type ShadowFrame = {
     copyTextureToTexture(src: DepthTexture, dst: DepthTexture): void;
     /** The scene's lights as the frame's own draw found them (three's Lighting). */
     lighting: { getNode(scene: Scene): { getLights(): Object3D[] } };
+    /** The render bundle three is recording, if any (Renderer internals). */
+    _currentRenderBundle?: unknown;
   };
 };
 
@@ -105,7 +107,19 @@ export class MoverShadow {
     (sun.shadow as unknown as { shadowNode: unknown }).shadowNode = node;
   }
 
+  /**
+   * The map is drawn from inside the frame's own draw (three updates it before the first object that receives it),
+   * which may be recording a render bundle (stage StaticBundle): three would add every caster drawn here to that
+   * bundle, to be refreshed on each replay, gone or not (a townsperson's crowd body at night: a null sampler and a
+   * broken frame, MW #578). So the recording is set aside while the map is drawn.
+   */
   private drawMap(frame: ShadowFrame, whole: (frame: ShadowFrame) => void): void {
+    const r = frame.renderer, bundle = r._currentRenderBundle ?? null;
+    r._currentRenderBundle = null;
+    try { this.drawOutsideBundles(frame, whole); } finally { r._currentRenderBundle = bundle; }
+  }
+
+  private drawOutsideBundles(frame: ShadowFrame, whole: (frame: ShadowFrame) => void): void {
     const map = this.node.shadowMap?.depthTexture;
     if (!map) return whole(frame);
     const r = frame.renderer, scene = frame.scene, lights = r.lighting.getNode(scene).getLights();
