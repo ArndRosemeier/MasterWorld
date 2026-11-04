@@ -506,7 +506,7 @@ export class FolkView {
     s.seen = null;
     s.detailed = s.shadow = false;
     if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
-    this.stage.scene.add(mover(s.place));
+    this.stage.scene.add(mover(s.place, () => s.detailed));
     s.ready = true;
   }
 
