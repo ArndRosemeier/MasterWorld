@@ -13,7 +13,7 @@ import type { Character } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
 import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
-import { dauntsFrom, fightXp } from './growth';
+import { dauntsFrom, evenDanger, fightXp } from './growth';
 import type { Standing } from './standing';
 import { opposed } from '../sim/factions';
 
@@ -106,12 +106,14 @@ export class Fight implements RecipeWorld {
 
   /**
    * Threat of a creature against the hero (the target frame's ward): with all who fight the hero beside it,
-   * so one wolf of a pack that surrounds the hero is read as the pack. `together` when others count.
+   * so one wolf of a pack that surrounds the hero is read as the pack. `together` when others count. Weighed against an even fight
+   * at the hero's level, the scale the target card's level and the experience are on (the hero's power runs about twice that at level 1,
+   * so a foe of the hero's own level read "weaker than you").
    */
   threat(c: Creature): { readonly threat: Threat; readonly together: boolean } {
     const others = this.den.fighting.filter((o) => o !== c);
     const danger = c.def.danger + others.reduce((a, o) => a + o.def.danger, 0);
-    return { threat: threatOf(danger, this.hero.power), together: others.length > 0 };
+    return { threat: threatOf(danger, evenDanger(this.setting.growth, this.hero.level)), together: others.length > 0 };
   }
 
   /** Seconds left of the current swing (0: the next blow can start). */

@@ -122,29 +122,31 @@ export const creatures: readonly CreatureDef[] = [
   // faction, at feud with nobody, and placid: they take no notice of a hero so small, are afraid of nothing, and fight only once struck (Arnd
   // 2026-11-03: "they are certainly not afraid"). They walk slowly for their size, as their weight asks, but a 14 m stride covers ground: the elk's
   // roam (a third of its speed) is its own unhurried walk (Actors' `strideSpeed`), so its legs swing as the ground goes by. The two that hunt live only far out (D29), at the
-  // danger the land there holds, and never below.
+  // danger the land there holds, and never below. Their blows are a giant's, and their danger (the level the target card shows) is what a fight with one is
+  // (Arnd 2026-11-04: a turtle read "weaker than you" at level 1 and had health for minutes of blows): the peaceful two are far beyond a fresh hero, and
+  // safe only because they never start a fight. test/giants.test.ts holds every beast's danger to its blows and health.
   {
     id: 'giant elk', name: 'giant elk', plural: 'giant elk', body: { kind: 'beast', species: 'elk', length: 13.8, color: '#6e5238', giant: 6 },
-    health: 110, armour: 2, defence: 16, speed: 7.5, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 14,
-    attacks: [{ name: 'antlers', damage: [6, 12], kind: 'pierce', reach: 3.5, time: 3, prowess: 30 }],
+    health: 160, armour: 2, defence: 16, speed: 7.5, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 29,
+    attacks: [{ name: 'antlers', damage: [13, 24], kind: 'pierce', reach: 3.5, time: 3, prowess: 40 }],
     loot: 'giant-elk', tell: 'Antlers like a dead tree above the grass, and the grass does not move for the wind.',
   },
   {
     id: 'giant turtle', name: 'giant turtle', plural: 'giant turtles', body: { kind: 'beast', species: 'turtle', length: 14, color: '#5a6a40', giant: 12.7, radius: 6.2 },
-    health: 140, armour: 7, defence: 6, speed: 1.4, senses: { sight: 30, hearing: 30 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 12,
-    attacks: [{ name: 'beak', damage: [5, 10], kind: 'bite', reach: 2.4, time: 3.5, prowess: 24 }],
+    health: 140, armour: 7, defence: 6, speed: 1.4, senses: { sight: 30, hearing: 30 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 44,
+    attacks: [{ name: 'beak', damage: [12, 22], kind: 'bite', reach: 2.4, time: 3.5, prowess: 34 }],
     loot: 'giant-turtle', tell: 'A boulder by the water that is, on a closer look, breathing.',
   },
   {
     id: 'giant boar', name: 'giant boar', plural: 'giant boars', body: { kind: 'beast', species: 'boar', length: 9.1, color: '#3a2e24', giant: 6.5 },
-    health: 150, armour: 4, defence: 12, speed: 6.6, senses: { sight: 12, hearing: 24 }, faction: 'beasts', temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 26,
-    attacks: [{ name: 'tusks', damage: [9, 18], kind: 'pierce', reach: 3, time: 2.8, prowess: 40 }],
+    health: 150, armour: 4, defence: 12, speed: 6.6, senses: { sight: 12, hearing: 24 }, faction: 'beasts', temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 45,
+    attacks: [{ name: 'tusks', damage: [16, 30], kind: 'pierce', reach: 3, time: 2.8, prowess: 44 }],
     loot: 'giant-boar', tell: 'Whole oaks rooted up, and a smell like a midden at noon.',
   },
   {
     id: 'giant wolf', name: 'giant wolf', plural: 'giant wolves', body: { kind: 'beast', species: 'wolf', length: 9.2, color: '#5c564c', giant: 8 },
-    health: 120, armour: 2, defence: 28, speed: 8.4, senses: { sight: 30, hearing: 38 }, faction: 'predators', temper: 'hostile', morale: 0.9, pack: true, role: 'leader', danger: 26,
-    attacks: [{ name: 'bite', damage: [8, 16], kind: 'bite', reach: 3.2, time: 2.2, prowess: 42 }],
+    health: 120, armour: 2, defence: 28, speed: 8.4, senses: { sight: 30, hearing: 38 }, faction: 'predators', temper: 'hostile', morale: 0.9, pack: true, role: 'leader', danger: 35,
+    attacks: [{ name: 'bite', damage: [14, 26], kind: 'bite', reach: 3.2, time: 2.2, prowess: 46 }],
     loot: 'giant-wolf', tell: 'A howl that comes up through the soles of your feet.',
   },
   {
