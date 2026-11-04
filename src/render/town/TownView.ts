@@ -4,12 +4,13 @@
  * shader (materials/building.ts).
  */
 import { hash3f } from '@futuremagic/core';
-import { Group, type BufferAttribute, type Mesh, type Vector3 } from 'three/webgpu';
+import { type BufferAttribute, type Mesh, type Vector3 } from 'three/webgpu';
 import type { BuildingMesh, TownPlan } from '@futuremagic/settlement';
 import type { Stage } from '@futuremagic/stage';
 import type { TerrainJobs } from '../../workers/pool';
 import type { MeshRange } from '../../world/townMesh';
 import { buildingMeshAt } from '../materials/building';
+import { keepRecorded, staticGroup } from '../bundles';
 
 /** From this far (m, camera to the cell's middle) the far meshes draw. */
 const FAR = 200;
@@ -28,13 +29,13 @@ export function charred(r: number, g: number, b: number, h: number, n: number): 
 interface Cell { x: number; z: number; near: Mesh; far: Mesh; nearRanges: MeshRange[]; farRanges: MeshRange[] }
 
 export class TownView {
-  readonly group = new Group();
+  /** A render bundle while bundles are on (render/bundles.ts): its cells do not move, they only switch near and far. */
+  readonly group = staticGroup('town');
   private readonly cells: Cell[] = [];
   /** Buildings taken out of their cell's meshes (shown open in their place), with their indices to put back. */
   private readonly hidden = new Map<number, { index: BufferAttribute; start: number; saved: Uint32Array }[]>();
 
   constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs) {
-    this.group.name = 'town';
   }
 
   /** Mesh the buildings of the town of this id and put them in; its plan, if `plan` (planned in the worker). */
@@ -58,6 +59,7 @@ export class TownView {
       c.near.visible = !far;
       c.far.visible = far;
     }
+    keepRecorded(this.group);
   }
 
   /**

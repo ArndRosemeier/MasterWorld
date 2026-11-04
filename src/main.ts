@@ -44,6 +44,7 @@ import type { Agent, TownOrder } from './sim/townLife';
 import { LANTERN_COLOR, createView } from './render/view';
 import { ORIGIN } from './render/origin';
 import { TerrainView } from './render/terrain/TerrainView';
+import { BUNDLES } from './render/bundles';
 import { ROOT_LEVEL, chunkSize } from './render/terrain/lod';
 import { VolumeView } from './render/terrain/VolumeView';
 import { TerrainJobs, WorldJobs, createCavePool, createTerrainPool, createTexturePool, createWorldPool, type CavePool } from './workers/pool';
@@ -286,6 +287,7 @@ export async function start(b: Boot): Promise<void> {
     }
 
     loading.set('Starting the renderer');
+    BUNDLES.on = params.bundles;
     const view = await createView(canvas, { forceWebGL: boot.webgl, hour: save?.clock.hour ?? hour, dayMinutes: boot.dayMinutes, tone: params.tone, post: params.post, postSamples: params.postSamples, postFloatDepth: params.postFloatDepth, ao: params.ao, bloom: params.bloom, envGround: params.envGround });
     if (save) view.sky.day = save.clock.day;
     view.sky.look = setting.look?.grade ?? [];
@@ -496,7 +498,7 @@ export async function start(b: Boot): Promise<void> {
     void roadWork.start(later);
     // The land round the camera is asked for early (after the roads, which the workers hear of first), so its
     // chunks build while the hero and the town load; it is shown once its shader is warm.
-    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z), { bundle: params.bundles });
+    const ground = new TerrainView(view.stage, terrainJobs, (x, z) => terrain.height(x, z));
     // (Once the ground's textures are made: their workers come first, as the warm-up waits for them.)
     // (And once every river and brook tile under the land drawn at the start is traced, each once, side by side.)
     const rootSide = chunkSize(ROOT_LEVEL), cam = view.camera.position;

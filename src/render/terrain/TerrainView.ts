@@ -4,7 +4,8 @@
  * the scene through the Stage and shares the TERRAIN kind's one shader.
  */
 import { BufferAttribute, BufferGeometry, type Camera, type Mesh } from 'three/webgpu';
-import { StaticBundle, type Stage } from '@futuremagic/stage';
+import type { Stage } from '@futuremagic/stage';
+import { BUNDLES, staticGroup, keepRecorded } from '../bundles';
 import { CANOPY_RISE, TERRAIN, kindMesh } from '../materials';
 import { chunkIndex, type ChunkMesh } from '../../world/chunkMesh';
 import { until, type TerrainJobs } from '../../workers/pool';
@@ -29,11 +30,10 @@ export class TerrainView {
   /** Each built or building chunk's key, by id. */
   private readonly keys = new Map<string, ChunkKey>();
 
-  /** With `bundle` (URL `bundles=1`), the chunks are drawn as one WebGPU render bundle (StaticBundle): recorded once, replayed each frame. */
-  private readonly bundle: StaticBundle | null;
+  /** With bundles on (render/bundles.ts), the chunks are drawn as one WebGPU render bundle: recorded once, replayed each frame. */
+  private readonly bundle = BUNDLES.on ? staticGroup('terrain') : null;
 
-  constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs, private readonly groundAt: (x: number, z: number) => number, opts: { bundle?: boolean } = {}) {
-    this.bundle = opts.bundle ? new StaticBundle('terrain') : null;
+  constructor(private readonly stage: Stage, private readonly jobs: TerrainJobs, private readonly groundAt: (x: number, z: number) => number) {
     if (this.bundle) void stage.add(this.bundle);
   }
 
@@ -43,14 +43,14 @@ export class TerrainView {
     await this.stage.prepare(m);
     m.frustumCulled = false; // a recording keeps what was in view when it was made: the GPU drops what is off screen
     this.bundle.add(m);
-    this.bundle.changed();
+    keepRecorded(this.bundle);
   }
 
   /** A chunk out of the view. */
   private takeChunk(m: Mesh): void {
     if (!this.bundle) return this.stage.remove(m);
     this.bundle.remove(m);
-    this.bundle.changed();
+    keepRecorded(this.bundle);
   }
 
   /** Chunks drawn now, and chunks being built. */
