@@ -47,7 +47,8 @@ export const LIBRARY_KINDS = {
   elk: {
     // The giant elk's body (M2, Deform "giant"): WildMesh3D's elk, on the red deer's rig B (so the deer's clips, here under their elk names).
     ids: ['elk'],
-    clips: { idle: ['Idle'], alert: ['Idle_Breathing_01', 'Idle'], feed: ['Food_Eating_01_Wolf'], walk: ['Walk'], run: ['Run', 'Sprint'], hurt: ['Hit_Idle_L01'], dead: ['Death_Idle_R01'] },
+    // (Its file's "Walk" keys only the rig's root node, no joint: Actors drops it. Walk_2 is the walk.)
+    clips: { idle: ['Idle'], alert: ['Idle_Breathing_01', 'Idle'], feed: ['Food_Eating_01_Wolf'], walk: ['Walk_2', 'WalkSlow'], run: ['Run', 'Sprint'], hurt: ['Hit_Idle_L01'], dead: ['Death_Idle_R01'] },
   },
   turtle: {
     // The giant turtle's body (M2, Deform "giant"): a stylized tortoise (0.85 m at scale 1) that draws its head in when struck and dies on its back.
