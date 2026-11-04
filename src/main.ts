@@ -187,6 +187,7 @@ import { COURT } from './world/hold';
 import { DrawnGround, drawnSource } from './world/drawnGround';
 import { emptyWater, inChannel, tracedTiles } from './world/hydro';
 import { onLand } from './world/dungeon/site';
+import { mover } from './render/moverShadow';
 
 declare global {
   interface Window {
@@ -567,7 +568,7 @@ export async function start(b: Boot): Promise<void> {
     if ((title?.draw.giant || params.giant) && title && !title.calm && orbit) {
       const g = { view: await GiantView.grow(view.renderer, GIANT_SPEED), t: 0 };
       g.view.frame(0, giantPose(orbit, title.draw.seed, 0));
-      giantReady = preparePeople(view.stage, g.view.object).then(() => view.stage.add(g.view.object)).then(() => { giant = g; });
+      giantReady = preparePeople(view.stage, g.view.object).then(() => view.stage.add(mover(g.view.object))).then(() => { giant = g; });
     }
     let heroName = save?.looks?.name ?? '';
     // The hero's sheet (level, abilities, health, gear, purse) and what they hold.
@@ -774,7 +775,7 @@ export async function start(b: Boot): Promise<void> {
     await view.stage.add(view.sky.dome);
     await view.stage.add(sea.mesh);
     if (grass) await view.stage.add(grass.group);
-    await view.stage.add(hero.object);
+    await view.stage.add(mover(hero.object));
     await horses?.show(view.stage);
     await stock?.enter(view.stage);
     await hens?.enter(view.stage);

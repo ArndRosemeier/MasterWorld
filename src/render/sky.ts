@@ -1,6 +1,6 @@
 /**
  * Sky, sun, moon, fog and the environment light, driven by the time of day and the weather
- * (@futuremagic/sky, from Scale; the weather itself comes from WeatherView). The sun casts one shadow map that follows the camera. Everything that changes any shader's key
+ * (@futuremagic/sky, from Scale; the weather itself comes from WeatherView). The sun casts a shadow map that follows the camera (its near movers drawn every frame, moverShadow.ts). Everything that changes any shader's key
  * (the environment map, shadows, fog type) is set up in the constructor, before the warm-up.
  */
 import { BoxGeometry, Color, Mesh, type Sprite, PMREMGenerator, Scene, Vector3, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
@@ -15,6 +15,7 @@ import { HorizonShadow } from './horizonShadow';
 import { WINDOWS } from './materials/building';
 import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 import { inRenderGroup } from './renderGroup';
+import { MoverShadow } from './moverShadow';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
 const SHADOW_EXTENT = 160;
@@ -159,9 +160,15 @@ export class SkyView {
    * The sun's shadow map is drawn every this many frames (and at once after a jump): drawing it took about 7 ms of
    * a town frame on the reference machine (every caster drawn again). A shadow a frame or two late does not show.
    * Every third frame: about 1.5-2 ms off a town frame at dusk and in rain against every second (gate G); at 90 fps
-   * a running hero's shadow is then at most 0.1 m behind.
+   * a running hero's shadow is then at most 0.1 m behind. That still showed on the hero (a shadow that twitches
+   * as they walk, Arnd 2026-11-04): the movers near the camera are drawn into it every frame (MoverShadow).
    */
   shadowEvery = 3;
+  /**
+   * The sun's shadow node that draws the movers near the camera (the hero, townsfolk, creatures) every frame over a
+   * copy of the whole map. WebGPU only (MoverShadow); on WebGL 2 the movers stay in the map, every third frame.
+   */
+  readonly movers: MoverShadow | null;
   private shadowFrame = 0;
   private readonly shadowAt = { x: Infinity, z: Infinity };
   private shadowSteps = -1;
@@ -171,7 +178,7 @@ export class SkyView {
     private readonly scene: Scene,
     private readonly sun: DirectionalLight,
     private readonly hemi: HemisphereLight,
-    opts: { hour: number; dayMinutes: number; exposure?: number; envGround?: number },
+    opts: { hour: number; dayMinutes: number; exposure?: number; envGround?: number; moverShadow?: boolean },
   ) {
     this.exposure = EXPOSURE * (opts.exposure ?? 1);
     this.hour = opts.hour;
@@ -224,6 +231,7 @@ export class SkyView {
     sc.near = 1; sc.far = SHADOW_EXTENT * 12;
     sc.updateProjectionMatrix();
     sun.shadow.normalBias = 0.02 * SHADOW_EXTENT / 60;
+    this.movers = opts.moverShadow === false ? null : new MoverShadow(sun);
     this.update(0, null);
   }
 
@@ -412,10 +420,16 @@ export class SkyView {
     // A step of the floating origin moves the scene under the map's old box: drawn again at once too.
     const jumped = Math.hypot(fx - this.shadowAt.x, fz - this.shadowAt.z) > SHADOW_JUMP || ORIGIN.steps !== this.shadowSteps;
     this.shadowSteps = ORIGIN.steps;
-    if (jumped || ++this.shadowFrame >= this.shadowEvery) {
+    const whole = jumped || ++this.shadowFrame >= this.shadowEvery;
+    if (whole) {
       this.shadowFrame = 0;
       this.shadowAt.x = fx; this.shadowAt.z = fz;
       this.sun.shadow.needsUpdate = true;
+    }
+    // The movers near the camera every frame (over the map as last drawn whole), while the sun casts.
+    if (this.movers) {
+      if (whole) this.movers.stillDue = true;
+      if (this.sun.castShadow && this.sun.intensity > 0) this.sun.shadow.needsUpdate = true;
     }
 
     // The environment map when the sun moved or the weather changed noticeably.

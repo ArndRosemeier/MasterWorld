@@ -23,6 +23,7 @@ import { GAIT_CLIPS, gaitOf, gaitScale } from './gaits';
 import { MOVE_CLIPS } from './moves';
 import type { LimbGoals } from '@futuremagic/figure';
 import { BodyRig, applyPuppet, limbGoals, type HeroPuppet } from '../hero/puppet';
+import { mover } from '../moverShadow';
 
 /** Where the build serves the pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -171,6 +172,11 @@ export class FolkView {
   private constructor(private readonly stage: Stage, private readonly dressedAs: readonly Person[], private readonly height: (x: number, z: number) => number, lead: Character, others: Character[]) {
     for (const ch of [lead, ...others]) {
       ch.lodBias = LOD_BIAS;
+      // Every update animates: who steps slower is decided here (SLOW_RANGE, `sight`). Actors' own steps (every 2nd
+      // update in the Crowd level, every 4th out of view) came on top of that, and the Crowd level is everyone but
+      // the DETAILED nearest, however close: a figure 5 m off walked at half rate, one past SLOW_RANGE at a quarter.
+      ch.actor.animationSteps = [];
+      ch.actor.offscreenStep = 1;
       const place = new Group();
       place.add(ch.object);
       place.name = 'townsfolk';
@@ -500,7 +506,7 @@ export class FolkView {
     s.seen = null;
     s.detailed = s.shadow = false;
     if (s.agent !== id) { s.place.visible = false; return; } // taken over meanwhile
-    this.stage.scene.add(s.place);
+    this.stage.scene.add(mover(s.place, () => s.detailed));
     s.ready = true;
   }
 

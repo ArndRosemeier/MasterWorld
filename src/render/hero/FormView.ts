@@ -17,6 +17,7 @@ import { shelvedAnimal } from '../dungeon/animals';
 import type { MaterialKind } from '../materials';
 import { BUBBLE, BUBBLE_GLOW, FEATHER, FEATHER_GLOW } from '../materials/feathers';
 import { preparePeople } from './play';
+import { mover } from '../moverShadow';
 
 /** What an animal form looks like: its library animal and clips, and the swirl of its change. */
 export interface FormLook<D extends string> {
@@ -91,7 +92,7 @@ export class FormView<D extends string> {
     await preparePeople(stage, v.place);
     await preparePeople(stage, v.swirl);
     v.place.visible = v.swirl.visible = false;
-    await stage.add(v.place);
+    await stage.add(mover(v.place));
     await stage.add(v.swirl);
     return v;
   }

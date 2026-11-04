@@ -74,7 +74,7 @@ export async function createView(canvas: HTMLCanvasElement, opts: { forceWebGL: 
   const warm = new WarmLights(scene);
   // Sky, fog, environment map and the sun's shadow (all part of shader keys) before the Stage warms up.
   // AgX (with or without our look) needs more exposure than ACES for the same mid-grey (ACES divides by 0.6).
-  const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
+  const sky = new SkyView(renderer, scene, sun, hemi, { ...opts, moverShadow: backend === 'webgpu', exposure: (opts.tone ?? 'graded') === 'aces' ? 1 : (opts.tone ?? 'graded') === 'agx' ? 1.5 : 1.6 });
   // Bloom: a soft glow round the sun, lit windows and fire. Its threshold follows the exposure (frame()).
   // Ambient occlusion: contact shade in corners, under eaves, round feet and stones.
   const post = opts.post === false ? null : createPost(renderer, scene, drawn, { bloom: { strength: opts.bloom?.[1] ?? BLOOM_STRENGTH, radius: opts.bloom?.[2] ?? BLOOM_RADIUS, threshold: 1 }, ...(opts.ao === null ? {} : { ao: opts.ao ?? { radius: 1, strength: 0.6 } }), samples: opts.postSamples, floatDepth: opts.postFloatDepth, veil: (color, depth) => outlineVeil(waterVeil(color, depth), depth) });

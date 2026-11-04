@@ -10,6 +10,7 @@ import type { Grazer, Herds } from '../../sim/livestock';
 import { HorseView } from '../horse/HorseView';
 import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from '../dungeon/animals';
 import { deriveSeed } from '@futuremagic/core';
+import { mover } from '../moverShadow';
 
 /** Farther than this (m) an animal is not drawn. */
 const REACH = 180;
@@ -46,7 +47,7 @@ class ActorsHerd implements Bodies {
   }
 
   warmObjects(): Object3D[] { return this.bodies.map((b) => b.place); }
-  async show(stage: Stage): Promise<void> { for (const b of this.bodies) await stage.add(b.place); }
+  async show(stage: Stage): Promise<void> { for (const b of this.bodies) await stage.add(mover(b.place)); }
   shown(i: number, on: boolean): void { this.bodies[i].place.visible = on; }
   pose(i: number, p: { x: number; y: number; z: number; yaw: number; act: 'eat' | 'idle' | 'walk'; speed: number }, dt: number): void {
     poseAnimal(this.bodies[i], p.x, p.y, p.z, p.yaw, DOING[p.act], p.speed, dt);
