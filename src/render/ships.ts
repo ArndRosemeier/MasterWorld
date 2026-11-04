@@ -14,6 +14,7 @@ import { WEATHER } from './materials/weather';
 import { LIE_OVER, afloatAt, farBerth, fleetOf, passageShip, voyageAfloat, wreckLying, type Afloat as Place, type Vessel, type Voyage } from '../world/fleet';
 import type { Decks, Pose } from '../world/deck';
 import type { Town } from '../world/town';
+import { freeMesh } from './materials';
 
 /** Vessels are drawn within this of the camera (m); their decks are walked within ABOARD. */
 const SEEN = 1500, ABOARD = 250;
@@ -153,7 +154,7 @@ export class ShipsView {
   private beachedBoats(cam: Vector3, built: boolean): void {
     for (const b of this.h.beached?.() ?? []) {
       const near = Math.hypot(b.x - cam.x, b.z - cam.z) < SEEN, m = this.ashore.get(b.id);
-      if (!near) { if (m) { this.group.remove(m); m.geometry.dispose(); this.ashore.delete(b.id); } continue; }
+      if (!near) { if (m) { freeMesh(m); this.ashore.delete(b.id); } continue; }
       if (m || built) continue;
       built = true;
       // Dismasted: her mast gone (the spar lies on the sand, world/sites.ts). (A mast without yards breaks the shrouds.)
@@ -171,7 +172,7 @@ export class ShipsView {
   /** The boats gone over near the camera (S9): keel up, riding the waves where they float; one built a frame at most. */
   private overturned(cam: Vector3, built: boolean): boolean {
     const now = this.h.capsized?.() ?? [];
-    for (const [id, u] of this.upturned) if (!now.some((c) => c.id === id)) { this.group.remove(u.mesh); u.mesh.geometry.dispose(); this.upturned.delete(id); }
+    for (const [id, u] of this.upturned) if (!now.some((c) => c.id === id)) { freeMesh(u.mesh); this.upturned.delete(id); }
     for (const c of now) {
       let u = this.upturned.get(c.id);
       if (Math.hypot(c.x - cam.x, c.z - cam.z) > SEEN) continue;
@@ -198,7 +199,7 @@ export class ShipsView {
       const d = Math.hypot(w.x - cam.x, w.z - cam.z);
       let s = this.sunk.get(w.id);
       if (d > SEEN) {
-        if (s) { this.group.remove(s.mesh); s.mesh.geometry.dispose(); this.sunk.delete(w.id); this.h.decks.drop(w.id); }
+        if (s) { freeMesh(s.mesh); this.sunk.delete(w.id); this.h.decks.drop(w.id); }
         continue;
       }
       if (!s) {
@@ -315,7 +316,7 @@ export class ShipsView {
   private drop(fleet: Afloat[]): void {
     for (const a of fleet) {
       this.h.decks.drop(a.id);
-      for (const m of [a.furled, a.set, a.plank]) if (m) { this.group.remove(m); m.geometry.dispose(); }
+      for (const m of [a.furled, a.set, a.plank]) if (m) freeMesh(m);
     }
   }
 }

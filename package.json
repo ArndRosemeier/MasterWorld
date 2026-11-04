@@ -68,7 +68,8 @@
     "shot:vgm": "node tools/shot/vgm.mjs",
     "shot:stone": "node tools/shot/stone.mjs",
     "shot:crossing": "node tools/shot/crossing.mjs",
-    "shot:giants": "node tools/shot/giants.mjs"
+    "shot:giants": "node tools/shot/giants.mjs",
+    "shot:fly": "node tools/shot/fly.mjs"
   },
   "dependencies": {
     "@actors/animal": "https://github.com/ArndRosemeier/Actors/releases/download/v0.32.0/actors-animal-0.32.0.tgz",

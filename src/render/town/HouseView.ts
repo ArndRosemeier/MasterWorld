@@ -8,6 +8,7 @@ import { HATCH_RAILS_UP, type BuildingMesh, type DoorLeaf, type TownBuilding } f
 import type { Stage } from '@futuremagic/stage';
 import { buildingMeshAt } from '../materials/building';
 import type { TownView } from './TownView';
+import { freeMesh } from '../materials';
 
 /** A hatch's ladder top sinks this far under the shut lid (m), and is all the way up once the lid is this far open (rad). */
 const LADDER_SINK = HATCH_RAILS_UP + 0.1, LADDER_UP_BY = 1.2;
@@ -71,7 +72,7 @@ export class HouseView {
     if (this.ladderTop && this.mesh === mesh) await this.stage.add(this.ladderTop);
     for (const d of this.doors) if (this.mesh === mesh) await this.stage.add(d.pivot);
     // Shut again meanwhile: not drawn after all.
-    if (this.mesh !== mesh) { this.stage.remove(mesh); mesh.geometry.dispose(); return; }
+    if (this.mesh !== mesh) { this.stage.remove(mesh); freeMesh(mesh); return; }
     town?.hide(b.id, true);
   }
 
@@ -103,14 +104,14 @@ export class HouseView {
 
   /** Shut: the town's own building stands there again. */
   hide(): void {
-    if (this.lid) { this.stage.remove(this.lid.pivot); this.lid.mesh.geometry.dispose(); this.lid = null; }
-    if (this.ladderTop) { this.stage.remove(this.ladderTop); this.ladderTop.geometry.dispose(); this.ladderTop = null; }
-    for (const d of this.doors) { this.stage.remove(d.pivot); d.mesh.geometry.dispose(); }
+    if (this.lid) { this.stage.remove(this.lid.pivot); freeMesh(this.lid.mesh); this.lid = null; }
+    if (this.ladderTop) { this.stage.remove(this.ladderTop); freeMesh(this.ladderTop); this.ladderTop = null; }
+    for (const d of this.doors) { this.stage.remove(d.pivot); freeMesh(d.mesh); }
     this.doors = [];
     if (!this.mesh) return;
     this.town?.hide(this.id, false);
     this.stage.remove(this.mesh);
-    this.mesh.geometry.dispose();
+    freeMesh(this.mesh);
     this.mesh = null;
     this.id = -1;
   }
