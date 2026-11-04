@@ -5,6 +5,7 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterPatch } from '@actors/generator';
+import { faceShape, LIVING } from '../living';
 import type { Person } from '../../sim/people';
 import type { ActivityKind } from '../../sim/spots';
 
@@ -105,7 +106,7 @@ export function lookOf(p: Person): CharacterPatch {
   const youth = youthOf(p);
   // Actors keeps a child's body at its youngest adult age and gives it child proportions from `youth`.
   const ageYears = youth > 0 ? 18 : p.race === 'elf' ? 20 + p.age / 12 : p.age;
-  return {
+  const look: CharacterPatch = {
     race: p.race, race2: null, raceMix: 0, raceSize: r.range(0.3, 0.7), youth,
     body: {
       gender: f ? 0 : 1, ageYears, muscle: p.dress === 'fighter' ? r.range(0.7, 0.95) : r.range(0.3, p.role === 'trade' ? 0.8 : 0.6), weight: r.range(0.3, 0.75),
@@ -119,7 +120,31 @@ export function lookOf(p: Person): CharacterPatch {
         : r.chance(0.45) ? r.pick(['short', 'full', 'mustache', 'chinstrap', 'goatee'] as const) : 'none',
     stubble: f || youth > 0 ? 0 : r.range(0, 0.6),
     outfit, garmentColors: colors,
+    ...LIVING,
   };
+  // The named shape sliders come last, so every other draw of a person's look stays as it was.
+  return { ...look, shape: shapeOf(r, p, youth > 0, old) };
+}
+
+/**
+ * A person's named shape sliders (Actors 0.32), seeded: faces differ by a little in everything; bodies by their
+ * work (a fighter trained, a trader soft, the old a little heavier) and by chance. Children keep their body's.
+ */
+function shapeOf(r: Rng, p: Person, child: boolean, old: boolean): Record<string, number> {
+  const shape = faceShape(r);
+  if (child) return shape;
+  const fighter = p.dress === 'fighter', trader = p.role === 'trader';
+  const work = p.role === 'trade' || p.role === 'hand';
+  shape.fat = r.range(-0.3, 0.3) + (trader ? 0.3 : 0) + (old ? 0.2 : 0) - (fighter ? 0.3 : 0);
+  shape.fitness = r.range(-0.2, 0.3) + (fighter ? 0.5 : work ? 0.3 : 0);
+  shape.shoulders = r.range(-0.3, 0.3) + (fighter ? 0.3 : 0);
+  shape.waist = r.range(-0.3, 0.3);
+  shape.belly = trader || old ? r.range(0, 0.5) : r.range(-0.2, 0.2);
+  shape.hips = r.range(-0.3, 0.3);
+  shape.legs = r.range(-0.3, 0.3);
+  shape.arms = r.range(-0.2, 0.3) + (work ? 0.2 : 0);
+  shape.neck = r.range(-0.3, 0.3);
+  return shape;
 }
 
 /**

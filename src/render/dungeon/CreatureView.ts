@@ -175,6 +175,12 @@ export class CreatureView {
     return v;
   }
 
+  /** `who` says `text`: their lips move with it (Actors' lip-sync; nothing for a beast or a skeleton's jaw). */
+  speak(who: Creature, text: string): void {
+    const b = this.shown.find((x) => x.c === who)?.body;
+    if (b?.kind === 'person') b.ch.say(text);
+  }
+
   /** Everything drawn (for the warm-up). */
   get objects(): Object3D[] { return [this.group]; }
 

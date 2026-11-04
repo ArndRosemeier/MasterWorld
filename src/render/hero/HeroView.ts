@@ -7,6 +7,7 @@
  * A new look never builds a shader on the render path: it is put on a second, hidden character, compiled
  * (each garment, hairstyle and shadow) and then swapped in, so the old look shows until the new one is ready.
  */
+import { faceShape, LIVING, RAIN_WET, wetter } from '../living';
 import { Group, Matrix4, Quaternion, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { Rng, deriveSeed, smoothstep } from '@futuremagic/core';
 import { Character, outfitGarments, randomConfig, type CharacterCatalog, type CharacterConfig, type CharacterPatch } from '@actors/generator';
@@ -110,6 +111,18 @@ export function heroCatalog(looks: HeroLooks): (c: CharacterCatalog) => Characte
   });
 }
 
+/**
+ * A new hero's named shape sliders (Actors 0.32): a face of their own, and a body that is fit, never soft (heroic
+ * proportions: the build's weight and muscle stay as drawn).
+ */
+function heroShape(rng: Rng): Record<string, number> {
+  return {
+    ...faceShape(rng, 0.6),
+    fat: rng.range(-0.5, 0), fitness: rng.range(0.2, 0.8), shoulders: rng.range(0, 0.5), waist: rng.range(-0.3, 0.1),
+    belly: rng.range(-0.4, 0), legs: rng.range(0, 0.4), neck: rng.range(-0.1, 0.4),
+  };
+}
+
 /** A new hero of the setting drawn from `seed`: one of its peoples (or `race`), in one of its starting outfits. */
 export function newHero(catalog: CharacterCatalog, looks: HeroLooks, base: CharacterConfig, seed: number, race?: string): CharacterConfig {
   const rng = new Rng(deriveSeed(seed, 'hero', 'look'));
@@ -121,7 +134,7 @@ export function newHero(catalog: CharacterCatalog, looks: HeroLooks, base: Chara
   const presets = catalog.outfits.filter((o) => looks.outfits.includes(o.id) && (!o.gender || o.gender === (female ? 'female' : 'male')));
   const preset = presets.length ? rng.pick(presets) : null;
   return {
-    ...look, anatomy: false, animation: 'idle',
+    ...look, ...LIVING, shape: heroShape(rng), anatomy: false, animation: 'idle',
     ...(preset ? { outfit: outfitGarments(preset, look.body), garmentColors: { ...preset.colors } } : {}),
   };
 }
@@ -161,6 +174,10 @@ export class HeroView {
   private wanted: CharacterPatch | null = null;
   private dressing: Promise<void> | null = null;
   private readonly seatAt = new Vector3();
+  /** The rain on the hero now (0 indoors or under cover, 1 in a downpour); the game sets it every frame. */
+  rain = 0;
+  /** How wet the skin is (0..1). */
+  private wet = 0;
   /** Resting: sitting (or sitting down), seconds since it began or ended, standing up, how far down (0 standing, 1 sat). */
   private readonly rest = { on: false, t: 0, rising: false, k: 0 };
   private readonly listeners = new Set<(c: CharacterConfig) => void>();
@@ -185,7 +202,7 @@ export class HeroView {
    */
   static async load(stage: Stage, renderer: WebGPURenderer, looks: HeroLooks, look: CharacterPatch | null, seed: number, race?: string): Promise<HeroView> {
     const opts = loadOptions(looks);
-    const front = await Character.load({ ...opts, renderer, worker: new HumanWorker(), config: { ...look, anatomy: false, animation: 'idle' } });
+    const front = await Character.load({ ...opts, renderer, worker: new HumanWorker(), config: { ...look, ...LIVING, anatomy: false, animation: 'idle' } });
     if (!look) await front.set(newHero(front.catalog, looks, front.config, seed, race));
     await fitHeight(front, looks.maxHeightM);
     const back = await Character.load({ ...opts, renderer, shareWith: front });
@@ -219,7 +236,7 @@ export class HeroView {
    * come quickly, as with a slider's drag).
    */
   dress(look: CharacterPatch): Promise<void> {
-    this.wanted = { ...look, anatomy: false, animation: null };
+    this.wanted = { ...look, ...LIVING, anatomy: false, animation: null };
     if (!this.dressing) this.dressing = this.dressAll().finally(() => { this.dressing = null; });
     return this.dressing;
   }
@@ -332,6 +349,9 @@ export class HeroView {
     if (action && pace) action.timeScale = Math.min(1.8, Math.max(0.5, speed / pace));
     // Climbing: the cycle is held at the phase of the limbs' paces on the rock (a foot on its hold stays on it).
     else if (action && p.puppet?.phase !== undefined) { action.timeScale = 0; action.time = (p.puppet.phase % 1) * action.getClip().duration; }
+    // Wet skin: soaked in a swim or the rain, dry again slowly (Actors 0.31).
+    this.wet = wetter(this.wet, p.gait === 'swim' ? 1 : this.rain * RAIN_WET, dt);
+    this.front.actor.skin.uWet.value = this.wet;
     this.front.update(dt);
     if (p.gait === 'ride') {
       // Seated: the rider's seat (below the middle of the hips) on the saddle.

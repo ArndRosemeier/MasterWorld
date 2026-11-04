@@ -3,6 +3,7 @@
  * TALL metres (over the treetops), walking slowly past the town in some fly-overs. Built behind the title's
  * still and compiled before it shows (preparePeople), so it costs no shader on the render path.
  */
+import { LIVING } from '../living';
 import { Group, type WebGPURenderer } from 'three/webgpu';
 import { Character, type CharacterPatch } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
@@ -21,7 +22,7 @@ const LOOK: CharacterPatch = {
   hair: 'hair-shaggy', hairColor: '#3b2417', beard: 'full', stubble: 0.8,
   outfit: ['briefs', 'med-tunic', 'wool-pants', 'med-belt', 'med-mantle'],
   garmentColors: { 'med-tunic': '#6a5c44', 'wool-pants': '#4e4434', 'med-belt': '#3a2416', 'med-mantle': '#55604f' },
-  anatomy: false, animation: null, seed: 0.37,
+  anatomy: false, animation: null, seed: 0.37, ...LIVING,
 };
 
 export class GiantView {
