@@ -10,6 +10,7 @@
  * texture, as WebGPU copies no other depth format. WebGPU only (Sky.movers); on WebGL 2 the map stays as it was.
  */
 import { DepthTexture, FloatType, ShadowNode, type DirectionalLight, type Object3D, type Scene } from 'three/webgpu';
+import { ORIGIN } from './origin';
 
 /**
  * The roots of everything that moves and casts a shadow, as views register them (`mover`). Held weakly: a body its
@@ -36,7 +37,7 @@ function eachMover(f: (o: Object3D) => void): void {
 /** Metres round the shadow box's middle within which movers are drawn every frame. */
 export const MOVER_RANGE = 40;
 
-/** Whether a mover root is near the middle (x, z in render space) and drawn at all. */
+/** Whether a mover root is near the middle (x, z in render space, like its matrixWorld) and drawn at all. */
 const near = (o: Object3D, x: number, z: number): boolean => {
   const e = o.matrixWorld.elements;
   return o.parent !== null && Math.hypot(e[12] - x, e[14] - z) <= MOVER_RANGE;
@@ -90,17 +91,18 @@ export class MoverShadow {
 
   private drawMap(frame: ShadowFrame, whole: (frame: ShadowFrame) => void): void {
     const map = this.node.shadowMap?.depthTexture;
-    const r = frame.renderer, at = this.sun.target.position;
+    // The box's middle in render space: the sun's target is set in world space (Sky), matrixWorld is relative (origin.ts).
+    const r = frame.renderer, at = this.sun.target.position, x = at.x - ORIGIN.at.x, z = at.z - ORIGIN.at.z;
     if (!map) return whole(frame);
     if (this.stillDue || !this.kept) {
-      eachMover((o) => { if (o.visible && near(o, at.x, at.z)) { o.visible = false; this.hidden.push(o); } });
+      eachMover((o) => { if (o.visible && near(o, x, z)) { o.visible = false; this.hidden.push(o); } });
       try { whole(frame); } finally { this.unhide(); }
       this.kept ??= keptLike(map);
       r.copyTextureToTexture(map, this.kept);
       this.stillDue = false;
     } else r.copyTextureToTexture(this.kept, map);
     // The near movers over it, in the box the map was drawn with (no clear: the copy stays).
-    this.onlyMovers(frame.scene, at.x, at.z);
+    this.onlyMovers(frame.scene, x, z);
     const clear = r.autoClear;
     r.autoClear = false;
     try { r.render(frame.scene, this.sun.shadow.camera); } finally { r.autoClear = clear; this.unhide(); }

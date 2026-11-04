@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DepthTexture, DirectionalLight, FloatType, Group, Mesh, PointLight, Scene, ShadowNode, type Object3D } from 'three/webgpu';
 import { MOVER_RANGE, MoverShadow, mover, type ShadowFrame } from '../src/render/moverShadow';
+import { ORIGIN } from '../src/render/origin';
 
 test('MoverShadow: the whole map leaves the near movers out and is kept; every frame they are drawn over the kept copy', () => {
   // Each draw records what it would draw (three's own draw needs a GPU), and how.
@@ -14,6 +15,8 @@ test('MoverShadow: the whole map leaves the near movers out and is kept; every f
   const proto = ShadowNode.prototype as unknown as { renderShadow(frame: ShadowFrame): void };
   const was = proto.renderShadow;
   proto.renderShadow = function (frame) { log.push(`whole: ${seen(frame.scene)}`); };
+  // As at the start town: the origin far out, the sun's target in world space, the bodies relative to the origin.
+  ORIGIN.moveTo(25600, 33280);
   try {
     const scene = new Scene();
     const named = <T extends Object3D>(o: T, name: string): T => { o.name = name; return o; };
@@ -32,6 +35,7 @@ test('MoverShadow: the whole map leaves the near movers out and is kept; every f
 
     const sun = new DirectionalLight();
     sun.castShadow = true;
+    sun.target.position.set(ORIGIN.at.x, 0, ORIGIN.at.z);
     const split = new MoverShadow(sun);
     assert.equal((sun.shadow as unknown as { shadowNode?: unknown }).shadowNode, split.node, 'the sun shades with this node');
     const map = new DepthTexture(8, 8, FloatType);
@@ -62,5 +66,6 @@ test('MoverShadow: the whole map leaves the near movers out and is kept; every f
     assert.equal(hidden.visible, false);
   } finally {
     proto.renderShadow = was;
+    ORIGIN.moveTo(0, 0);
   }
 });
