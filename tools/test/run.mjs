@@ -4,14 +4,15 @@
  * once per file, which halves the time (MW: 47 s down to about 25 s on 4 cores). Files share their process, so a test
  * file never changes what another one sees: a fixture it changes is its own (test/frontierLand.ts).
  *
- * The shares are balanced by each file's time last measured (tools/test/times.json; `--save-times` writes it anew).
+ * The files are dealt out as the processes come to them, heaviest first by each file's time last measured (tools/test/times.json; `--save-times` writes it anew).
  * `npm test -- test/town.test.ts` runs the files given; TEST_PROCS=n sets how many processes. One test may take 5 s
  * (docs/CHECKS.md).
  */
 import { spawn } from 'node:child_process';
-import { globSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { globSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const PATTERNS = ['test/**/*.test.ts', 'tools/**/*.test.mjs'];
 const TIMES = 'tools/test/times.json';
@@ -24,45 +25,54 @@ const files = [...new Set((given.length ? given : PATTERNS).flatMap((p) => globS
 
 let known = {};
 try { known = JSON.parse(readFileSync(TIMES, 'utf8')); } catch { /* no times yet: all alike */ }
-// A file's own setup is not in its time: each counts a little more than its tests.
-const guess = (f) => (known[f] ?? 1) + 0.3;
+// (A file's time is its setup at the top and its tests; a file not measured yet counts 1 s.)
+const guess = (f) => known[f] ?? 1;
 
-// Heaviest first, each to the share with the least so far.
+// Every process gets the same list of wrappers, heaviest first, and takes each file not yet taken when its turn comes
+// (tools/test/claim.mjs): a process that finishes early takes the next file, so they all end together.
 const k = Math.max(1, Math.min(files.length, Number(process.env.TEST_PROCS) || os.availableParallelism()));
-const shares = Array.from({ length: k }, () => ({ files: [], weight: 0 }));
-for (const f of [...files].sort((a, b) => guess(b) - guess(a) || a.localeCompare(b))) {
-  const s = shares.reduce((a, b) => (b.weight < a.weight ? b : a));
-  s.files.push(f);
-  s.weight += guess(f);
-}
+const ordered = [...files].sort((a, b) => guess(b) - guess(a) || a.localeCompare(b));
 
 const isolation = Number(process.versions.node.split('.')[0]) >= 23 ? '--test-isolation=none' : '--experimental-test-isolation=none';
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'mw-test-'));
+const claims = path.join(tmp, 'claims'), tiles = path.join(tmp, 'tiles');
+mkdirSync(claims);
+mkdirSync(tiles);
+const wrapUrl = pathToFileURL(path.resolve('tools/test/claim.mjs')).href;
+const stubs = ordered.map((f, i) => {
+  const stub = path.join(tmp, `${String(i).padStart(3, '0')}.mjs`);
+  writeFileSync(stub, `import { wrap } from ${JSON.stringify(wrapUrl)};\nwrap(${JSON.stringify(claims)}, ${JSON.stringify(f)}, ${JSON.stringify(pathToFileURL(path.resolve(f)).href)});\n`);
+  return stub;
+});
 const t0 = performance.now();
-const runs = shares.filter((s) => s.files.length).map((s, i) => new Promise((done) => {
+const runs = Array.from({ length: k }, (_, i) => new Promise((done) => {
   const out = path.join(tmp, `times-${i}.json`);
   const child = spawn(process.execPath, [
-    '--import', 'tsx', '--test', isolation, '--test-timeout=5000',
+    '--import', 'tsx', '--import', './tools/test/tileStore.mjs', '--test', isolation, '--test-timeout=5000',
     '--test-reporter=spec', '--test-reporter-destination=stdout',
     '--test-reporter=./tools/test/times.mjs', `--test-reporter-destination=${out}`,
-    ...flags, ...s.files,
-  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    ...flags, ...stubs,
+  ], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MW_TILE_STORE: tiles } });
   const log = [];
   child.stdout.on('data', (d) => log.push(d));
   child.stderr.on('data', (d) => log.push(d));
   child.on('close', (code, signal) => {
     const secs = (performance.now() - t0) / 1000;
-    let res = { per: {}, pass: 0, fail: 0 };
+    let res = { pass: 0, fail: 0 };
     try { res = JSON.parse(readFileSync(out, 'utf8')); } catch { /* it died before its reporter wrote */ }
-    process.stdout.write(`\n── share ${i + 1} of ${k}: ${s.files.length} files, ${res.pass} passed, ${res.fail} failed, ${secs.toFixed(1)} s ──\n`);
-    process.stdout.write(Buffer.concat(log));
-    done({ ok: code === 0 && !signal, files: s.files, ...res, secs });
+    // (The wrappers of files another process took are skipped: not shown.)
+    const text = Buffer.concat(log).toString().split('\n').filter((l) => !l.includes('# taken') && !/^\s+✔ barrier /.test(l)).join('\n');
+    process.stdout.write(`\n── process ${i + 1} of ${k}: ${res.pass} passed, ${res.fail} failed, ${secs.toFixed(1)} s ──\n${text}`);
+    done({ ok: code === 0 && !signal, ...res, secs });
   });
 }));
 const results = await Promise.all(runs);
+// Each file's seconds, its setup at the top included (written by its wrapper).
+const per = {};
+for (const f of files) {
+  try { per[f] = Number(readFileSync(path.join(claims, encodeURIComponent(f), 'ms'), 'utf8')) / 1000; } catch { /* not run */ }
+}
 rmSync(tmp, { recursive: true, force: true });
-
-const per = Object.assign({}, ...results.map((r) => r.per));
 const pass = results.reduce((a, r) => a + r.pass, 0), fail = results.reduce((a, r) => a + r.fail, 0);
 const slow = Object.entries(per).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([f, t]) => `${f} ${t.toFixed(1)} s`);
 const secs = (performance.now() - t0) / 1000;

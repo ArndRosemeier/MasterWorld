@@ -124,10 +124,6 @@
     "reason": "Both override KeyWindow.opened (app/window.ts): each window fills itself when it opens; the card entrances are shared in KeyWindow.entrances."
   },
   {
-    "key": "same name: masterworld/game/evening.ts#floor + masterworld/world/dungeon/space.ts#floor",
-    "reason": "WalkWorld.floor (game/walker.ts) for the loop check's land walk vs the dungeon space's own floor lookup: an interface member, only the name matches."
-  },
-  {
     "key": "same name: masterworld/game/evening.ts#height + masterworld/main.ts#height",
     "reason": "Both implement WalkWorld (game/walker.ts): the game's walk world (with cellars, rooms, trunks and folk) and the loop check's bare land and town. Interface members share names by design."
   },

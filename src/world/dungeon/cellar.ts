@@ -65,10 +65,14 @@ interface Rect { readonly x: number; readonly z: number; readonly ux: number; re
 /** Two rectangles on the floor overlap (by more than `slack` m). */
 function rectsMeet(p: Rect, q: Rect, slack = 0.02): boolean {
   for (const [ax, az] of [[p.ux, p.uz], [-p.uz, p.ux], [q.ux, q.uz], [-q.uz, q.ux]]) {
-    const reach = (r: Rect) => r.a * Math.abs(ax * r.ux + az * r.uz) + r.b * Math.abs(-ax * r.uz + az * r.ux);
-    if (Math.abs((q.x - p.x) * ax + (q.z - p.z) * az) >= reach(p) + reach(q) - slack) return false;
+    if (Math.abs((q.x - p.x) * ax + (q.z - p.z) * az) >= rectReach(p, ax, az) + rectReach(q, ax, az) - slack) return false;
   }
   return true;
+}
+
+/** How far a rectangle reaches along the axis (ax, az). */
+function rectReach(r: Rect, ax: number, az: number): number {
+  return r.a * Math.abs(ax * r.ux + az * r.uz) + r.b * Math.abs(-ax * r.uz + az * r.ux);
 }
 
 /** The floor a prop takes up (its along-wall axis is (cos yaw, −sin yaw), as the props are drawn). */
