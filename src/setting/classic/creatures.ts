@@ -120,11 +120,12 @@ export const creatures: readonly CreatureDef[] = [
   // times its own (the elk 2.3 m, the tortoise 1.1 m, the wolf 1.15 m, the boar 1.4 m), so an elk stands 8 m at the shoulder with antlers over 14 m, a turtle
   // is a house of a shell, and their blows reach from a head that high. Two are a promise, peaceful and near: a giant elk of the open land and a giant turtle on the strand. They are the great beasts' own
   // faction, at feud with nobody, and placid: they take no notice of a hero so small, are afraid of nothing, and fight only once struck (Arnd
-  // 2026-11-03: "they are certainly not afraid"). They walk slowly, as their weight asks. The two that hunt live only far out (D29), at the
+  // 2026-11-03: "they are certainly not afraid"). They walk slowly for their size, as their weight asks, but a 14 m stride covers ground: the elk's
+  // roam (a third of its speed) is its own unhurried walk (Actors' `strideSpeed`), so its legs swing as the ground goes by. The two that hunt live only far out (D29), at the
   // danger the land there holds, and never below.
   {
     id: 'giant elk', name: 'giant elk', plural: 'giant elk', body: { kind: 'beast', species: 'elk', length: 13.8, color: '#6e5238', giant: 6 },
-    health: 110, armour: 2, defence: 16, speed: 6, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 14,
+    health: 110, armour: 2, defence: 16, speed: 7.5, senses: { sight: 60, hearing: 60 }, faction: 'great', temper: 'placid', morale: 1, pack: false, role: 'melee', danger: 14,
     attacks: [{ name: 'antlers', damage: [6, 12], kind: 'pierce', reach: 3.5, time: 3, prowess: 30 }],
     loot: 'giant-elk', tell: 'Antlers like a dead tree above the grass, and the grass does not move for the wind.',
   },
