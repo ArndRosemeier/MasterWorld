@@ -277,6 +277,11 @@ export class FolkView {
     return { height, hipHeight: s.rig.of(s.ch, s.ch.height || 1.75)?.hipHeight ?? 0.52 * height };
   }
 
+  /** `a` says `text`: their lips move with it, if they are drawn as a character now. */
+  speak(a: Agent, text: string): void {
+    this.shown.get(a)?.ch.say(text);
+  }
+
   /** Where a hand of `a`'s character is in the world (`out`); null if they are not drawn as a character now. */
   agentHand(a: Agent, side: 'l' | 'r', out: Vector3): Vector3 | null {
     const slot = this.shown.get(a);

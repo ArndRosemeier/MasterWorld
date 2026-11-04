@@ -30,3 +30,18 @@ test('looks: children are Actors characters with child proportions, never anatom
   assert.ok(youthOf(young) >= youthOf(old));
   assert.equal(youthOf({ ...young, role: 'hand', age: 30 }), 0);
 });
+
+test('looks: everyone has the living face and a seeded face; children have no body sliders; the same person looks the same', () => {
+  const plan = planTown({ seed: 5, x: 0, z: 0, radius: 72, height: () => 10 });
+  const folk = townsfolk(plan, 5);
+  const BODY = ['fat', 'fitness', 'shoulders', 'waist', 'belly', 'hips', 'legs', 'arms', 'neck'];
+  for (const p of folk) {
+    const l = lookOf(p);
+    assert.equal(l.faceRig && l.faceAnimation && l.wrinkles, true);
+    assert.deepEqual(l.shape, lookOf(p).shape);
+    assert.ok(l.shape && 'jaw' in l.shape, 'a face of their own');
+    for (const v of Object.values(l.shape ?? {})) assert.ok(Math.abs(v) <= 1.3, `slider ${v}`);
+    if (p.role === 'child') for (const k of BODY) assert.ok(!(k in (l.shape ?? {})), `child with ${k}`);
+  }
+  assert.ok(new Set(folk.map((p) => lookOf(p).shape?.jaw)).size > folk.length / 2, 'faces differ');
+});

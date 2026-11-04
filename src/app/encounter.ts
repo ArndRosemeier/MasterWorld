@@ -240,6 +240,7 @@ export class Encounter {
   /** `text` in a bubble over `who`'s head while they live (the bubble floats OVER_HEAD over the point it is given, so give the feet less that much below the head). */
   private bubble(who: Creature, text: string): void {
     const O = this.creatures.group.position, head = (who.def.body.kind === 'humanoid' ? who.def.body.height + 0.25 : 1) - OVER_HEAD;
+    this.creatures.speak(who, text);
     this.host.say(text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
   }
 

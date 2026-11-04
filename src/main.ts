@@ -1344,6 +1344,8 @@ export async function start(b: Boot): Promise<void> {
     // climbs down the ladder, comes to the hero and thanks and pays them there.
     /** What one of a household says down in a place, over their head (their thanks; someone lost, found). */
     const overHead: OwnerHost['say'] = (text, at) => speech.say(text, at);
+    /** What one of a household says: over their head, and their lips move with it. */
+    const thanks = (a: Agent, text: string, at: Parameters<OwnerHost['say']>[1]): void => { overHead(text, at); folk?.speak(a, text); };
     comeDown = (id) => {
       const v = visit(), t = townOfPromise(id);
       if (!v || owner || !t?.living || t.talk.isSettled(id)) return false;
@@ -1352,7 +1354,7 @@ export async function start(b: Boot): Promise<void> {
       if (!a) return false;
       owner = new OwnerComes(v, a, {
         body: () => folk?.bodyOf(a) ?? null,
-        say: overHead,
+        say: (text, at) => thanks(a, text, at),
         told: () => {
           t.talk.thanked(a.person.id, id);
           return paidFor(id, t, true);
@@ -2713,6 +2715,8 @@ export async function start(b: Boot): Promise<void> {
         // A free camera disturbs no one; they live round it.
         const hero = player.flying ? null : { x: w.pos.x, y: w.pos.y, z: w.pos.z, speed: w.groundSpeed };
         if (out) for (const e of small.step(dt, hero, daylight(view.sky.hour), wx.shown.rain, hero ?? view.camera.position)) sounds?.wings(e);
+        // Rain wets the hero's skin only out of doors.
+        if (player.hero) player.hero.rain = out && !rooms?.inside ? wx.shown.rain : 0;
         smallView.show(dt, view.camera.position, out, view.sky.underwater);
       }
       // The people in the building drawn open (seen through its door and windows too).

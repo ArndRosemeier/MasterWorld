@@ -4,6 +4,7 @@
  * for what the den says it does. `FOE_CLIPS` is what `npm run packs` (tools/packs/actors.mjs) copies for
  * them besides the hero's and the townsfolk's: keep it a plain quoted list.
  */
+import { faceShape, LIVING } from '../living';
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterPatch } from '@actors/generator';
 import type { RaceId } from '@actors/human';
@@ -64,6 +65,7 @@ export function foeLook(def: CreatureDef, seed: number, id: number): CharacterPa
     ...(b.bones ? { skeletal: true, skeletalLook: { bone: b.skin ?? '#d8ccb4', glow: '#4dc8ff', glowStrength: 0.6, dryness: 0.7 } } : {}),
     outfit, garmentColors: colors, anatomy: false, animation: 'idle', seed: r.float(),
     ...hairOf(b, female, r),
+    ...LIVING, shape: faceShape(r),
   };
 }
 
