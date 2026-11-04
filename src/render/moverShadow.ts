@@ -1,16 +1,15 @@
 /**
- * The sun's shadow in two maps: the still world's, drawn every few frames (Sky.shadowEvery: drawing every caster
- * again is the dearest pass of a town frame), and the movers' (the hero, townsfolk, creatures, beasts) near the
- * camera, drawn every frame. A mover's shadow drawn every third frame trails its body and twitches as it walks
- * (Arnd, 2026-11-04: fine far off, not for the hero). The lit shaders take the product of the two (three's custom
- * `shadow.shadowNode`); the second map's light lights nothing, it only lends its shadow.
+ * The sun's shadow with its movers drawn every frame. The map is drawn whole every few frames (Sky.shadowEvery:
+ * drawing every caster again is the dearest pass of a town frame); a mover's shadow drawn that seldom trails its body
+ * and twitches as it walks (Arnd, 2026-11-04: fine far off, not for the hero). So the whole draw leaves out the
+ * movers near the camera and keeps a copy of the map; every frame that copy goes back into the map and the near
+ * movers (the hero, townsfolk, creatures, beasts) are drawn over it. One map, one sampler: a second map would be a
+ * 17th texture in the busiest shaders, which neither WebGL 2 nor WebGPU's default limits allow (MW #578's first try).
  *
- * Which map draws a mover goes by where it is: within MOVER_RANGE of the box's middle the movers' map, beyond it
- * the still map (far off a late shadow does not show), so nobody is drawn into both. WebGPU only (Sky.movers: on
- * WebGL 2 the second sampler is one more than the busiest shader has).
+ * Movers beyond MOVER_RANGE stay in the whole draw (far off a late shadow does not show). The map's depth is a float
+ * texture, as WebGPU copies no other depth format. WebGPU only (Sky.movers); on WebGL 2 the map stays as it was.
  */
-import { DirectionalLight, type Node, type Object3D, type OrthographicCamera, type Scene } from 'three/webgpu';
-import { shadow } from 'three/tsl';
+import { DepthTexture, FloatType, ShadowNode, type DirectionalLight, type Object3D, type Scene } from 'three/webgpu';
 
 /**
  * The roots of everything that moves and casts a shadow, as views register them (`mover`). Held weakly: a body its
@@ -34,15 +33,8 @@ function eachMover(f: (o: Object3D) => void): void {
   }
 }
 
-/** Metres round the box's middle in which movers go into the movers' map. */
+/** Metres round the shadow box's middle within which movers are drawn every frame. */
 export const MOVER_RANGE = 40;
-/**
- * Half the side of the movers' shadow box (m): their range and a body. The box stands across the light, so a
- * shadow however long falls where its caster is in the map; ground beyond the box takes no shadow from it.
- */
-const MOVER_EXTENT = 44;
-/** The movers' map's side in texels (4.3 cm each: sharper than the still map's 7.8 cm). */
-const MOVER_MAP = 2048;
 
 /** Whether a mover root is near the middle (x, z in render space) and drawn at all. */
 const near = (o: Object3D, x: number, z: number): boolean => {
@@ -50,72 +42,77 @@ const near = (o: Object3D, x: number, z: number): boolean => {
   return o.parent !== null && Math.hypot(e[12] - x, e[14] - z) <= MOVER_RANGE;
 };
 
-/** A shadow node as far as drawing its map goes (three's ShadowNode.renderShadow). */
-export type Shadowing = { renderShadow(frame: { scene: Scene }): void };
+/** What a frame hands a shadow node (three's NodeFrame, as far as it is used here). */
+export type ShadowFrame = {
+  scene: Scene;
+  renderer: {
+    autoClear: boolean;
+    render(scene: Scene, camera: object): void;
+    copyTextureToTexture(src: DepthTexture, dst: DepthTexture): void;
+  };
+};
+
+/** three's ShadowNode internals used here (its typings leave them out). */
+type Inner = {
+  renderShadow(frame: ShadowFrame): void;
+  setupRenderTarget(shadow: unknown, builder: unknown): { shadowMap: unknown; depthTexture: DepthTexture };
+  shadowMap: { depthTexture: DepthTexture } | null;
+};
 
 /**
- * Splits `sun`'s shadow (see above). Call `follow` every frame after the sun's box moved (its position and target).
- * Set before the warm-up: the product is part of every lit shader.
+ * The sun's shadow node, its map split as above. Set before the warm-up (it is in every lit shader); Sky sets
+ * `stillDue` when the whole map is to be drawn, and asks for the map every frame.
  */
 export class MoverShadow {
-  /** The light the movers' map is drawn from (never in the scene: it lights nothing). */
-  readonly light = new DirectionalLight();
-  private readonly at = { x: 0, z: 0 };
+  /** Draw the whole map (the still world) this frame; else only the near movers over the kept copy. */
+  stillDue = true;
+  /** The map as last drawn whole, without the near movers. */
+  private kept: DepthTexture | null = null;
   private readonly hidden: Object3D[] = [];
   private readonly path = new Set<Object3D>();
   private readonly keep = new Set<Object3D>();
-  /** The two shadow nodes (the still map's, the movers'), their drawing wrapped as above. */
-  readonly passes: { readonly still: Shadowing; readonly moving: Shadowing };
+  /** The node (exposed for the test). */
+  readonly node: Inner;
 
   constructor(private readonly sun: DirectionalLight) {
-    const m = this.light, s = sun.shadow;
-    m.castShadow = true;
-    m.shadow.autoUpdate = false;
-    m.shadow.camera.layers.mask = s.camera.layers.mask;
-    m.shadow.mapSize.setScalar(MOVER_MAP);
-    m.shadow.bias = s.bias;
-    m.shadow.normalBias = s.normalBias * (MOVER_EXTENT / ((s.camera as OrthographicCamera).right || MOVER_EXTENT));
-    const c = m.shadow.camera as OrthographicCamera, sc = s.camera as OrthographicCamera;
-    c.left = -MOVER_EXTENT; c.right = MOVER_EXTENT; c.top = MOVER_EXTENT; c.bottom = -MOVER_EXTENT;
-    c.near = sc.near; c.far = sc.far;
-    c.updateProjectionMatrix();
-    // (Typed as float nodes: three's types give the ShadowNode none of a node's maths, which it has at run time.)
-    const still = shadow(sun) as unknown as Node<'float'>, moving = shadow(m) as unknown as Node<'float'>;
-    // The still map without the near movers; the movers' map with nothing but them.
-    const stillNode = still as unknown as Shadowing, movingNode = moving as unknown as Shadowing;
-    const drawStill = stillNode.renderShadow.bind(still), drawMoving = movingNode.renderShadow.bind(moving);
-    stillNode.renderShadow = (frame) => {
-      eachMover((o) => { if (o.visible && near(o, this.at.x, this.at.z)) { o.visible = false; this.hidden.push(o); } });
-      try { drawStill(frame); } finally { this.unhide(); }
+    const node = new ShadowNode(sun, sun.shadow) as unknown as Inner;
+    const setup = node.setupRenderTarget.bind(node), whole = node.renderShadow.bind(node);
+    // A float depth map: WebGPU copies depth32float, not depth24plus (three's default).
+    node.setupRenderTarget = (shadow, builder) => {
+      const made = setup(shadow, builder);
+      made.depthTexture.type = FloatType;
+      return made;
     };
-    movingNode.renderShadow = (frame) => {
-      this.onlyMovers(frame.scene);
-      try { drawMoving(frame); } finally { this.unhide(); }
-    };
-    this.passes = { still: stillNode, moving: movingNode };
-    (s as unknown as { shadowNode: unknown }).shadowNode = still.mul(moving);
+    node.renderShadow = (frame) => this.drawMap(frame, whole);
+    this.node = node;
+    (sun.shadow as unknown as { shadowNode: unknown }).shadowNode = node;
   }
 
-  /** Follows the sun's box (its middle and direction) and asks for this frame's movers' map. */
-  follow(): void {
-    const sun = this.sun, m = this.light;
-    m.position.copy(sun.position);
-    m.target.position.copy(sun.target.position);
-    m.updateMatrixWorld();
-    m.target.updateMatrixWorld();
-    this.at.x = sun.target.position.x;
-    this.at.z = sun.target.position.z;
-    m.shadow.needsUpdate = sun.castShadow && sun.intensity > 0;
+  private drawMap(frame: ShadowFrame, whole: (frame: ShadowFrame) => void): void {
+    const map = this.node.shadowMap?.depthTexture;
+    const r = frame.renderer, at = this.sun.target.position;
+    if (!map) return whole(frame);
+    if (this.stillDue || !this.kept) {
+      eachMover((o) => { if (o.visible && near(o, at.x, at.z)) { o.visible = false; this.hidden.push(o); } });
+      try { whole(frame); } finally { this.unhide(); }
+      this.kept ??= keptLike(map);
+      r.copyTextureToTexture(map, this.kept);
+      this.stillDue = false;
+    } else r.copyTextureToTexture(this.kept, map);
+    // The near movers over it, in the box the map was drawn with (no clear: the copy stays).
+    this.onlyMovers(frame.scene, at.x, at.z);
+    const clear = r.autoClear;
+    r.autoClear = false;
+    try { r.render(frame.scene, this.sun.shadow.camera); } finally { r.autoClear = clear; this.unhide(); }
   }
 
   /** Hides everything in `scene` but the near movers and the lights (the lights stay: they are part of every draw's key). */
-  private onlyMovers(scene: Scene): void {
-    const path = this.path;
+  private onlyMovers(scene: Scene, x: number, z: number): void {
+    const path = this.path, keep = this.keep;
     path.clear();
-    const keep = this.keep;
     keep.clear();
     eachMover((o) => {
-      if (!o.visible || !near(o, this.at.x, this.at.z)) return;
+      if (!o.visible || !near(o, x, z)) return;
       keep.add(o);
       for (let p = o.parent; p && !path.has(p); p = p.parent) path.add(p);
     });
@@ -134,4 +131,12 @@ export class MoverShadow {
     for (const o of this.hidden) o.visible = true;
     this.hidden.length = 0;
   }
+}
+
+/** A depth texture the map can be copied into and back (same size and format). */
+function keptLike(map: DepthTexture): DepthTexture {
+  const { width, height } = map.image as { width: number; height: number };
+  const t = new DepthTexture(width, height, FloatType);
+  t.name = 'ShadowDepthKept';
+  return t;
 }

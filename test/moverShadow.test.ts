@@ -1,19 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DirectionalLight, Group, Mesh, PointLight, Scene, type Object3D } from 'three/webgpu';
-import { shadow } from 'three/tsl';
-import { MOVER_RANGE, MoverShadow, mover } from '../src/render/moverShadow';
+import { DepthTexture, DirectionalLight, FloatType, Group, Mesh, PointLight, Scene, ShadowNode, type Object3D } from 'three/webgpu';
+import { MOVER_RANGE, MoverShadow, mover, type ShadowFrame } from '../src/render/moverShadow';
 
-test('MoverShadow: near movers are drawn into their own map only, far ones and the world into the still map', () => {
-  // Each draw of a map records what it would draw (three's own draw needs a renderer).
-  const drawn: string[][] = [];
-  const proto = Object.getPrototypeOf(shadow(new DirectionalLight())) as { renderShadow(frame: { scene: Scene }): void };
-  const was = proto.renderShadow;
-  proto.renderShadow = function (frame) {
-    const seen: string[] = [];
-    frame.scene.traverseVisible((o: Object3D) => { if (o.name) seen.push(o.name); });
-    drawn.push(seen.sort());
+test('MoverShadow: the whole map leaves the near movers out and is kept; every frame they are drawn over the kept copy', () => {
+  // Each draw records what it would draw (three's own draw needs a GPU), and how.
+  const log: string[] = [];
+  const seen = (scene: Scene): string => {
+    const names: string[] = [];
+    scene.traverseVisible((o: Object3D) => { if (o.name) names.push(o.name); });
+    return names.sort().join(' ');
   };
+  const proto = ShadowNode.prototype as unknown as { renderShadow(frame: ShadowFrame): void };
+  const was = proto.renderShadow;
+  proto.renderShadow = function (frame) { log.push(`whole: ${seen(frame.scene)}`); };
   try {
     const scene = new Scene();
     const named = <T extends Object3D>(o: T, name: string): T => { o.name = name; return o; };
@@ -33,18 +33,33 @@ test('MoverShadow: near movers are drawn into their own map only, far ones and t
     const sun = new DirectionalLight();
     sun.castShadow = true;
     const split = new MoverShadow(sun);
-    split.follow();
-    split.passes.still.renderShadow({ scene });
-    split.passes.moving.renderShadow({ scene });
-    assert.deepEqual(drawn[0], ['cart', 'farFolk', 'house', 'lamp', 'people', 'world'], 'still map: everything but the near movers');
-    assert.deepEqual(drawn[1], ['hero', 'heroBody', 'lamp', 'people'], 'movers map: the near movers (and the lights)');
+    assert.equal((sun.shadow as unknown as { shadowNode?: unknown }).shadowNode, split.node, 'the sun shades with this node');
+    const map = new DepthTexture(8, 8, FloatType);
+    split.node.shadowMap = { depthTexture: map };
+    const renderer = {
+      autoClear: true,
+      render(s: Scene) { log.push(`movers${this.autoClear ? ' (cleared!)' : ''}: ${seen(s)}`); },
+      copyTextureToTexture(src: DepthTexture, dst: DepthTexture) { log.push(`copy ${src === map ? 'map' : 'kept'} to ${dst === map ? 'map' : 'kept'}`); },
+    };
+    const frame = { scene, renderer } as ShadowFrame;
+    split.node.renderShadow(frame);
+    split.node.renderShadow(frame);
+    split.stillDue = true;
+    split.node.renderShadow(frame);
+    assert.deepEqual(log, [
+      'whole: cart farFolk house lamp people world',
+      'copy map to kept',
+      'movers: hero heroBody lamp people',
+      'copy kept to map',
+      'movers: hero heroBody lamp people',
+      'whole: cart farFolk house lamp people world',
+      'copy map to kept',
+      'movers: hero heroBody lamp people',
+    ]);
+    assert.equal(renderer.autoClear, true, 'the renderer clears again afterwards');
     // Everything shown as it was afterwards.
-    const after: string[] = [];
-    scene.traverseVisible((o) => { if (o.name) after.push(o.name); });
-    assert.deepEqual(after.sort(), ['cart', 'farFolk', 'hero', 'heroBody', 'house', 'lamp', 'people', 'world']);
+    assert.equal(seen(scene), 'cart farFolk hero heroBody house lamp people world');
     assert.equal(hidden.visible, false);
-    assert.ok((sun.shadow as unknown as { shadowNode?: unknown }).shadowNode, 'the sun shades with both maps');
-    assert.equal(split.light.shadow.needsUpdate, true, 'the movers map is drawn every frame while the sun shines');
   } finally {
     proto.renderShadow = was;
   }
