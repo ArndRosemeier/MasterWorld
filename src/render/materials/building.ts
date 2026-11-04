@@ -14,12 +14,13 @@ import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { townTextures } from './townGround';
 import { WEATHER } from './weather';
 import { floatsOf, sphereOf, type ReadyMesh } from '../../world/townMesh';
+import { inRenderGroup } from '../renderGroup';
 
 /**
  * Lit windows after dusk (sky.ts sets them): `glow` 0 by day .. 1 at night, `share` of the rooms with a
  * light on (most in the evening, few after midnight).
  */
-export const WINDOWS = { glow: uniform(0), share: uniform(0.7) };
+export const WINDOWS = inRenderGroup({ glow: uniform(0), share: uniform(0.7) });
 
 /**
  * The sky's light inside an open building (@futuremagic/settlement INSIDE_LIGHT): its inside faces get the
@@ -28,7 +29,7 @@ export const WINDOWS = { glow: uniform(0), share: uniform(0.7) };
  * it throws about the room one is in (game/roomLight.ts: irradiance, coloured as the sun; black at night
  * and outdoors), lighting every inside face a little.
  */
-export const ROOM_LIGHT = { gain: uniform(1), fill: uniform(0.05), bounce: uniform(new Color(0, 0, 0)) };
+export const ROOM_LIGHT = inRenderGroup({ gain: uniform(1), fill: uniform(0.05), bounce: uniform(new Color(0, 0, 0)) });
 
 export const BUILDING = defineKind('building', ['position', 'normal', 'uv', 'mat', 'tint'], () => {
   const { albedo: A, normal: N } = townTextures();

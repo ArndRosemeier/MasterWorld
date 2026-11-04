@@ -7,9 +7,10 @@
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';
 import { abs, float, length, mix, sin, smoothstep, uniform, uv, vec2, vec3 } from 'three/tsl';
 import { defineKind } from '../materials';
+import { inRenderGroup } from '../renderGroup';
 
 /** How bright the feathers are, 0..1 (the change sets it every frame). */
-export const FEATHER_GLOW = uniform(0);
+export const FEATHER_GLOW = inRenderGroup(uniform(0));
 
 export const FEATHER = defineKind('feather swirl', ['position', 'uv'], () => {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, fog: false });
@@ -28,7 +29,7 @@ export const FEATHER = defineKind('feather swirl', ['position', 'uv'], () => {
 }, { cast: false, receive: false }, true);
 
 /** How bright the bubbles are, 0..1 (the change sets it every frame). */
-export const BUBBLE_GLOW = uniform(0);
+export const BUBBLE_GLOW = inRenderGroup(uniform(0));
 
 export const BUBBLE = defineKind('bubble swirl', ['position', 'uv'], () => {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, fog: false });

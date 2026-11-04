@@ -7,6 +7,7 @@ import { Color, Vector2, Vector3, Vector4, type Node } from 'three/webgpu';
 import { mix, smoothstep, uniform, uniformArray, vec4 } from 'three/tsl';
 import { DRY } from '../../world/water';
 import { FloatMask, inside, sampleMask } from './masks';
+import { inRenderGroup } from '../renderGroup';
 
 /** A water mask (world/water.ts): surface level, depth, flow. Empty: far below, dry. */
 export const emptyWaterMask = (side: number, res: number): FloatMask => new FloatMask(side, res, [-1e4, DRY, 0, 0]);
@@ -27,7 +28,7 @@ export const HULL_STATIONS = 17;
 export const HULL_POSES: readonly Vector4[] = [new Vector4(), new Vector4(), new Vector4(), new Vector4()];
 export const HULLS = HULL_POSES.length;
 
-export const WATER = {
+export const WATER = inRenderGroup({
   /** Each hull's half length (0: none), and its half width at the waterline at each station from stern to bow (m). */
   hullPose: uniformArray(HULL_POSES as Vector4[], 'vec4'),
   hullLength: uniformArray(new Array<number>(HULLS).fill(0), 'float'),
@@ -51,4 +52,4 @@ export const WATER = {
   near: emptyWaterMask(1024, 512),
   mid: emptyWaterMask(4096, 512),
   far: emptyWaterMask(16384, 256),
-};
+});

@@ -9,6 +9,7 @@ import type { GroundTextures } from '../terrain/groundTextures';
 import { TOWN_TILE_METERS } from '../terrain/groundTextures';
 import { TOWN_RASTER, type Town } from '../../world/town';
 import { townMaskData } from '../../world/townMask';
+import { inRenderGroup } from '../renderGroup';
 
 let town: GroundTextures | null = null;
 /** The town's texture arrays; set at load, before the warm-up builds the terrain and building shaders. */
@@ -38,7 +39,7 @@ function maskTexture(data: Uint8Array, w: number, h: number): DataTexture {
  * CROP_STEP / 255; A the way its rows run, 0..π as 0..1). Crop and rows reach two metres past each
  * field, so filtering at its edge mixes nothing in.
  */
-export const TOWN_MASKS = {
+export const TOWN_MASKS = inRenderGroup({
   mask: maskTexture(new Uint8Array(8), 2, 1) as DataTexture,
   /** World xz of the masks' corner, and their size in metres. */
   origin: uniform(new Vector2(0, 0)),
@@ -47,7 +48,7 @@ export const TOWN_MASKS = {
   half: uniform(new Vector2(0.5, 0.5)),
   /** How wholly its streets and market are paved: 0, a village's stones laid where the traffic is; 1, a city's wall to wall. */
   paved: uniform(0),
-};
+});
 
 export { CROP_STEP } from '../../world/townMask';
 

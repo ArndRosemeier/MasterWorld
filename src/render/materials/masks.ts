@@ -5,15 +5,16 @@
  */
 import { DataTexture, NearestFilter, ClampToEdgeWrapping, FloatType, RGBAFormat, Vector2, type Node } from 'three/webgpu';
 import { float, floor, fract, mix, texture, uniform, vec2 } from 'three/tsl';
+import { inRenderGroup } from '../renderGroup';
 
 /** An RGBA float mask `side` metres across, `res` samples a side; `fill` is what it holds before any data. */
 export class FloatMask {
   readonly data: Float32Array;
   readonly tex: DataTexture;
-  readonly origin = uniform(new Vector2(1e9, 1e9));
+  readonly origin = inRenderGroup(uniform(new Vector2(1e9, 1e9)));
   readonly size;
   constructor(readonly side: number, readonly res: number, fill: readonly [number, number, number, number]) {
-    this.size = uniform(side);
+    this.size = inRenderGroup(uniform(side));
     this.data = new Float32Array(res * res * 4);
     for (let p = 0; p < res * res; p++) this.data.set(fill, p * 4);
     // Float textures filter only with an extension on WebGL 2: nearest, blended by hand (`sampleMask`).

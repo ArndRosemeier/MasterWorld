@@ -8,6 +8,7 @@ import { ClampToEdgeWrapping, DataTexture, LinearFilter, RGBAFormat, UnsignedByt
 import { float, smoothstep, texture, uniform, vec2 } from 'three/tsl';
 import { HORIZON_DIRS, type HorizonSpec } from '../world/horizon';
 import type { TerrainJobs } from '../workers/pool';
+import { inRenderGroup } from './renderGroup';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type N = any;
@@ -29,9 +30,9 @@ export class HorizonShadow {
     t.needsUpdate = true;
     return t;
   });
-  private readonly origin = uniform(new Vector2(-1e9, -1e9));
-  private readonly weights = [uniform(new Vector4()), uniform(new Vector4())];
-  private readonly sunAngle = uniform(1);
+  private readonly origin = inRenderGroup(uniform(new Vector2(-1e9, -1e9)));
+  private readonly weights = [inRenderGroup(uniform(new Vector4())), inRenderGroup(uniform(new Vector4()))];
+  private readonly sunAngle = inRenderGroup(uniform(1));
   private centre = { x: Infinity, z: Infinity };
   private pending = false;
 

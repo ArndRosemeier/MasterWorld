@@ -8,6 +8,7 @@
 import { Color, Vector2, Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { exp, float, max, mix, screenUV, sin, smoothstep, uniform, vec3, vec4, clamp } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import { inRenderGroup } from './renderGroup';
 
 /** Light lost per metre seen through sea water (red first), and the murk's own thickness per metre. */
 const ABSORB = new Vector3(0.16, 0.045, 0.03);
@@ -17,7 +18,7 @@ export const UNDER_LENS = 0.5;
 /** How far in front of the camera the waterline is taken across the frame (m). */
 const LENS = 0.8;
 
-export const VEIL = {
+export const VEIL = inRenderGroup({
   /** The camera's height over the water's surface at it, waves included (m; negative under it). */
   h: uniform(10),
   /** 1 while the scene is drawn as from under the water (fog, no sky), 0 above. */
@@ -28,7 +29,7 @@ export const VEIL = {
   near: uniform(0.2),
   murk: uniform(new Color(0.03, 0.17, 0.19)),
   time: uniform(0),
-};
+});
 
 /** The veil (PostOptions.veil): the drawn colour and its reversed depth value in, the colour out. */
 export function waterVeil(color: Node<'vec4'>, depth: Node<'float'>): Node<'vec4'> {

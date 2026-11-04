@@ -8,6 +8,7 @@
 import { DoubleSide, MeshBasicNodeMaterial, Vector4, type Node } from 'three/webgpu';
 import { attribute, cameraPosition, cross, float, fract, int, mix, normalize, positionGeometry, pow, sin, smoothstep, uniform, uniformArray, vec3, vec4 } from 'three/tsl';
 import { WEATHER } from './weather';
+import { inRenderGroup } from '../renderGroup';
 
 /** Columns drawn at once, and puffs in each. */
 export const SMOKE_COLUMNS = 4;
@@ -21,12 +22,12 @@ const RISE = 2.4;
 export const SMOKE_FEET: readonly Vector4[] = Array.from({ length: SMOKE_COLUMNS }, () => new Vector4());
 export const SMOKE_SHAPE: readonly Vector4[] = Array.from({ length: SMOKE_COLUMNS }, () => new Vector4());
 
-export const SMOKE = {
+export const SMOKE = inRenderGroup({
   columns: uniformArray(SMOKE_FEET as Vector4[], 'vec4'),
   shape: uniformArray(SMOKE_SHAPE as Vector4[], 'vec4'),
   /** Seconds (real time, wrapped). */
   time: uniform(0),
-};
+});
 
 /** Columns of puffs as uniforms: each column's foot (x, y, z origin-relative; w: 0 or 1, what the look makes of it) and shape (as SMOKE_SHAPE; w free), and the clock. */
 export interface PuffSet { readonly columns: Node; readonly shape: Node; readonly time: Node }

@@ -22,6 +22,7 @@ import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
 import { ORIGIN, WORLD } from './origin';
 import { geometryInstancing } from '@futuremagic/instances/node';
+import { inRenderGroup } from './renderGroup';
 
 export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'ground' | 'mat' | 'tint' | 'look' | 'fx';
 
@@ -95,7 +96,7 @@ const LAYER = (name: string): number => {
  * canopy (vertex attribute `canopy`: crown cover, tree height, spacing, conifer share; world/canopy.ts) and draws
  * crowns, gaps and glades per pixel. `band`: from where to where (m from the eye) the canopy takes over.
  */
-export const WOODS = { band: uniform(new Vector2(800, 1000)) };
+export const WOODS = inRenderGroup({ band: uniform(new Vector2(800, 1000)) });
 /** The highest the canopy raises the ground (m; bounds of terrain meshes make room for it). */
 export const CANOPY_RISE = 22;
 /** The crowns' colour from afar (linear): broadleaf and conifer, matched to the near trees' hulls. */
@@ -107,7 +108,7 @@ const UNDER_CROWNS = 0.15;
  * The ground sunk round a world point while a hero climbs through a house's hatch there (app/hatchClimb.ts): x, z,
  * the radius (m) and how deep (m; 0: not at all). The ground under a plinth is never seen otherwise.
  */
-export const GROUND_DIP = uniform(new Vector4(0, 0, 0, 0));
+export const GROUND_DIP = inRenderGroup(uniform(new Vector4(0, 0, 0, 0)));
 
 export const TERRAIN = defineKind('terrain', ['position', 'normal', 'color', 'surface', 'level', 'canopy', 'ground'], () => {
   if (!ground) throw new Error('terrain material built before the ground textures were loaded');

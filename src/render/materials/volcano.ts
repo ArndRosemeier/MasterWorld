@@ -18,9 +18,10 @@ import { defineKind } from '../materials';
 import { WORLD } from '../origin';
 import { puffMaterial } from './smoke';
 import { WEATHER } from './weather';
+import { inRenderGroup } from '../renderGroup';
 
 /** The volcano's clock (seconds; it moves the lava's plates and the steam's puffs). */
-export const LAVA = { time: uniform(0) };
+export const LAVA = inRenderGroup({ time: uniform(0) });
 
 /**
  * How far (m) a vertex of the lava or the sulphur crust is lifted over the ground it was laid on, by its distance from the eye: the

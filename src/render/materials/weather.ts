@@ -10,8 +10,9 @@ import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
   positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
+import { inRenderGroup } from '../renderGroup';
 
-export const WEATHER = {
+export const WEATHER = inRenderGroup({
   /** Seconds since start (real time: rain falls even when the clock stands still). */
   time: uniform(0),
   /** Precipitation 0..1, and the share of it that is snow. */
@@ -29,13 +30,13 @@ export const WEATHER = {
   light: uniform(new Color(0.5, 0.5, 0.5)),
   /** The floating origin (render/origin.ts) modulo the box of drops (`precipShift`): the drops stay put in the world when it steps. */
   precipShift: uniform(new Vector3()),
-};
+});
 
 /**
  * The scene's fog: exponential-squared haze (as three's FogExp2) plus exponential height mist below
  * `mistBase`, integrated along the view ray so it pools in valleys and over still water.
  */
-export const FOG = {
+export const FOG = inRenderGroup({
   color: uniform(new Color(0xbfd0e0)),
   density: uniform(0.00004),
   /** Mist density at its base (per metre), the base height and how fast it thins above (per metre). */
@@ -44,7 +45,7 @@ export const FOG = {
   mistFalloff: uniform(1 / 14),
   /** 1: one colour everywhere (`color`: under water, below ground); 0: the sky's colour toward each view. */
   flat: uniform(0),
-};
+});
 
 /**
  * The sky's light in the shade is its environment map; Preetham's clear sky is too saturated a blue for

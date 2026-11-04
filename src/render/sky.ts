@@ -14,6 +14,7 @@ import { SKY, makeEnvSky, skyUniforms, type SkyUniforms } from './materials';
 import { HorizonShadow } from './horizonShadow';
 import { WINDOWS } from './materials/building';
 import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
+import { inRenderGroup } from './renderGroup';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
 const SHADOW_EXTENT = 160;
@@ -150,8 +151,8 @@ export class SkyView {
   /** Exposure on top of the sky's own (the tone curve's gain times ours). */
   private readonly exposure: number;
   /** The sun's (or moon's) colour times its strength, and where it comes from: its colorNode reads them. */
-  private readonly sunLight = uniform(new Color());
-  private readonly lightDir = uniform(new Vector3(0, 1, 0));
+  private readonly sunLight = inRenderGroup(uniform(new Color()));
+  private readonly lightDir = inRenderGroup(uniform(new Vector3(0, 1, 0)));
   /** The weather the environment map was last rendered with. */
   private lastEnvWx = '';
   /**

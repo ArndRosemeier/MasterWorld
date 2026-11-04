@@ -15,6 +15,7 @@ import { FloatMask, inside, sampleMask } from './masks';
 import { WATER } from './waterInputs';
 import { WEATHER } from './weather';
 import { ORIGIN } from '../origin';
+import { inRenderGroup } from '../renderGroup';
 
 /** Side of a patch, metres, and blades in it (the near density: 48 a square metre). */
 export const PATCH = 4;
@@ -26,13 +27,13 @@ export const NEAR_FULL = 7, NEAR_END = 20, REACH = 48;
 /** Side of a tuft's cell, metres. */
 const TUFT = 0.32;
 
-export const GRASS = {
+export const GRASS = inRenderGroup({
   /** Ground height, density, blade height, dryness (world/grass.ts), 128 m around the camera. */
   mask: new FloatMask(128, 256, [-1e4, 0, 0, 0]),
   time: uniform(0),
   /** Wind strength, 0 calm .. 1 a stiff breeze. */
   wind: uniform(0.5),
-};
+});
 
 export function createGrassMaterial(): MeshPhysicalNodeMaterial {
   // Physical for its weak specular: blades seen edge-on far away must not mirror the bright sky.

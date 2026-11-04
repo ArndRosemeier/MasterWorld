@@ -12,6 +12,7 @@ import { Vector4 } from 'three/webgpu';
 import { FAINT, STRONG } from '../../sim/aura';
 import { Fn, If, Loop, abs, dot, float, max, mix, screenSize, screenUV, sin, step, time, toneMappingExposure, uniform, uniformArray, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import { inRenderGroup } from '../renderGroup';
 
 /** Creatures outlined at once, at most (the shader loops over this many). */
 const CAP = 16;
@@ -24,7 +25,7 @@ const zeros = (): Vector4[] => {
 /** The values behind the three uniform arrays (rewritten each frame, render/aura/marks.ts). */
 const slots = { area: zeros(), range: zeros(), tint: zeros() };
 
-export const OUTLINE = {
+export const OUTLINE = inRenderGroup({
   cap: CAP,
   slots,
   /** The ellipse on the screen: middle (uv), half width, half height (uv). */
@@ -36,7 +37,7 @@ export const OUTLINE = {
   near: uniform(0.2),
   /** 1 while any creature is outlined, else 0: the depth taps then all fall on the pixel itself (cached, nearly free). */
   live: uniform(0),
-};
+});
 
 /** The line is read in this many steps (px) outward from the silhouette: the target's line is all of them, the others' the first two. */
 const STEP_PX = 2.1;
