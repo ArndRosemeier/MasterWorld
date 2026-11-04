@@ -23,7 +23,7 @@ import { SEA_LEVEL } from '../../src/world/water';
 import { Walker } from '../../src/game/walker';
 import { shipFixtures } from '@futuremagic/settlement';
 
-const seeds = process.argv.length > 2 ? process.argv.slice(2) : ['masterworld', 'alpha', 'x4'];
+const seeds = process.argv.length > 2 ? process.argv.slice(2) : ['masterworld', 'alpha', 'x8'];
 /** One frame of play (s), in game hours; the hero lies down this far into the crossing and wakes this long before she is in. */
 const FRAME = 1 / 30, HOUR_PER_FRAME = (FRAME * CLOCK) / 3600, AWAKE = 0.5, WAKE = 0.28;
 /** Her keel at bow and stern, as a share of her draft amidships. */
