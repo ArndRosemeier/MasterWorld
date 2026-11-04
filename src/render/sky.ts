@@ -1,6 +1,6 @@
 /**
  * Sky, sun, moon, fog and the environment light, driven by the time of day and the weather
- * (@futuremagic/sky, from Scale; the weather itself comes from WeatherView). The sun casts one shadow map that follows the camera. Everything that changes any shader's key
+ * (@futuremagic/sky, from Scale; the weather itself comes from WeatherView). The sun casts a shadow map that follows the camera (and a second for the movers near it, moverShadow.ts). Everything that changes any shader's key
  * (the environment map, shadows, fog type) is set up in the constructor, before the warm-up.
  */
 import { BoxGeometry, Color, Mesh, type Sprite, PMREMGenerator, Scene, Vector3, type DirectionalLight, type HemisphereLight, type OrthographicCamera, type PerspectiveCamera, type RenderTarget, type WebGPURenderer } from 'three/webgpu';
@@ -15,6 +15,7 @@ import { HorizonShadow } from './horizonShadow';
 import { WINDOWS } from './materials/building';
 import { ENV_SATURATION, FOG, fogNode } from './materials/weather';
 import { inRenderGroup } from './renderGroup';
+import { MoverShadow } from './moverShadow';
 
 /** Half the side of the sun's shadow box around the camera, metres. */
 const SHADOW_EXTENT = 160;
@@ -159,9 +160,12 @@ export class SkyView {
    * The sun's shadow map is drawn every this many frames (and at once after a jump): drawing it took about 7 ms of
    * a town frame on the reference machine (every caster drawn again). A shadow a frame or two late does not show.
    * Every third frame: about 1.5-2 ms off a town frame at dusk and in rain against every second (gate G); at 90 fps
-   * a running hero's shadow is then at most 0.1 m behind.
+   * a running hero's shadow is then at most 0.1 m behind. That still showed on the hero (a shadow that twitches
+   * as they walk, Arnd 2026-11-04): movers near the camera have their own map, drawn every frame (MoverShadow).
    */
   shadowEvery = 3;
+  /** The movers' shadow map (the hero, townsfolk, creatures near the camera), drawn every frame. */
+  readonly movers: MoverShadow;
   private shadowFrame = 0;
   private readonly shadowAt = { x: Infinity, z: Infinity };
   private shadowSteps = -1;
@@ -224,6 +228,7 @@ export class SkyView {
     sc.near = 1; sc.far = SHADOW_EXTENT * 12;
     sc.updateProjectionMatrix();
     sun.shadow.normalBias = 0.02 * SHADOW_EXTENT / 60;
+    this.movers = new MoverShadow(sun);
     this.update(0, null);
   }
 
@@ -406,6 +411,7 @@ export class SkyView {
     this.sun.target.position.set(fx, focus.y, fz);
     this.sun.position.set(fx + d[0] * r, focus.y + d[1] * r, fz + d[2] * r);
     this.sun.target.updateMatrixWorld();
+    this.movers?.follow();
     if (camera) { this.dome.position.copy(camera.position); this.stars.position.copy(camera.position); }
     // The map keeps the box it was drawn with (three moves its matrix only when it draws), so a frame between
     // draws still lines up; a jump of the box draws it at once.

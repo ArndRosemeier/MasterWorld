@@ -10,6 +10,7 @@ import { hash2f } from '@futuremagic/core';
 import type { Hen, HenAct, Poultry } from '../../sim/poultry';
 import { LIBRARY_KINDS, type AnimalDoing, type LibraryKind } from '../libraryAnimals';
 import { poseLibrary, shelvedAnimal } from '../dungeon/animals';
+import { mover } from '../moverShadow';
 
 /** Farther than this (m) a bird is not drawn. */
 const REACH = 60;
@@ -53,7 +54,7 @@ export class PoultryView {
   }
 
   toWarm(): Object3D[] { return [...this.hens, ...this.cocks].map((b) => b.place); }
-  async enter(stage: Stage): Promise<void> { for (const b of [...this.hens, ...this.cocks]) await stage.add(b.place); }
+  async enter(stage: Stage): Promise<void> { for (const b of [...this.hens, ...this.cocks]) await stage.add(mover(b.place)); }
 
   /** Each frame, after the flocks have stepped: the birds nearest the camera get the bodies. */
   showFlocks(dt: number, cam: Vector3, flocks: readonly Poultry[]): void {

@@ -32,6 +32,7 @@ import { renderGround } from './renderGround';
 import { Held, Steady } from '../steady';
 import { AURAS } from '../aura/marks';
 import { FAINT, STRONG, auraReach, auraSize, healthLook } from '../../sim/aura';
+import { mover } from '../moverShadow';
 
 /** Where the build serves the people's pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/human/manifest.json`;
@@ -139,7 +140,7 @@ export class CreatureView {
         place.add(ch.object);
         place.scale.setScalar(b.height / (ch.height || 1.75));
         castShadows(ch.object);
-        v.group.add(place);
+        v.group.add(mover(place));
         body = { kind: 'person', ch, place, held: b.held ? buildArm(b.held) : null, clip: '', drawn: null };
       } else if (b.kind === 'rat') {
         if (!rat) {
@@ -152,11 +153,11 @@ export class CreatureView {
         // Its length without the tail, as the setting gives it (the tail is about two fifths of the model).
         const scale = b.length / (rat.length * 0.6);
         fig.root.name = c.def.name;
-        v.group.add(fig.root);
+        v.group.add(mover(fig.root));
         body = { kind: 'modelled', fig, scale };
       } else if (animal) {
         body = animal;
-        v.group.add(animal.place);
+        v.group.add(mover(animal.place));
         // Its feet stand on the drawn ground, whatever its size, deform or clip (Actors' foot pass); the centre point's height only places the body.
         animal.lib?.setGround(ground);
       } else {
@@ -166,7 +167,7 @@ export class CreatureView {
         // Its length, legs and all, as the setting gives it.
         const scale = b.length / Math.max(0.05, m.species.totalLength);
         fig.root.name = c.def.name;
-        v.group.add(fig.root);
+        v.group.add(mover(fig.root));
         body = { kind: 'critter', fig, scale };
       }
       v.shown.push({ c, body, st: new Steady().ease(0, c.x, c.y, c.z, yawOf(c.dir)), look: new Held(''), blowAt: -9, health: c.health, hurtAt: -9, act: c.act, variant: c.id, walked: 0, blows: c.blows, jolt: new Jolt(), faint: 0, strong: 0 });

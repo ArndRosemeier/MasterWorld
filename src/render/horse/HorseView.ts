@@ -13,6 +13,7 @@ import type { ThreeActor } from '@actors/three';
 import { furActor, gaitPace } from '../furAnimal';
 import type { Stage } from '@futuremagic/stage';
 import { ORIGIN } from '../origin';
+import { mover } from '../moverShadow';
 
 /** Where the build serves the horse pack (`npm run packs` fills public/packs). */
 const PACK = `${import.meta.env.BASE_URL}packs/horse/manifest.json`;
@@ -74,7 +75,7 @@ export class HorseView {
 
   /** Into the scene, after the warm-up (each compiled on the way, cache hits after the first). */
   async show(stage: Stage): Promise<void> {
-    for (const h of this.horses) await stage.add(h.place);
+    for (const h of this.horses) await stage.add(mover(h.place));
   }
 
   /** Show or hide horse `i` (a hidden one need not be posed). */
