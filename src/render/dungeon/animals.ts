@@ -18,7 +18,7 @@ import { loadLibraryAnimal, type LibraryAnimal, type ThreeActor } from '@actors/
 import { LIBRARY_KINDS, giantPlan, libraryClip, type AnimalDoing, type LibraryKind } from '../libraryAnimals';
 import { hash2f } from '@futuremagic/core';
 import { deformCoat, deformRanges, deformShape } from '@actors/animal';
-import { furActor, gaitPace, stepRate } from '../furAnimal';
+import { furActor, gaitPace } from '../furAnimal';
 
 export type { AnimalDoing };
 
@@ -253,6 +253,18 @@ export function poseAnimal(b: AnimalBody, x: number, y: number, z: number, yaw: 
   actor.update(dt);
 }
 
+/**
+ * How fast an animal goes before it runs rather than walks (m/s): a giant's between its walk's and its run's own stride (Actors' `strideSpeed`;
+ * a 14 m elk walks where a deer runs, and a run played at a crawl floats), any other animal's 2.2.
+ */
+export function runAbove(b: AnimalBody): number {
+  const lib = b.lib, kind = b.def.library;
+  if (!lib || !kind || !lib.deform) return 2.2;
+  const walk = libraryClip(lib, kind, 'walk'), run = libraryClip(lib, kind, 'run');
+  const w = walk ? lib.strideSpeed(walk) : 0, r = run ? lib.strideSpeed(run) : 0;
+  return w > 0 && r > 0 ? Math.sqrt(w * r) : 2.2;
+}
+
 /** A frame of a library animal's clips (`b.doing`: what it did last frame): the clip for `doing`, the gait at the ground speed. */
 export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, kind: LibraryKind, doing: AnimalDoing, speed: number, dt: number): void {
   const name = doing !== b.doing ? libraryClip(lib, kind, doing) : undefined;
@@ -262,12 +274,9 @@ export function poseLibrary(b: { doing: AnimalDoing | '' }, lib: LibraryAnimal, 
     // The same one-shot again (already running, so not restarted by play): from its start.
     if (a && ONCE.includes(doing)) a.time = 0;
   }
-  // The gait at its own pace when the ground speed is the clip's (its scale counted), within half to 1.6 times (of a giant's slow step, `stepRate`).
-  const a = lib.currentAction, g = stepRate(lib.deform?.scale ?? 1);
-  if (a) {
-    const own = (doing === 'walk' || doing === 'run') && b.doing === doing ? lib.speedOf(a.getClip().name) * lib.object.scale.x : 0;
-    a.timeScale = own > 0 ? Math.min(1.6 * g, Math.max(0.5 * g, speed / own)) : g;
-  }
+  // A walk or a run as fast as the ground goes by (Actors' pace: the stride grown with the body, a giant's long and slow); what stays put
+  // plays at the body's own gait (a giant's slower, as Actors' Deform has it).
+  if (doing === 'walk' || doing === 'run') lib.pace(speed);
   // Standing about (not walking, running or hurt), every foot is on the ground, whatever an idle clip does with a leg (the giant turtle's hind legs hung).
   lib.standing = doing === 'idle' || doing === 'alert' || doing === 'feed' || doing === 'rest' || doing === 'call' || doing === 'flick';
   lib.update(dt);

@@ -23,7 +23,7 @@ import { gripHeld } from '../hero/grips';
 import { FADE, castShadows, playClip, preparePeople } from '../hero/play';
 import { foeClip, foeLook, type FoeDoing } from './foes';
 import type { Stage } from '@futuremagic/stage';
-import { animalBody, poseAnimal, type AnimalBody, type AnimalDoing } from './animals';
+import { animalBody, poseAnimal, runAbove, type AnimalBody, type AnimalDoing } from './animals';
 import { Jolt, joltRoot, joltSpine } from '../jolt';
 import { limp, limpOf } from '../limp';
 import { PACE } from '../hero/clips';
@@ -228,7 +228,7 @@ export class CreatureView {
         f.advance(dt);
       } else if (s.body.kind === 'animal') {
         const speed = Math.hypot(vx, vz);
-        const want: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > 2.2 ? 'run' : speed > 0.2 ? 'walk'
+        const want: AnimalDoing = dead ? 'dead' : blowT < 1 ? 'blow' : hurtT < 1 ? 'hurt' : speed > runAbove(s.body) ? 'run' : speed > 0.2 ? 'walk'
           : c.state === 'alert' ? 'alert' : c.act === 'gnaw' || c.act === 'rummage' || c.act === 'sniff' ? 'feed' : 'idle';
         const doing = s.look.pick(dt, want, dead || blowT < 1 || hurtT < 1) as AnimalDoing;
         this.near = Y;
