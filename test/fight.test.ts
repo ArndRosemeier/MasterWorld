@@ -5,6 +5,7 @@ import { classic } from '../src/setting/classic/index';
 import { validateSetting } from '../src/setting/contract';
 import { hitChance, strike, threatOf } from '../src/sim/combat';
 import { Character } from '../src/game/character';
+import { evenDanger } from '../src/game/growth';
 import { coinText, rarityOdds, rollItem, rollLoot } from '../src/game/items';
 import { fightBot } from '../src/game/bot';
 import { CELL, type Cellar } from '../src/world/dungeon/cellar';
@@ -234,10 +235,10 @@ test('fight: the target plate reads all who fight the hero at once, not the one 
   const c = cellars.find((x) => x.dweller.id === 'rats')!;
   const d = new Delve(c, openSpace(c), classic, new Character(classic), 4);
   const [one, ...rest] = d.den.creatures;
-  assert.deepEqual(d.fight.threat(one), { threat: threatOf(one.def.danger, d.fight.hero.power), together: false });
+  assert.deepEqual(d.fight.threat(one), { threat: threatOf(one.def.danger, evenDanger(classic.growth, d.fight.hero.level)), together: false });
   for (const o of [one, ...rest]) o.state = 'fight';
   const all = [one, ...rest].reduce((a, o) => a + o.def.danger, 0);
-  assert.deepEqual(d.fight.threat(one), { threat: threatOf(all, d.fight.hero.power), together: rest.length > 0 });
+  assert.deepEqual(d.fight.threat(one), { threat: threatOf(all, evenDanger(classic.growth, d.fight.hero.level)), together: rest.length > 0 });
 });
 
 test('fight: a blow that hurts is counted for its jolt; bleeding and a blow for nothing are not', () => {

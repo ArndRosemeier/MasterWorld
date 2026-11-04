@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import { parseSeed } from '@futuremagic/core';
 import { classic } from '../src/setting/classic/index';
 import { validateSetting } from '../src/setting/contract';
-import { awake, extraOf, groupDanger } from '../src/sim/wild';
+import { awake, extraOf, groupDanger, unbiddenDanger } from '../src/sim/wild';
 import { WALK_R, radiusOf, walkRadius } from '../src/sim/creatures';
 import { territoryOf, wildFor } from '../src/vgm/wild';
 import { dangerAt } from '../src/vgm/dungeons';
 import { encounterFor, membersOf, typicalDanger } from '../src/vgm/encounters';
 import { giantPlan, LIBRARY_KINDS } from '../src/render/libraryAnimals';
 import { startWorld } from './frontierLand';
+import { Character } from '../src/game/character';
+import { levelOfDanger } from '../src/game/growth';
+import { hitChance } from '../src/sim/combat';
 
 const seed = parseSeed('masterworld');
 const { terrain } = startWorld();
@@ -39,7 +42,8 @@ test('two giants are peaceful and near, as a promise; two hunt and live only whe
     assert.equal(d.temper, 'placid', `${id} takes no notice of the hero, and is afraid of nothing`);
     assert.equal(d.morale, 1, `${id} never runs from a fight it is in`);
     assert.ok(!d.wary, `${id} keeps no flight distance`);
-    assert.ok(d.danger <= 18, `${id} is no danger to a fresh hero`);
+    // Struck, a giant fights as one (its danger is its blows and health): far beyond a fresh hero, and safe only because it never starts a fight.
+    assert.ok(levelOfDanger(classic.growth, d.danger) >= 8, `${id} is no fight for a fresh hero (level ${levelOfDanger(classic.growth, d.danger)})`);
     assert.equal(d.faction, 'great', `${id}: the great beasts are at feud with nobody`);
   }
   for (const [a, b] of classic.factions.matrix) assert.ok(a !== 'great' && b !== 'great', 'nobody is at feud with the great beasts');
@@ -64,7 +68,8 @@ test('the giants the start world places stand where their groups may, never too 
   assert.ok(wet, 'water beside the turtle');
   for (const t of places.filter((t) => t.members.some((m) => GIANTS.includes(m)))) {
     const near = Math.hypot(t.x - town.decision.x, t.z - town.decision.z);
-    assert.ok(groupDanger(t.members, classic.creatures) <= Math.max(18, dangerAt({ decision: t }, town.decision)), `${t.id} at ${near.toFixed(0)} m fits the land`);
+    // Only those who may start a fight must fit the land's danger (D29); the placid giants start none.
+    assert.ok(unbiddenDanger(t.members, classic.creatures) <= Math.max(18, dangerAt({ decision: t }, town.decision)), `${t.id} at ${near.toFixed(0)} m fits the land`);
     if (t.members.some((m) => def(m).temper === 'hostile')) assert.ok(near >= 2400, `${t.id}: a hunting giant lives far out`);
     assert.equal(terrain.waterDepth(t.x, t.z), 0, `${t.id} on dry land`);
   }
@@ -93,7 +98,8 @@ test('a giant wolf leads a pack of plain wolves, and is the only one of its kind
     assert.ok(m.slice(1).every((x) => x === 'wolf'), m.join(','));
     assert.ok(m.length >= 3 && m.length <= 4);
   }
-  assert.ok(typicalDanger(classic, e) < 36, 'its typical danger counts one giant');
+  // One giant and plain wolves (were every member a giant, two would weigh twice the giant's danger).
+  assert.ok(typicalDanger(classic, e) < 2 * def('giant wolf').danger, 'its typical danger counts one giant');
   // Encounters that are not "lone" are drawn as before.
   const rats = classic.encounters.find((x) => x.id === 'ghoul-and-bones')!;
   assert.deepEqual(membersOf(rats, 5), membersOf(rats, 5));
@@ -151,5 +157,18 @@ test('the giants have a library body with a clip for every doing', () => {
   for (const id of ['giant elk', 'giant turtle']) {
     const b = def(id).body;
     assert.ok(b.kind === 'beast' && ['elk', 'turtle'].includes(b.species), id);
+  }
+});
+
+test('every beast\'s danger is its fight: its blows and its health against a fresh hero (a giant turtle once read "weaker than you")', () => {
+  // A fight's weight is the damage each side deals while the other is beaten (Lanchester: the square root of the foe's blows times how long it lasts).
+  const hero = new Character(classic), w = hero.guard(), blow = hero.blow();
+  const per = (damage: readonly [number, number], prowess: number, armour: number, kind: string) => Math.max(1, (damage[0] + damage[1]) / 2 * (1 + prowess / 220) - armour * (kind === 'pierce' ? 0.6 : 1));
+  for (const c of classic.creatures.filter((c) => c.body.kind === 'beast')) {
+    const a = c.attacks[0];
+    const dealt = hitChance(a.prowess, w.defence) * per(a.damage, a.prowess, w.armour, a.kind) / a.time;
+    const lasts = c.health / (hitChance(blow.prowess, c.defence) * per(blow.damage, blow.prowess, c.armour, blow.kind) / hero.weapon.time);
+    const weight = Math.sqrt(dealt * lasts);
+    assert.ok(c.danger >= 0.8 * weight && c.danger <= 1.45 * weight, `${c.id}: danger ${c.danger}, its fight weighs ${weight.toFixed(1)} (${(0.8 * weight).toFixed(0)} to ${(1.45 * weight).toFixed(0)})`);
   }
 });

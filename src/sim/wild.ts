@@ -231,6 +231,10 @@ export function groupDanger(members: readonly string[], defs: readonly CreatureD
   return ds.length ? ds[0] + ds.slice(1).reduce((a, d) => a + d * 0.25, 0) : 0;
 }
 
+/** The danger of those in a group who may start a fight (a placid giant starts none): what the land must hold where it lives (D29). */
+export const unbiddenDanger = (members: readonly string[], defs: readonly CreatureDef[]): number =>
+  groupDanger(members.filter((m) => defs.find((d) => d.id === m)?.temper !== 'placid'), defs);
+
 /** One group out on the land: its den, and whether it is awake (near the hero). */
 export interface Band {
   readonly territory: Territory;
