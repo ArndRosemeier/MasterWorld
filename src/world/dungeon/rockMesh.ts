@@ -156,10 +156,10 @@ export function fieldAt(f: AnyField, x: number, y: number, z: number, outside = 
   const i = Math.floor(u), j = Math.floor(v), k = Math.floor(w);
   if (i < 0 || j < 0 || k < 0 || i >= f.nx - 1 || j >= f.ny - 1 || k >= f.nz - 1) return outside;
   const a = u - i, b = v - j, c = w - k;
-  const at = (p: number, q: number, r: number) => sampleOf(f, p, q, r);
+  // (Written out: a closure made on each call cost a tenth of the cave tests' time, as the test loader names closures.)
   return lerp(
-    lerp(lerp(at(i, j, k), at(i + 1, j, k), a), lerp(at(i, j + 1, k), at(i + 1, j + 1, k), a), b),
-    lerp(lerp(at(i, j, k + 1), at(i + 1, j, k + 1), a), lerp(at(i, j + 1, k + 1), at(i + 1, j + 1, k + 1), a), b),
+    lerp(lerp(sampleOf(f, i, j, k), sampleOf(f, i + 1, j, k), a), lerp(sampleOf(f, i, j + 1, k), sampleOf(f, i + 1, j + 1, k), a), b),
+    lerp(lerp(sampleOf(f, i, j, k + 1), sampleOf(f, i + 1, j, k + 1), a), lerp(sampleOf(f, i, j + 1, k + 1), sampleOf(f, i + 1, j + 1, k + 1), a), b),
     c,
   );
 }

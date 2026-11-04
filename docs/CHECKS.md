@@ -16,10 +16,15 @@ The slow checks today: `npm run variety` (every kind of dungeon, 1000 each), `np
 Tests use seeds, fake clocks and small fixtures, never wall-clock waits.
 
 `npm test` is `node tools/test/run.mjs`: the test files run in one process per core, side by side, and each process
-runs its share of the files one after the other (`--test-isolation=none`), so the code is loaded and compiled once per
-process, not once per file (MW: 47 s down to about 24 s on 4 cores). The shares are balanced by each file's tests' time
-in `tools/test/times.json` (`npm test -- --save-times` writes it anew; a new file counts as 1 s until then).
-`npm test -- test/town.test.ts` runs the files given, `TEST_PROCS=n npm test` with n processes.
+runs its files one after the other (`--test-isolation=none`), so the code is loaded and compiled once per process, not
+once per file (MW: 47 s down to about 24 s on 4 cores). Every process gets the same list of the files, heaviest first, and
+takes each file not yet taken when its turn comes (`tools/test/claim.mjs`: a wrapper test per file claims it with an
+atomic `mkdir`, imports it and waits for its tests), so a process that is done early takes the next file and all end
+within a second of each other, however far the times last measured are off. Those times are in `tools/test/times.json`
+(`npm test -- --save-times` writes it anew; a file's time counts its setup at the top; a new file counts as 1 s until
+then). The rivers' and brooks' tiles one process traces are put in a folder made for the run and taken from there by
+the others (`tools/test/tileStore.mjs`, `useTileStore` in world/hydro.ts), so the same tile is traced once, not once per
+process. `npm test -- test/town.test.ts` runs the files given, `TEST_PROCS=n npm test` with n processes.
 
 Because files share a process, a test file never changes what another one sees, and module-level state in `src`
 holds only caches. The start's land (seed masterworld, small drainage tiles) is built once per process and shared:
@@ -32,7 +37,8 @@ is not timed, so keep it small. The land's big rivers' grid costs about 2 s to b
 
 The test loader (tsx) keeps function names, so every closure made in a function wraps its name on (a
 `defineProperty`): in the land's hot paths (heights, asked millions of times) a closure made per call cost a tenth of
-all test time. Write such helpers out there (the built game has no such cost, but tests run the land a lot).
+all test time (and again in the rock field's `fieldAt` and the dungeon space's cells, 5 % of all of it). Write such
+helpers out there, or make them methods of a class (the built game has no such cost, but tests run the land a lot).
 
 ## CI time
 
@@ -45,7 +51,7 @@ before it fails. When a warning shows up, find the cause then, not when it fails
 
 | Step | Time (Oct 2026) | Warn | Fail |
 |---|---|---|---|
-| `npm test` | ~42 s here, ~1.4 times that on CI's runner | 55 s | 70 s |
+| `npm test` | ~46 s on CI's runner (4 cores, Nov 2026; was 68-72 s before the files were dealt out as processes finish) | 55 s | 70 s |
 | `npm run variety` | ~12 s | 30 s | 5 min |
 | `npm run loop` (its runs side by side, one process each) | ~30 s | 60 s | 5 min |
 | `npm run walk:landforms` (three worlds) | ~20 s | 30 s | 5 min |

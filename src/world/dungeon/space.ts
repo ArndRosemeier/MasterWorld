@@ -40,6 +40,16 @@ const ekey = (x: number, z: number, l: number, dir: number) => {
   return `${x},${z},${l},${dir}`;
 };
 
+/** A cell's floor and ceiling (a class: a floor function made for each ask cost as much as the ask, as the test loader names closures). */
+class CellInfo {
+  constructor(readonly owner: number, readonly ceil: number, private readonly base: number, private readonly stair: PathCell | null, private readonly scale: DungeonScale) {}
+
+  /** The floor's height at (x, z): level in a room or passage, dropping along a stair. */
+  floorAtPoint(x: number, z: number): number {
+    return this.stair ? this.base - stairDrop(this.stair, x, z, this.scale) : this.base;
+  }
+}
+
 export class DungeonSpace {
   readonly grid: LayoutGrid;
   /** Its grid in metres (the layout's). */
@@ -106,20 +116,20 @@ export class DungeonSpace {
     return Math.floor((y + 0.4) / this.scale.storey);
   }
 
-  private cellInfo(i: number, j: number, l: number): { floor: (x: number, z: number) => number; ceil: number; owner: number } | null {
+  private cellInfo(i: number, j: number, l: number): CellInfo | null {
     const owner = this.own(i, j, l);
     if (owner === undefined) return null;
     const S = this.scale;
     if (owner >= 0) {
       const r = this.layout.rooms[owner];
-      return { owner, floor: () => r.level * S.storey, ceil: (r.level + r.height) * S.storey };
+      return new CellInfo(owner, (r.level + r.height) * S.storey, r.level * S.storey, null, S);
     }
     const st = this.grid.stairs.get(`${i},${j},${l}`);
     if (st) {
       const top = st.level * S.storey;
-      return { owner, ceil: top + S.passage, floor: (x, z) => top - stairDrop(st, x, z, S) };
+      return new CellInfo(owner, top + S.passage, top, st, S);
     }
-    return { owner, floor: () => l * S.storey, ceil: l * S.storey + S.passage };
+    return new CellInfo(owner, l * S.storey + S.passage, l * S.storey, null, S);
   }
 
   /** The opening in the wall on side `dir` of cell (i, j, l), if any (the door, and whether it lets through now). */
@@ -160,7 +170,7 @@ export class DungeonSpace {
     const a = this.cellInfo(i, j, lv), b = this.cellInfo(ni, nj, lv);
     if (!a || !b) return false;
     const C = this.scale.cell, x = (i + 0.5 + DIRS[dir][0] * 0.5) * C, z = (j + 0.5 + DIRS[dir][1] * 0.5) * C;
-    return Math.abs(a.floor(x, z) - b.floor(x, z)) < 0.5;
+    return Math.abs(a.floorAtPoint(x, z) - b.floorAtPoint(x, z)) < 0.5;
   }
 
   /** Does the door let one through from the side owned by `from`? A passage's kind sits at its `b` end; its `a` end is an open arch. */
@@ -203,7 +213,7 @@ export class DungeonSpace {
     // Just under a floor: the cell below may be air (a ledge, a tall room).
     if (!c) c = this.cellInfo(i, j, l - 1);
     if (!c) return { floor: -0.1, ceil: -0.1, walls: -0.1 };
-    const floor = y - c.floor(x, z), ceil = c.ceil - y;
+    const floor = y - c.floorAtPoint(x, z), ceil = c.ceil - y;
     const near = Math.min(reach, floor, ceil) + round;
     let walls = Infinity;
     const fx = x - i * CELL, fz = z - j * CELL;
@@ -246,7 +256,7 @@ export class DungeonSpace {
     const i = Math.floor(x / this.scale.cell), j = Math.floor(z / this.scale.cell);
     for (let l = this.levelAt(y); l >= this.layout.levels[0]; l--) {
       const c = this.cellInfo(i, j, l);
-      if (c) return c.floor(x, z);
+      if (c) return c.floorAtPoint(x, z);
     }
     return null;
   }
