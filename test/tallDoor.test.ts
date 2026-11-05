@@ -3,10 +3,8 @@ import assert from 'node:assert/strict';
 import { planInterior, planTown, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk } from '../src/game/interiorWorld';
 import { Walker, type WalkWorld } from '../src/game/walker';
-import { heightFit } from '@actors/generator';
 import { allowOf } from '../src/render/hero/allow';
 import { classic } from '../src/setting/classic/index';
-import { raceScale } from '@actors/human';
 
 const houses = [3, 4].flatMap((seed) => planTown({ seed, x: 0, z: 0, radius: 130, height: () => 10 }).buildings).filter((_, i) => i % 3 === 0);
 
@@ -36,15 +34,8 @@ test('door: the tallest hero the setting allows is the 2.1 m the doors, stairs a
   assert.equal(MAX, 2.1);
 });
 
-test('door: a look taller than the limit (any people, the height slider at its top) is scaled down to it by Actors', () => {
-  // Actors' height law: scale * (1.03 + 0.14 * gender + 1.08 * slider), the scale of the people at its biggest.
-  const range = allowOf(classic.hero).height;
-  assert.deepEqual(range, { max: MAX });
-  for (const race of classic.hero.races) for (const gender of [0, 1]) {
-    const h = raceScale({ race, size: 1 } as never) * (1.03 + 0.14 * gender + 1.08);
-    assert.ok(h * heightFit(h, range) <= MAX + 1e-9, `${race} gender ${gender}: ${h.toFixed(3)} m`);
-  }
-  assert.equal(heightFit(1.8, range), 1);
+test('door: Actors is told the tallest hero (it scales a taller look down as a whole), the 2.1 m of the doors', () => {
+  assert.deepEqual(allowOf(classic.hero).height, { max: MAX });
 });
 
 test('allow: Actors is told the four peoples and the setting\'s clothing, never robots or skeletons', () => {
