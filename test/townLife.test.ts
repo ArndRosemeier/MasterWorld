@@ -79,21 +79,28 @@ test('town life: the same seed and steps give the same town', () => {
 
 test('town life: the start town (D41) costs well under its 2 ms a frame', () => {
   const town = planTown({ seed: 3, x: 0, z: 0, radius: 72, height: () => 10 });
-  const life = new TownLife(town, 3, 6);
-  life.focus = { x: 0, z: 0 }; // the player in the middle: every walk in detail
   const frames = 4000, dt = 1 / 60;
-  const ms: number[] = [];
-  // Fifteen game hours in 4000 frames (much faster than D37's 60-minute day): the busiest mix of walks and choices.
-  for (let f = 0; f < frames; f++) {
-    const t0 = performance.now();
-    life.step(dt * 13.5, 6 + (f / frames) * 15);
-    ms.push(performance.now() - t0);
+  // A wall-clock check beside three other test processes (and their GC) on a shared CI runner: one pause of the
+  // machine can push the 99th percentile past 2 ms (3.1 ms seen on CI, main and PRs alike). A real slowdown shows in
+  // every run, so the check passes if any of up to three runs of the same steps keeps both limits.
+  let last = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const life = new TownLife(town, 3, 6);
+    life.focus = { x: 0, z: 0 }; // the player in the middle: every walk in detail
+    const ms: number[] = [];
+    // Fifteen game hours in 4000 frames (much faster than D37's 60-minute day): the busiest mix of walks and choices.
+    for (let f = 0; f < frames; f++) {
+      const t0 = performance.now();
+      life.step(dt * 13.5, 6 + (f / frames) * 15);
+      ms.push(performance.now() - t0);
+    }
+    ms.sort((a, b) => a - b);
+    const mean = ms.reduce((s, x) => s + x, 0) / frames, p99 = ms[Math.floor(frames * 0.99)];
+    // On a slow CI runner too: the budget is 2 ms, the check allows half of it on average.
+    if (mean < 1 && p99 < 2) return;
+    last = `mean ${mean.toFixed(3)} ms, 99th percentile ${p99.toFixed(3)} ms for ${life.agents.length} people`;
   }
-  ms.sort((a, b) => a - b);
-  const mean = ms.reduce((s, x) => s + x, 0) / frames, p99 = ms[Math.floor(frames * 0.99)];
-  // On a slow CI runner too: the budget is 2 ms, the check allows half of it on average.
-  assert.ok(mean < 1, `mean ${mean.toFixed(3)} ms for ${life.agents.length} people`);
-  assert.ok(p99 < 2, `99th percentile ${p99.toFixed(3)} ms`);
+  assert.fail(`three runs in a row over the limits (mean under 1 ms, 99th percentile under 2 ms): ${last}`);
 });
 
 test('town life: orders are timed in game hours since the start, so a curfew on day 2 leaves day 1 alone', () => {
