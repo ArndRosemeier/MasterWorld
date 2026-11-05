@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import { planInterior, planTown, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk } from '../src/game/interiorWorld';
 import { Walker, type WalkWorld } from '../src/game/walker';
-import { shorter } from '../src/render/hero/build';
+import { allowOf } from '../src/render/hero/allow';
 import { classic } from '../src/setting/classic/index';
-import { raceScale } from '@actors/human';
 
 const houses = [3, 4].flatMap((seed) => planTown({ seed, x: 0, z: 0, radius: 130, height: () => 10 }).buildings).filter((_, i) => i % 3 === 0);
 
@@ -35,17 +34,13 @@ test('door: the tallest hero the setting allows is the 2.1 m the doors, stairs a
   assert.equal(MAX, 2.1);
 });
 
-test('door: a look taller than the limit (any people, the height slider at its top) is brought down to it', () => {
-  // Actors' height law: scale * (1.03 + 0.14 * gender + 1.08 * slider), the scale of the people at its biggest.
-  for (const race of classic.hero.races) for (const gender of [0, 1]) {
-    const scale = raceScale({ race, size: 1 } as never), body = { height: 1, gender };
-    let h = scale * (1.03 + 0.14 * gender + 1.08 * body.height);
-    for (let i = 0; i < 4 && shorter(body, h, MAX); i++) {
-      body.height = shorter(body, h, MAX)!.height;
-      h = scale * (1.03 + 0.14 * gender + 1.08 * body.height);
-    }
-    assert.ok(h <= MAX + 0.005, `${race} gender ${gender}: ${h.toFixed(3)} m`);
-    assert.ok(h > MAX - 0.1 || scale * (1.03 + 0.14 * gender + 1.08) <= MAX, `${race}: not shrunk past need (${h.toFixed(2)} m)`);
-  }
-  assert.equal(shorter({ height: 0.5, gender: 1 }, 1.8, MAX), null);
+test('door: Actors is told the tallest hero (it scales a taller look down as a whole), the 2.1 m of the doors', () => {
+  assert.deepEqual(allowOf(classic.hero).height, { max: MAX });
+});
+
+test('allow: Actors is told the four peoples and the setting\'s clothing, never robots or skeletons', () => {
+  const allow = allowOf(classic.hero);
+  assert.deepEqual(allow.races, ['human', 'dwarf', 'halfling', 'elf']);
+  assert.deepEqual(allow.clothing, classic.hero.themes);
+  assert.ok(!(allow.races as string[]).some((r) => r === 'robot' || r === 'skeleton' || r === 'goblin'));
 });

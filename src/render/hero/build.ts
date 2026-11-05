@@ -38,23 +38,3 @@ export function inBuild(roll: () => CharacterConfig, build: HeroBuildDef | undef
 
 const within = (v: number, [lo, hi]: readonly [number, number]) => v >= lo && v <= hi;
 const draw = ([lo, hi]: readonly [number, number], random: () => number) => lo + (hi - lo) * random();
-
-/** Actors' height slider gives `scale * (lerp(1.03, 1.17, gender) + 1.08 * slider)` metres (its random heroes invert this). */
-const SLIDER_SPAN = 1.08;
-const sliderBase = (gender: number) => 1.03 + 0.14 * gender;
-
-/** Whether a body of `height` is taller than the setting lets a hero stand. */
-export const tooTall = (height: number, max: number | undefined): boolean => max !== undefined && height > max + 0.005;
-
-/**
- * The body values that bring a hero `height` metres tall (config `body`) down to `max`, or null when it fits.
- * Estimated from Actors' height law (the people's scale follows from the measured height); call again with
- * the measured result until it fits.
- */
-export function shorter(body: { height: number; gender: number }, height: number, max: number | undefined): { height: number } | null {
-  if (max === undefined || !tooTall(height, max)) return null;
-  const base = sliderBase(body.gender), scale = height / (base + SLIDER_SPAN * body.height);
-  // A little under the limit, so rounding does not leave it over.
-  const slider = (max - 0.01) / scale / SLIDER_SPAN - base / SLIDER_SPAN;
-  return { height: Math.max(0, Math.min(body.height - 0.005, slider)) };
-}

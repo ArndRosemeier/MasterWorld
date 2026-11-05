@@ -30,6 +30,7 @@ import { woodsOf } from './world/flora';
 import { daylight } from './game/soundscape';
 import { Noticed, noticeable, type NoticeSpot } from './game/noticed';
 import { HeroView } from './render/hero/HeroView';
+import { allowOf } from './render/hero/allow';
 import { preparePeople } from './render/hero/play';
 import { GiantView } from './render/giant/GiantView';
 import { routePackImages } from './render/packImages';
@@ -731,7 +732,7 @@ export async function start(b: Boot): Promise<void> {
     if (startTown && params.folk > 0) {
       loading.set('Waking the town');
       // One pool of characters for every town's people, warmed in the start town's clothes (the one wardrobe).
-      folk = await FolkView.create(view.stage, view.renderer, startTown.residents, outdoors, params.folk);
+      folk = await FolkView.create(view.stage, view.renderer, startTown.residents, outdoors, params.folk, allowOf(setting.hero));
       folk.camera = view.camera;
     }
     loading.set('Growing the woods');

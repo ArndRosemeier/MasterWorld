@@ -5,7 +5,7 @@
  * (FarFolk). Characters far off draw their "Crowd" level (one draw call plus the hair).
  */
 import { Frustum, Group, Matrix4, Sphere, Vector3, type Camera, type DirectionalLight, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { Character, type CharacterCatalog } from '@actors/generator';
+import { Character, type AllowOptions, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '../../workers/human.worker?worker';
 import type { Stage } from '@futuremagic/stage';
@@ -190,7 +190,7 @@ export class FolkView {
    * Loads the pack and `count` characters behind the loading screen, the first dressed like a
    * townsman so its shaders (skin, cloth, hair, each detail level) are compiled by `warm`.
    */
-  static async create(stage: Stage, renderer: WebGPURenderer, dressedAs: readonly Person[], height: (x: number, z: number) => number, count: number): Promise<FolkView> {
+  static async create(stage: Stage, renderer: WebGPURenderer, dressedAs: readonly Person[], height: (x: number, z: number) => number, count: number, allow: AllowOptions): Promise<FolkView> {
     const worker = new HumanWorker();
     // Only what the town's pack has (tools/packs/actors.mjs).
     const catalog = (c: CharacterCatalog): CharacterCatalog => ({
@@ -200,8 +200,8 @@ export class FolkView {
       animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id) || GAIT_CLIPS.includes(a.id) || MOVE_CLIPS.includes(a.id)),
     });
     // The first loads the pack; the others share it (and the garments any of them loads).
-    const first = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, catalog });
-    const share = () => Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: first, catalog });
+    const first = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, worker, allow, catalog });
+    const share = () => Character.load({ pack: PACK, renderer, materials: nodeMaterials, shareWith: first, allow, catalog });
     const lead = first;
     const others: Character[] = [];
     for (let i = 1; i < count; i++) others.push(await share());
