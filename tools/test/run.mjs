@@ -5,7 +5,7 @@
  * file never changes what another one sees: a fixture it changes is its own (test/frontierLand.ts).
  *
  * The files are dealt out as the processes come to them, heaviest first by each file's time last measured (tools/test/times.json; `--save-times` writes it anew).
- * `npm test -- test/town.test.ts` runs the files given; TEST_PROCS=n sets how many processes. One test may take 5 s
+ * `npm test -- test/town.test.ts` runs the files given; `npm test -- --changed=origin/main` the files a change can break; TEST_PROCS=n sets how many processes. One test may take 5 s
  * (docs/CHECKS.md).
  */
 import { spawn } from 'node:child_process';
@@ -18,8 +18,19 @@ const PATTERNS = ['test/**/*.test.ts', 'tools/**/*.test.mjs'];
 const TIMES = 'tools/test/times.json';
 const argv = process.argv.slice(2);
 const save = argv.includes('--save-times');
-const flags = argv.filter((a) => a.startsWith('--') && a !== '--save-times');
-const given = argv.filter((a) => !a.startsWith('--'));
+// `--changed=<ref>`: only the files a change since <ref> can break (tools/test/affected.mjs; everything when it is unsure).
+const changed = argv.find((a) => a.startsWith('--changed='))?.slice('--changed='.length);
+const flags = argv.filter((a) => a.startsWith('--') && a !== '--save-times' && !a.startsWith('--changed='));
+let given = argv.filter((a) => !a.startsWith('--'));
+if (changed) {
+  const { affected, changedFiles } = await import('./affected.mjs');
+  const res = await affected(changedFiles(changed));
+  console.log(`--changed=${changed}: ${res.full ? `everything (${res.why})` : `${res.tests.length} test files (${res.why})`}`);
+  if (!res.full) {
+    if (!res.tests.length) { console.log('no test file reaches what changed'); process.exit(0); }
+    given = res.tests;
+  }
+}
 const files = [...new Set((given.length ? given : PATTERNS).flatMap((p) => globSync(p)))]
   .map((f) => f.split(path.sep).join('/')).filter((f) => !f.includes('node_modules/')).sort();
 
