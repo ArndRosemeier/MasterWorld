@@ -42,21 +42,23 @@ helpers out there, or make them methods of a class (the built game has no such c
 
 ## CI time
 
-CI (`.github/workflows/ci.yml`) runs three jobs side by side, so it takes as long as the slowest (about 1.5 min):
-tests and guards; the dungeon variety and the evening loop; the build and the texture-unit check (on the runner's
-own Chrome). Each step runs under `node tools/guards/budget.mjs <warn s> <fail s> -- <command>`: past its warning
+CI (`.github/workflows/ci.yml`) runs its jobs side by side, so it takes as long as the slowest: tests and guards
+(about 1 min); the build and the texture-unit check (on the runner's own Chrome, about 1 min); and one runner for
+each slow simulation (dungeon variety, the evening loop in three parts, the landform walks). The simulations used to
+run one after the other in one job and were the slowest part of every run (3.5-4 min, Nov 2026, with the evening loop alone 2 min); one runner each, the run takes
+as long as the evening loop (about 2 min). Each step runs under `node tools/guards/budget.mjs <warn s> <fail s> -- <command>`: past its warning
 the run's page shows a "Slow step" warning; past its budget the step fails. The fail budgets are the limits above
-(70 s for `npm test`, 5 min for a slow check); the warnings sit at about twice today's time, so creep shows long
+(70 s for `npm test`, 5 min for a slow check); the warnings sit at about 1.5 times today's time, so creep shows long
 before it fails. When a warning shows up, find the cause then, not when it fails.
 
-| Step | Time (Oct 2026) | Warn | Fail |
+| Step | Time on CI (Nov 2026) | Warn | Fail |
 |---|---|---|---|
-| `npm test` | ~46 s on CI's runner (4 cores, Nov 2026; was 68-72 s before the files were dealt out as processes finish) | 55 s | 70 s |
-| `npm run variety` | ~12 s | 30 s | 5 min |
-| `npm run loop` (its runs side by side, one process each) | ~30 s | 60 s | 5 min |
-| `npm run walk:landforms` (three worlds) | ~20 s | 30 s | 5 min |
-| `npm run build` | ~10 s | 30 s | 5 min |
-| `npm run check:units` | ~20 s | 60 s | 5 min |
+| `npm test` | 62-63 s on CI's 4 cores (46 s on 2026-11-04; 190 files, 880 tests, about 270 s of CPU) | 55 s | 70 s |
+| `npm run variety` | ~55 s | 90 s | 5 min |
+| `npm run loop:evening` / `loop:voyage` / `loop:fray` (its runs side by side, one process each) | ~2 min for all three; measure each after the split | 90 / 60 / 60 s | 5 min |
+| `npm run walk:landforms` (three worlds) | ~30 s | 60 s | 5 min |
+| `npm run build` | ~10-15 s | 30 s | 5 min |
+| `npm run check:units` | ~30 s | 60 s | 5 min |
 
 ## Duplication
 

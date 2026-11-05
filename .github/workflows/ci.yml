@@ -28,10 +28,21 @@ jobs:
       - name: Tests and guards
         run: node tools/guards/budget.mjs 55 70 -- npm test
 
+  # The slow simulations, one runner each, so the run takes as long as the slowest and not the sum (variety ~55 s, the
+  # evening loop ~2 min in three parts, the walks ~30 s on CI, Nov 2026: the three in a row took 3.5-4 min).
   sims:
-    name: Dungeon variety and the evening loop
+    name: "Sim: ${{ matrix.name }}"
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Dungeon variety, run: npm run variety, warn: 90 }
+          - { name: The evening loop (evenings), run: npm run loop:evening, warn: 90 }
+          - { name: The evening loop (voyage), run: npm run loop:voyage, warn: 60 }
+          - { name: The evening loop (fray), run: npm run loop:fray, warn: 60 }
+          - { name: A landform every minute of walking (gate L), run: npm run walk:landforms, warn: 60 }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,12 +52,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Dungeon variety
-        run: node tools/guards/budget.mjs 30 300 -- npm run variety
-      - name: The evening loop
-        run: node tools/guards/budget.mjs 60 300 -- npm run loop
-      - name: A landform every minute of walking (gate L)
-        run: node tools/guards/budget.mjs 30 300 -- npm run walk:landforms
+      - name: ${{ matrix.name }}
+        run: node tools/guards/budget.mjs ${{ matrix.warn }} 300 -- ${{ matrix.run }}
 
   build:
     name: Build and WebGL 2 texture units
