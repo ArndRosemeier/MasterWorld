@@ -4,10 +4,35 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A full run by hand (Actions, Run workflow).
+  workflow_dispatch:
 
-# Three jobs side by side; CI takes as long as the longest. Every step has a time budget (tools/guards/budget.mjs:
+# Jobs side by side; CI takes as long as the longest. Every step has a time budget (tools/guards/budget.mjs:
 # warn seconds, fail seconds), so a slow step shows as a warning on the run's page long before it fails (docs/CHECKS.md).
+# A pull request runs the tests and simulations its change can reach (tools/test/affected.mjs: what each test imports);
+# a push to main and a manual run run everything.
 jobs:
+  # Which simulations this change can break (the tests pick their own files: npm test -- --changed).
+  plan:
+    name: What the change reaches
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      sims: ${{ steps.plan.outputs.sims }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # On a pull request HEAD is the merge into main: its first parent is main.
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: plan
+        run: node tools/test/affected.mjs ${{ github.event_name == 'pull_request' && '--base HEAD^1' || '' }} --github-output >/dev/null
+
   test:
     name: Tests and guards
     runs-on: ubuntu-latest
@@ -26,23 +51,21 @@ jobs:
         run: node tools/guards/pins.mjs
       - run: npm ci
       - name: Tests and guards
-        run: node tools/guards/budget.mjs 55 70 -- npm test
+        run: node tools/guards/budget.mjs 55 70 -- npm test ${{ github.event_name == 'pull_request' && '-- --changed=HEAD^1' || '' }}
 
   # The slow simulations, one runner each, so the run takes as long as the slowest and not the sum (variety ~55 s, the
   # evening loop ~2 min in three parts, the walks ~30 s on CI, Nov 2026: the three in a row took 3.5-4 min).
+  # (Which ones, and their commands: SIM_JOBS in tools/test/affected.mjs; on a pull request only those the change reaches.)
   sims:
     name: "Sim: ${{ matrix.name }}"
+    needs: plan
+    if: needs.plan.outputs.sims != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { name: Dungeon variety, run: npm run variety, warn: 90 }
-          - { name: The evening loop (evenings), run: npm run loop:evening, warn: 90 }
-          - { name: The evening loop (voyage), run: npm run loop:voyage, warn: 60 }
-          - { name: The evening loop (fray), run: npm run loop:fray, warn: 60 }
-          - { name: A landform every minute of walking (gate L), run: npm run walk:landforms, warn: 60 }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,10 +101,11 @@ jobs:
 
   # The one status that says CI passed (the name the merge rule waits for).
   check:
-    needs: [test, sims, build]
+    needs: [plan, test, sims, build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: All jobs passed
-        run: test "${{ needs.test.result }}" = success && test "${{ needs.sims.result }}" = success && test "${{ needs.build.result }}" = success
+        # (The simulations are skipped when the change reaches none of them.)
+        run: test "${{ needs.plan.result }}" = success && test "${{ needs.test.result }}" = success && test "${{ needs.build.result }}" = success && { test "${{ needs.sims.result }}" = success || test "${{ needs.sims.result }}" = skipped; }

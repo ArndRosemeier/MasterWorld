@@ -40,6 +40,15 @@ The test loader (tsx) keeps function names, so every closure made in a function 
 all test time (and again in the rock field's `fieldAt` and the dungeon space's cells, 5 % of all of it). Write such
 helpers out there, or make them methods of a class (the built game has no such cost, but tests run the land a lot).
 
+## What a PR runs
+
+A pull request runs only what its change can reach (Arnd 2026-11-05: CI was at its limit and most PRs touch the renderer, not the world). `tools/test/affected.mjs` reads what every test file and every slow simulation imports (esbuild, the whole import closure) and picks those that reach a file the PR changed. On the 49 PRs before this rule, 31 touched nothing the simulations use and a PR ran about a quarter of the test time on average; a render-only change runs 5 files in about 10 s.
+
+- **Run everything, never guess:** a push to main and a manual run (Actions, Run workflow) run the whole of `npm test` and every simulation; so does a PR that changes a dependency in `package.json`, the lockfile, the submodule pin, `public/`, the CI files, the test runner or the tsconfig, or any file the script cannot place. Main is the safety net: a pick that misses something shows up there, so when it does, fix the pick (`affected.mjs`), not the test.
+- **Tests that read files** (a source scan, a data pack) depend on what they read, found in their text (a path built with `${}` counts as the whole folder). A new test of that kind needs nothing; one that reaches files another way (a spawned script, a path from a variable) must be listed in `TOOL_DEPS` in `affected.mjs`.
+- **Run it yourself:** `npm test -- --changed=origin/main` runs what your branch can break; `node tools/test/affected.mjs --base origin/main` prints the tests and the simulations. Before a push that touches shared world code, `npm test` (everything) is still the check.
+- **CI:** the `plan` job names the simulations to run (`SIM_JOBS` in `affected.mjs` is their list: name, command, warning); the `test` job passes `--changed=HEAD^1` on a pull request (HEAD is the merge into main, its first parent is main). The `build` job (typecheck, bundle, texture units) runs on every PR.
+
 ## CI time
 
 CI (`.github/workflows/ci.yml`) runs its jobs side by side, so it takes as long as the slowest: tests and guards
