@@ -63,7 +63,7 @@ export function heroNameFor(names: NamesDef, female: boolean, n: number): string
 const TURN = 1.4;
 
 /** The creator's tabs: Actors' editor sections, then the hero's past. */
-const TABS = [['race', 'People'], ['body', 'Body'], ['look', 'Face & hair'], ['outfit', 'Clothes'], ['past', 'Past']] as const;
+const TABS = [['race', 'People'], ['body', 'Body'], ['face', 'Face & hair'], ['outfit', 'Clothes'], ['past', 'Past']] as const;
 /** The tabs that are Actors' editor sections. */
 const SECTIONS = TABS.map(([id]) => id).filter((id) => id !== 'past');
 

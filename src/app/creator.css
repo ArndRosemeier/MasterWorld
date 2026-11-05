@@ -51,7 +51,7 @@
 .creator .actors-editor > header { display: none; }
 .creator .actors-editor section { display: none; }
 .creator .cr-pane[data-tab="race"] section[data-section="race"], .creator .cr-pane[data-tab="body"] section[data-section="body"],
-.creator .cr-pane[data-tab="look"] section[data-section="look"], .creator .cr-pane[data-tab="outfit"] section[data-section="outfit"] { display: block; animation: cr-rise .35s ease-out both; }
+.creator .cr-pane[data-tab="face"] section[data-section="face"], .creator .cr-pane[data-tab="outfit"] section[data-section="outfit"] { display: block; animation: cr-rise .35s ease-out both; }
 .creator .actors-editor h2 { font: 13px/1 'Marcellus SC', Georgia, serif; letter-spacing: .14em; color: var(--brass); }
 .creator .actors-editor .ae-row { grid-template-columns: 116px 1fr 36px; }
 .creator .actors-editor select, .creator .actors-editor button, .creator .actors-editor input[type="search"] { background: #120d09; color: var(--ink); border: 1px solid var(--brass-lo); border-radius: 5px; font: inherit; }
@@ -59,7 +59,7 @@
 .creator .actors-editor input[type="range"] { accent-color: var(--brass); }
 .creator .actors-editor input[type="checkbox"] { accent-color: var(--brass); }
 .creator .actors-editor details { border-top-color: #4a3510; }
-.creator .actors-editor .ae-modes button[aria-pressed="true"] { background: linear-gradient(#e2bd68, #b08532); border-color: var(--brass-lo); color: #1e140a; }
+.creator .actors-editor .ae-tabs button[aria-selected="true"] { background: linear-gradient(#e2bd68, #b08532); border-color: var(--brass-lo); color: #1e140a; }
 .creator .actors-editor .ae-swatch.ae-on { outline-color: var(--ward); }
 .creator .actors-editor .ae-note, .creator .actors-editor .ae-credit { color: #9c8a6c; }
 
