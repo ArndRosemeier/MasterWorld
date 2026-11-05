@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { planInterior, planTown, type TownBuilding } from '@futuremagic/settlement';
 import { houseWalk } from '../src/game/interiorWorld';
 import { Walker, type WalkWorld } from '../src/game/walker';
-import { shorter } from '../src/render/hero/build';
+import { heightFit } from '@actors/generator';
+import { allowOf } from '../src/render/hero/allow';
 import { classic } from '../src/setting/classic/index';
 import { raceScale } from '@actors/human';
 
@@ -35,17 +36,20 @@ test('door: the tallest hero the setting allows is the 2.1 m the doors, stairs a
   assert.equal(MAX, 2.1);
 });
 
-test('door: a look taller than the limit (any people, the height slider at its top) is brought down to it', () => {
+test('door: a look taller than the limit (any people, the height slider at its top) is scaled down to it by Actors', () => {
   // Actors' height law: scale * (1.03 + 0.14 * gender + 1.08 * slider), the scale of the people at its biggest.
+  const range = allowOf(classic.hero).height;
+  assert.deepEqual(range, { max: MAX });
   for (const race of classic.hero.races) for (const gender of [0, 1]) {
-    const scale = raceScale({ race, size: 1 } as never), body = { height: 1, gender };
-    let h = scale * (1.03 + 0.14 * gender + 1.08 * body.height);
-    for (let i = 0; i < 4 && shorter(body, h, MAX); i++) {
-      body.height = shorter(body, h, MAX)!.height;
-      h = scale * (1.03 + 0.14 * gender + 1.08 * body.height);
-    }
-    assert.ok(h <= MAX + 0.005, `${race} gender ${gender}: ${h.toFixed(3)} m`);
-    assert.ok(h > MAX - 0.1 || scale * (1.03 + 0.14 * gender + 1.08) <= MAX, `${race}: not shrunk past need (${h.toFixed(2)} m)`);
+    const h = raceScale({ race, size: 1 } as never) * (1.03 + 0.14 * gender + 1.08);
+    assert.ok(h * heightFit(h, range) <= MAX + 1e-9, `${race} gender ${gender}: ${h.toFixed(3)} m`);
   }
-  assert.equal(shorter({ height: 0.5, gender: 1 }, 1.8, MAX), null);
+  assert.equal(heightFit(1.8, range), 1);
+});
+
+test('allow: Actors is told the four peoples and the setting\'s clothing, never robots or skeletons', () => {
+  const allow = allowOf(classic.hero);
+  assert.deepEqual(allow.races, ['human', 'dwarf', 'halfling', 'elf']);
+  assert.deepEqual(allow.clothing, classic.hero.themes);
+  assert.ok(!(allow.races as string[]).some((r) => r === 'robot' || r === 'skeleton' || r === 'goblin'));
 });
