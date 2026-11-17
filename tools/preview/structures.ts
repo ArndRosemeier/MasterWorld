@@ -62,7 +62,7 @@ function build(seed: number): { land: Land; built: Built } {
     land, built: {
       mesh, label: `${seed}: ${plan.picks.builder.id}, ${s.layout}, ${s.halls} halls, ${s.towers} towers, ${s.terraces} terraces, ${plan.picks.state} (${land.kind})`,
       centre: new T.Vector3(plan.cx, (plan.low + plan.high) / 2, plan.cz), radius: plan.radius,
-      eye: new T.Vector3(plan.gate[0], plan.gate[2] + 1.7, plan.gate[1] - 8), look: new T.Vector3(plan.cx, plan.gate[2] + 4, plan.cz), hero: new T.Vector3(plan.gate[0] + 1, land.ground(plan.gate[0] + 1, plan.gate[1] - 3), plan.gate[1] - 3),
+      eye: new T.Vector3(plan.gate[0], Math.max(plan.gate[2], land.ground(plan.gate[0], plan.gate[1] - 11)) + 1.7, plan.gate[1] - 11), look: new T.Vector3(plan.cx, plan.gate[2] + 4, plan.cz), hero: new T.Vector3(plan.gate[0] + 1, land.ground(plan.gate[0] + 1, plan.gate[1] - 6), plan.gate[1] - 6),
     },
   };
 }

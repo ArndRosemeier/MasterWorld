@@ -5,7 +5,7 @@
  * fallen stones. Everything goes into the building mesh format (world/dungeon/meshKit.ts) and draws with the town's
  * one building shader, no new shader. A wall's foot goes FOOT into the ground under it or stands on a given height.
  */
-import { smoothstep, type Ground, type Rng } from '@futuremagic/core';
+import { Noise, smoothstep, type Ground, type Rng } from '@futuremagic/core';
 import type { StructureArch } from '../../setting/contract';
 import { MeshKit, mixTint, type Tint } from '../dungeon/meshKit';
 
@@ -20,6 +20,10 @@ const DAMP_FULL = 0.7, DAMP_UP = 2.8;
 /** The depth of an arch's ring of dressed stone over its opening, m. */
 const RING = 0.55;
 const DAMP: Tint = [70, 74, 58], MOSSY: Tint = [98, 116, 62];
+/** Age's colours: grime over the whole face, rain streaks run down from a broken top, lichen in pale patches, soot. */
+const GRIME: Tint = [84, 80, 70], STREAK: Tint = [62, 60, 56], LICHEN: Tint = [168, 166, 120], SOOT: Tint = [44, 42, 40];
+/** Where lichen grows and soot clings: patches by place, the same for every structure (pure, no state). */
+const PATCHES = new Noise(0x11c4e7);
 
 /** What every part is built with: the mesh, the seed's dice, the land, how green it has grown (0..1). */
 export interface Site {
@@ -27,7 +31,12 @@ export interface Site {
   readonly rng: Rng;
   readonly ground: Ground;
   readonly moss: number;
+  /** How old and neglected it is, 0 (kept, the stone clean) .. 1 (a ruin: grimed, streaked, lichened, scorched). */
+  readonly wear?: number;
 }
+
+/** A column's own weathering: where it stands, how dark its rain streak and how far down it runs, how scorched. */
+export interface Weather { readonly x: number; readonly z: number; readonly streak: number; readonly run: number; readonly soot: number }
 
 /** An opening through a wall: s0..s1 along it (m), from y0 up to the spring line y1, its head an arch of that shape. */
 export interface Opening {
@@ -71,7 +80,7 @@ export interface WallSpec {
 type Edge = readonly [number, number];
 /** A solid piece of a column: its lower and upper edge (at the column's two ends), and what those edges are. */
 interface Piece { lo: Edge; hi: Edge; soffit: boolean; sill: boolean; ring?: boolean }
-interface Column { s0: number; s1: number; pieces: Piece[]; tint: Tint; mat: number; ringTint: Tint; ringMat: number; ground: number; top: number }
+interface Column { s0: number; s1: number; pieces: Piece[]; tint: Tint; mat: number; ringTint: Tint; ringMat: number; ground: number; top: number; weather?: Weather }
 
 const lerp2 = (a: P2, b: P2, t: number): P2 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
@@ -108,10 +117,24 @@ export function faceTo(k: MeshKit, q: number[][], uv: number[][], mat: number, t
   k.quad(a, d, c, b, [uv[0], uv[3], uv[2], uv[1]], mat, t ?? [ts[0], ts[3], ts[2], ts[1]]);
 }
 
+/** A tint under the grime of `wear` (0 clean .. 1 a ruin's): for the faces `aged` does not reach, floors and decks. */
+export const grimed = (tint: Tint, wear: number): Tint => (wear > 0 ? mixTint(tint, GRIME, 0.15 + wear * 0.4) : tint);
+
 /** A tint weathered at height y: damp at the foot (`gy` the ground there), green near the top as the site has grown over. */
-export function aged(site: Site, tint: Tint, y: number, gy: number, top: number): Tint {
-  const damp = 1 - smoothstep(DAMP_FULL, DAMP_UP, y - gy), green = site.moss * smoothstep(top - 1.4, top, y);
-  return mixTint(mixTint(tint, MOSSY, green * 0.75), DAMP, damp * 0.75);
+export function aged(site: Site, tint: Tint, y: number, gy: number, top: number, at?: Weather): Tint {
+  const w = site.wear ?? 0, damp = 1 - smoothstep(DAMP_FULL, DAMP_UP, y - gy), green = site.moss * smoothstep(top - 1.4, top, y);
+  let t = grimed(tint, w);
+  if (w > 0 && at) {
+    // A rain streak, darkest under the top and fading down its run; lichen and soot in patches by place.
+    t = mixTint(t, STREAK, at.streak * smoothstep(top - at.run, top - 0.15, y) * 0.9);
+    // Broad stains by place, so no stretch of wall is one clean colour.
+    t = mixTint(t, STREAK, smoothstep(-0.1, 0.55, PATCHES.n3(at.x / 5 - 17, y / 3.5, at.z / 5)) * w * 0.55);
+    const lichen = smoothstep(0.05, 0.5, PATCHES.n3(at.x / 2.6, y / 2.2, at.z / 2.6)) * w;
+    t = mixTint(t, LICHEN, lichen * 0.6);
+    t = mixTint(t, SOOT, at.soot * smoothstep(-0.2, 0.5, PATCHES.n3(at.x / 4 + 40, y / 3, at.z / 4)) * 0.7);
+  }
+  // A ruin is green at its damp foot too.
+  return mixTint(mixTint(t, MOSSY, Math.min(1, green + w * site.moss * damp * 0.8) * 0.75), DAMP, damp * 0.75);
 }
 
 /** Subtract [a, b] from a sorted list of ranges. */
@@ -148,6 +171,13 @@ export function wall(site: Site, w: WallSpec): void {
   const along = [(w.b[0] - w.a[0]) / len, 0, (w.b[1] - w.a[1]) / len];
   const O = (s: number) => lerp2(w.a, w.b, s / len), I = (s: number) => lerp2(w.ia, w.ib, s / len);
   const cols: Column[] = [];
+  // Age: a scorched wall now and then on a ruin; each column its own streak and run.
+  const wear = site.wear ?? 0, soot = wear > 0.6 && rng.chance(0.3) ? rng.range(0.5, 1) : 0;
+  const weatherAt = (s: number): Weather | undefined => {
+    if (wear <= 0) return undefined;
+    const p = O(s);
+    return { x: p[0], z: p[1], streak: (0.25 + 0.75 * rng.float() ** 1.5) * wear, run: rng.range(1.5, 6.5), soot };
+  };
   for (let i = 0; i + 1 < ss.length; i++) {
     const s0 = ss[i], s1 = ss[i + 1];
     if (s1 - s0 < 0.002) continue;
@@ -156,6 +186,7 @@ export function wall(site: Site, w: WallSpec): void {
     const b0 = typeof w.base === 'function' ? w.base(s0) : w.base ?? g - FOOT, b1 = typeof w.base === 'function' ? w.base(s1) : b0;
     const t0 = w.stepped ? w.top(mid) : w.top(s0), t1 = w.stepped ? t0 : w.top(s1);
     if (t0 <= b0 + 0.01 && t1 <= b1 + 0.01) { cols.push({ s0, s1, pieces: [], tint: w.tint, mat: w.mat, ringTint: w.tint, ringMat: w.mat, ground: g, top: t0 }); continue; }
+    const weather = weatherAt(mid);
     let pieces: Piece[] = [{ lo: [b0, b1], hi: [Math.max(t0, b0), Math.max(t1, b1)], soffit: false, sill: false }];
     for (const o of ops) {
       if (o.s0 > mid || o.s1 < mid) continue;
@@ -176,20 +207,21 @@ export function wall(site: Site, w: WallSpec): void {
       const r0 = p.lo[0] + RING, r1 = p.lo[1] + RING;
       return [{ ...p, hi: [r0, r1], sill: false, ring: true }, { ...p, lo: [r0, r1], soffit: false }];
     });
-    const v = w.vary ?? 0.05, f = 1 + rng.range(-v, v);
+    // (Stone of an old wall differs more from column to column: some replaced, some stained.)
+    const v = wear > 0 ? Math.max(w.vary ?? 0.05, 0.06 + wear * 0.14) : w.vary ?? 0.05, f = 1 + rng.range(-v, v);
     const vary = (t: Tint) => t.map((c) => Math.max(0, Math.min(255, Math.round(c * f)))) as unknown as Tint;
     const tint = vary(nearEdge ? w.trimTint! : w.tint);
-    cols.push({ s0, s1, pieces, tint, mat: nearEdge ? w.trimMat! : w.mat, ringTint: trimmed ? vary(w.trimTint!) : tint, ringMat: w.trimMat ?? w.mat, ground: g, top: Math.max(t0, t1) });
+    cols.push({ s0, s1, pieces, tint, mat: nearEdge ? w.trimMat! : w.mat, ringTint: trimmed ? vary(w.trimTint!) : tint, ringMat: w.trimMat ?? w.mat, ground: g, top: Math.max(t0, t1), weather });
   }
   const P3 = (p: P2, y: number) => [p[0], y, p[1]];
   for (const c of cols) {
     const o0 = O(c.s0), o1 = O(c.s1), i0 = I(c.s0), i1 = I(c.s1);
     for (const p of c.pieces) {
       const pt = p.ring ? c.ringTint : c.tint, pm = p.ring ? c.ringMat : c.mat;
-      const tintAt = (y: number) => aged(site, pt, y, c.ground, c.top);
+      const tintAt = (y: number) => aged(site, pt, y, c.ground, c.top, c.weather);
       // The faces, cut where the weathering turns when the piece is level (its texture runs on through the cuts).
       const level = Math.abs(p.lo[0] - p.lo[1]) < 1e-3 && Math.abs(p.hi[0] - p.hi[1]) < 1e-3;
-      const ys = level ? [p.lo[0], c.ground + DAMP_FULL, c.ground + DAMP_UP, c.top - 1.4, p.hi[0]].filter((y) => y >= p.lo[0] && y <= p.hi[0]).sort((a, b) => a - b) : null;
+      const ys = level ? [p.lo[0], c.ground + DAMP_FULL, c.ground + DAMP_UP, c.top - 1.4, ...(c.weather ? [c.top - c.weather.run, (c.ground + c.top) / 2] : []), p.hi[0]].filter((y) => y >= p.lo[0] && y <= p.hi[0]).sort((a, b) => a - b) : null;
       const bands: [Edge, Edge][] = ys ? ys.slice(1).map((y, i) => [[ys[i], ys[i]], [y, y]] as [Edge, Edge]) : [[p.lo, p.hi]];
       for (const [lo, hi] of bands) {
         if (hi[0] - lo[0] < 0.002 && hi[1] - lo[1] < 0.002) continue;
@@ -206,11 +238,11 @@ export function wall(site: Site, w: WallSpec): void {
   }
   // End faces: what a column has at its end that the next one has not.
   const at = (c: Column, end: 0 | 1): [number, number][] => c.pieces.map((p) => [p.lo[end], p.hi[end]] as [number, number]).sort((a, b) => a[0] - b[0]);
-  const cap = (s: number, ranges: [number, number][], want: number[], tint: Tint, mat: number, g: number, top: number) => {
+  const cap = (s: number, ranges: [number, number][], want: number[], tint: Tint, mat: number, g: number, top: number, at?: Weather) => {
     const o = O(s), i = I(s), across = Math.hypot(o[0] - i[0], o[1] - i[1]);
     for (const [y0, y1] of ranges) {
       if (y1 - y0 < 0.002) continue;
-      const t = (y: number) => aged(site, tint, y, g, top);
+      const t = (y: number) => aged(site, tint, y, g, top, at);
       faceTo(k, [P3(o, y0), P3(o, y1), P3(i, y1), P3(i, y0)], [[0, y0], [0, y1], [across, y1], [across, y0]], mat, [t(y0), t(y1), t(y1), t(y0)], want);
     }
   };
@@ -222,8 +254,8 @@ export function wall(site: Site, w: WallSpec): void {
     else left = left.flatMap(([a, b]) => (b > (w.capA ?? -Infinity) ? [[Math.max(a, w.capA ?? -Infinity), b] as [number, number]] : []));
     if (next) for (const [a, b] of at(next, 0)) right = minus(right, a, b);
     else right = right.flatMap(([a, b]) => (b > (w.capB ?? -Infinity) ? [[Math.max(a, w.capB ?? -Infinity), b] as [number, number]] : []));
-    cap(c.s0, left, back, c.tint, c.mat, c.ground, c.top);
-    cap(c.s1, right, along, c.tint, c.mat, c.ground, c.top);
+    cap(c.s0, left, back, c.tint, c.mat, c.ground, c.top, c.weather);
+    cap(c.s1, right, along, c.tint, c.mat, c.ground, c.top, c.weather);
   }
 }
 
@@ -281,13 +313,14 @@ export function floorOf(k: MeshKit, pts: readonly P2[], y: number, mat: number, 
 export function prism(site: Site, pts: readonly P2[], base: number | null, top: number, mat: number, tint: Tint, o: { open?: readonly number[]; apex?: number; topMat?: number; topTint?: Tint } = {}): void {
   const { k, ground } = site, n = pts.length, c = centroid(pts);
   const g = Math.min(...pts.map((p) => ground(p[0], p[1])));
+  const weather: Weather | undefined = (site.wear ?? 0) > 0 ? { x: c[0], z: c[1], streak: site.rng.float() * (site.wear ?? 0), run: site.rng.range(1, 3), soot: 0 } : undefined;
   let u = 0;
   for (let i = 0; i < n; i++) {
     const p = pts[i], q = pts[(i + 1) % n], l = Math.hypot(q[0] - p[0], q[1] - p[1]);
     if (!o.open?.includes(i)) {
       const b0 = base ?? ground(p[0], p[1]) - FOOT, b1 = base ?? ground(q[0], q[1]) - FOOT;
       const want = [(p[0] + q[0]) / 2 - c[0], 0, (p[1] + q[1]) / 2 - c[1]];
-      const t = (y: number) => aged(site, tint, y, g, top);
+      const t = (y: number) => aged(site, tint, y, g, top, weather);
       faceTo(k, [[p[0], b0, p[1]], [p[0], top, p[1]], [q[0], top, q[1]], [q[0], b1, q[1]]], [[u, b0], [u, top], [u + l, top], [u + l, b1]], mat, [t(b0), t(top), t(top), t(b1)], want);
     }
     u += l;
