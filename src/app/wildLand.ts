@@ -55,6 +55,8 @@ export interface WildHost {
 const BUILD = 420;
 /** A camp is built this near (m): there are many of them (D69, Z5), and its landmark shows from far before its foes do. */
 const CAMP_BUILD = 320;
+/** Past this a camp's bodies are taken off the stage and freed (what happened there is kept): the land holds dozens of camps a zone. */
+const CAMP_DROP = 900;
 
 interface Group {
   readonly territory: Territory;
@@ -69,6 +71,8 @@ interface Group {
   /** Once its bodies are warm. */
   encounter: Encounter | null;
   delve: Delve | null;
+  /** Its bodies as drawn (a camp's are freed once the hero is far off). */
+  view?: CreatureView;
 }
 
 export class WildLand {
@@ -82,6 +86,8 @@ export class WildLand {
   private clock: number;
   private readonly campState = new Map<string, CampSave>();
   private looked = 0;
+  /** What happened at camps taken off the stage since loading (who fell, what was searched), by territory id. */
+  private readonly kept = new Map<string, DelveSave>();
 
   /** `wild`: the town's wild groups (vgm/wild.ts, from the log); `bands`: the open story events' bands (vgm/events.ts openBands). */
   constructor(private readonly host: WildHost, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, wild: readonly Territory[] = [], bands: readonly Territory[] = [], camps?: CampsSave) {
@@ -165,8 +171,21 @@ export class WildLand {
       const d = this.away(g, x, z);
       if (!g.built && d < (g.camp ? CAMP_BUILD : BUILD)) g.built = this.raise(g);
       g.awake = awake(g.awake, d);
+      if (g.camp && g.encounter && !g.awake && d > CAMP_DROP) this.drop(g);
       if (g.delve) g.delve.fight.light = light;
     }
+  }
+
+  /** A camp far behind: what happened there is kept, its encounter retired and its bodies freed; it is raised again as the hero comes back. */
+  private drop(g: Group): void {
+    this.kept.set(g.territory.id, g.delve!.tally());
+    g.encounter!.retired = true;
+    g.view?.dispose();
+    g.encounter = null;
+    g.delve = null;
+    g.view = undefined;
+    g.ground = undefined;
+    g.built = null;
   }
 
   /** How far the hero at (x, z) is from a group's territory edge, less how much farther than the usual it is built and awake (a giant's, sim/wild.ts extraOf). */
@@ -198,7 +217,7 @@ export class WildLand {
 
   /** What each group's meetings changed, by territory id (groups not built since loading keep the save's). */
   diffs(): Record<string, DelveSave> {
-    const out: Record<string, DelveSave> = { ...this.saved };
+    const out: Record<string, DelveSave> = { ...this.saved, ...Object.fromEntries(this.kept) };
     for (const g of this.groups) if (g.delve) out[g.territory.id] = g.delve.tally();
     return out;
   }
@@ -220,7 +239,7 @@ export class WildLand {
   }
 
   private async raise(g: Group): Promise<void> {
-    const h = this.host, t = g.territory, saved = this.saved[t.id];
+    const h = this.host, t = g.territory, saved = this.kept.get(t.id) ?? this.saved[t.id];
     // Out at sea (S9) its swimmers come to the depth of a hero who swims.
     const w = h.player.walker, prey = () => (w.mode === 'swim' && !h.player.offFoot ? w.pos.y : null);
     const posts = t.posts, bed = bedOf(t.members, h.setting.creatures);
@@ -261,5 +280,6 @@ export class WildLand {
     e.onCue = (c) => h.cue(c);
     g.delve = delve;
     g.encounter = e;
+    g.view = creatures;
   }
 }
