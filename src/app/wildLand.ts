@@ -14,10 +14,10 @@ import type { Character } from '../game/character';
 import type { Standing } from '../game/standing';
 import { Delve, type DelveSave } from '../game/delve';
 import { CreatureView } from '../render/dungeon/CreatureView';
-import type { SettingModule } from '../setting/contract';
+import { campDefOf, type SettingModule } from '../setting/contract';
 import { Den } from '../sim/creatures';
 import { OpenGround, awake, bedOf, dangerOfAll, extraOf, groupDanger, type Land, type Territory } from '../sim/wild';
-import { POST_GATHER, POST_R, RETURN_SEEN, campTerritory, died, postDef, returned, returnsDue, type CampSave, type CampsSave } from '../sim/camps';
+import { POST_GATHER, POST_R, RETURN_SEEN, campTerritory, died, freePost, postDef, returned, returnsDue, type CampSave, type CampsSave } from '../sim/camps';
 import type { CampDecision } from '../world/decisions';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
@@ -113,7 +113,7 @@ export class WildLand {
    */
   addCamp(d: CampDecision): void {
     if (this.groups.some((g) => g.territory.id === d.id)) return;
-    const h = this.host, rules = h.setting.camps, def = rules?.camps.find((c) => c.id === d.camp);
+    const h = this.host, rules = h.setting.camps, def = campDefOf(rules, d.camp);
     if (!rules || !def) return;
     const territory = campTerritory(d, def, rules, h.setting.creatures, h.setting.growth, this.campState.get(d.id));
     this.territories.push(territory);
@@ -139,7 +139,7 @@ export class WildLand {
     for (const g of this.groups) {
       const d = g.camp, den = g.delve?.den, ground = g.ground;
       if (!d || !den || !ground) continue;
-      const def = rules.camps.find((c) => c.id === d.camp)!;
+      const def = campDefOf(rules, d.camp)!;
       let s = this.campState.get(d.id) ?? { dead: {}, rounds: {} };
       for (const c of den.creatures) if (c.state === 'dead' && !(c.id in s.dead)) s = died(s, c.id, this.clock);
       const seen = (x: number, z: number): boolean => Math.hypot(x - q.x, z - q.z) <= RETURN_SEEN && ground.sees(q.x, q.y, q.z, x, ground.floorAt(x, z), z, 1.6);
@@ -244,10 +244,10 @@ export class WildLand {
     const w = h.player.walker, prey = () => (w.mode === 'swim' && !h.player.offFoot ? w.pos.y : null);
     const posts = t.posts, bed = bedOf(t.members, h.setting.creatures);
     // A camp's bodies each keep to their post (a patrol to its round); a wild group roams its territory together.
-    const ground = posts ? new OpenGround(this.land, posts.map((p) => ({ x: p.x, z: p.z, r: POST_R })), prey, bed, POST_GATHER, posts.map((p) => p.round)) : new OpenGround(this.land, [t], prey, bed);
+    const ground = posts ? new OpenGround(this.land, posts.map((p) => ({ ...freePost(p.x, p.z, (x, z, r) => !!this.land.blocked?.(x, z, r)), r: POST_R })), prey, bed, POST_GATHER, posts.map((p) => p.round)) : new OpenGround(this.land, [t], prey, bed);
     g.ground = ground;
     // A camp's dead whose time came while nobody was near are back at their posts (unseen: the hero was far off).
-    const camp = g.camp, rules = h.setting.camps, cdef = camp && rules?.camps.find((c) => c.id === camp.camp);
+    const camp = g.camp, rules = h.setting.camps, cdef = camp && campDefOf(rules, camp.camp);
     let dead = saved?.dead ?? [];
     if (camp && rules && cdef) {
       let s = this.campState.get(camp.id) ?? { dead: {}, rounds: {} };

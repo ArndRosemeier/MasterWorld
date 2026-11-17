@@ -38,6 +38,9 @@ export interface Block {
   readonly doors: readonly number[];
   readonly broken: number;
 }
+/** Half the width of a gatehouse's passage through it, metres. */
+export const GATEHOUSE_HALF = 1.8;
+
 export interface RTower { readonly pts: readonly P2[]; readonly top: number; readonly roof: TowerTop; readonly broken: number; readonly fallSide: number; readonly great: boolean; readonly ways?: readonly number[] }
 export interface Curtain { readonly a: P2; readonly b: P2; readonly height: number; readonly thick: number; readonly breaches: readonly [number, number][]; readonly gate: number | null }
 export interface Arcade { readonly a: P2; readonly b: P2; readonly height: number }
@@ -67,9 +70,10 @@ export interface GreatRuinPlan {
 const boxPts = (b: Box): P2[] => [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
 const overlaps = (a: Box, b: Box, m = 0) => a[0] < b[2] + m && b[0] < a[2] + m && a[1] < b[3] + m && b[1] < a[3] + m;
 
-export function planGreatRuin(defs: StructuresDef, seed: number, ground: Ground): GreatRuinPlan {
+/** `holder`: who holds it (a camp's own, D69), else the kind's usual ones. */
+export function planGreatRuin(defs: StructuresDef, seed: number, ground: Ground, holder?: string): GreatRuinPlan {
   const rng = new Rng(deriveSeed(seed, 'ruin'));
-  const picks = pickStructure(defs, 'great-ruin', rng), b = picks.builder, fall = fallen(picks.state);
+  const picks = pickStructure(defs, 'great-ruin', rng, holder), b = picks.builder, fall = fallen(picks.state);
   const slope = Math.abs(ground(0, 40) - ground(0, -40)) / 80;
   const layout = rng.weighted<RuinLayout>(['axial', 'cloister', 'terraced', 'citadel', 'scattered'], (l) => ({ axial: 2, cloister: 2, terraced: slope > 0.08 ? 4 : 1, citadel: 2, scattered: 1 })[l]);
   const S = rng.range(62, 96), t = b.thick;
@@ -218,8 +222,11 @@ export function planGreatRuin(defs: StructuresDef, seed: number, ground: Ground)
     return terraces[0].level;
   };
   const front = Math.min(...terraces[0].pts.map((p) => p[1]));
-  const gy = ground(gate[0], front - 2), fl = levelAt(gate[0], gate[1] + 1);
-  if (fl - gy > 0.5 && layout !== 'citadel') { const run = (fl - gy) / 0.3 * 0.4; stairs.push({ a: [gate[0], front - run], b: [gate[0], front], y0: gy, y1: fl, half: 2.5, onGround: true }); }
+  const fl = levelAt(gate[0], gate[1] + 1);
+  // The gate stair's foot stands on the land where it ends (down a slope that is further out than 2 m before the front).
+  let run = 0, gy = ground(gate[0], front - 2);
+  for (let i = 0; i < 4 && fl - gy > 0.5; i++) { run = Math.min(40, ((fl - gy) / 0.3) * 0.4); gy = ground(gate[0], front - run); }
+  if (fl - gy > 0.5 && layout !== 'citadel') stairs.push({ a: [gate[0], front - run], b: [gate[0], front], y0: gy, y1: fl, half: 2.5, onGround: true });
   const adds = [...picks.holder.always, ...rng.sample(picks.holder.adds, rng.int(2, 3))];
   let low = Infinity;
   for (let x = bx0; x <= bx1; x += 4) for (let z = bz0; z <= bz1; z += 4) low = Math.min(low, ground(x, z));
@@ -288,7 +295,7 @@ export function greatRuinMesh(p: GreatRuinPlan, ground: Ground): PlacedMesh {
     const [lo, hi] = span(t.pts);
     tower(site, style, {
       pts: t.pts, base: null, floor: lo === hi ? hi : hi + 0.02, top: hi + t.top, roof: t.roof, thick: (t.great ? 1.6 : 1.2) * style.builder.thick, broken: t.broken, fallSide: t.fallSide, slits: style.builder.id === 'dwarves' || !t.great, merlon: style.builder.merlon,
-      ways: t.ways ? { sides: t.ways, half: 1.8, spring: hi + 4.6 - archRise(arch, 3.6), arch, sill: lo === hi ? hi - 1 : hi } : undefined, noFloor: lo === hi,
+      ways: t.ways ? { sides: t.ways, half: GATEHOUSE_HALF, spring: hi + 4.6 - archRise(arch, 3.6), arch, sill: lo === hi ? hi - 1 : hi } : undefined, noFloor: lo === hi,
     });
     if (t.broken > 0.15) { const c = t.pts[t.fallSide]; rubble(site, c[0] + rng.range(-2, 2), c[1] + rng.range(-2, 2), 5 + t.broken * 6, 10 + Math.round(t.broken * 16), style.wall, style.tint, 1.3); }
   }

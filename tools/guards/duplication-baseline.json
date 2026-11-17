@@ -1022,5 +1022,9 @@
   {
     "key": "same name: masterworld/world/dungeon/cellar.ts#settle + masterworld/world/terrain.ts#settle",
     "reason": "Only the name matches: Terrain.settle lays the decision log's towns and sites on the land; the cellar's settle puts dwellers in rooms."
+  },
+  {
+    "key": "same name: masterworld/main.ts#height + masterworld/world/terrain.ts#height",
+    "reason": "Only the name matches: main.ts hands the hero's walker a height() (the cellar's floor, else the drawn land); Terrain.height is the land itself as holds and camps' ruins shape it."
   }
 ]

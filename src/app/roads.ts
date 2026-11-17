@@ -94,6 +94,14 @@ export class RoadWork {
     const touches = (x0: number, z0: number, x1: number, z1: number) => Math.hypot(Math.max(x0 - c.x, 0, c.x - x1), Math.max(z0 - c.z, 0, c.z - z1)) < reach;
     this.views?.flora.refresh(touches);
     this.views?.trunks.forgetOver(touches);
+    // A camp's great ruin raises its terraces out of the land: the ground and what lies on it are built anew there.
+    if (d.kind === 'camp' && this.terrain.ruinOf(d.id)) {
+      this.views?.ground.refresh(touches);
+      this.views?.rocks.forgetOver(touches);
+      this.views?.rockView.refresh(touches);
+      this.views?.grass?.invalidate(touches);
+      this.mask.invalidate(touches);
+    }
   }
 
   /**
