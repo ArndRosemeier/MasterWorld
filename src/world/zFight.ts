@@ -52,6 +52,11 @@ export interface ZFightOptions {
 const PARALLEL = 4e-5;
 /** A face this close in front of a patch (m) covers it. */
 const PRESSED = 5e-3;
+/**
+ * A face turned down this close over the ground (m) is out of sight: the underside of a stone lying on a cave's
+ * floor, which the floor found by sampling the carved rock may put a few centimetres lower than the stone sits.
+ */
+const DOWN_ONTO = 0.05;
 /** The grid the triangles are sorted into, metres. */
 const CELL = 2;
 
@@ -62,7 +67,13 @@ export function zFights(mesh: ZMesh, opts: ZFightOptions = {}): ZFight[] {
   const vi = (t: number, k: number) => (index ? index[t * 3 + k] : t * 3 + k);
   // Each triangle's corners, unit normal, plane offset and box.
   const P = new Float64Array(tris * 9), N = new Float64Array(tris * 3), D = new Float64Array(tris), ok = new Uint8Array(tris);
-  const cells = new Map<string, number[]>();
+  // Each triangle's lowest cell: a pair is looked at only in the first cell both lie in (no set of pairs seen, which
+  // outgrew what a Set holds on a dungeon dressed with its detailed props).
+  const LO = new Int32Array(tris * 3);
+  // And its box: two faces whose boxes share less than `minArea` seen from any side cannot overlap by that much (the
+  // many faces of a tiled floor, side by side in one plane, are let go before they are clipped against each other).
+  const BOX = new Float64Array(tris * 6);
+  const cells = new Map<string, number[]>(), cellOf = new Map<number[], readonly [number, number, number]>();
   for (let t = 0; t < tris; t++) {
     for (let k = 0; k < 3; k++) for (let c = 0; c < 3; c++) P[t * 9 + k * 3 + c] = position[vi(t, k) * 3 + c];
     const o = t * 9;
@@ -75,22 +86,30 @@ export function zFights(mesh: ZMesh, opts: ZFightOptions = {}): ZFight[] {
     ok[t] = 1;
     const lo = [0, 1, 2].map((c) => Math.floor(Math.min(P[o + c], P[o + 3 + c], P[o + 6 + c]) / CELL));
     const hi = [0, 1, 2].map((c) => Math.floor(Math.max(P[o + c], P[o + 3 + c], P[o + 6 + c]) / CELL));
+    LO[t * 3] = lo[0]; LO[t * 3 + 1] = lo[1]; LO[t * 3 + 2] = lo[2];
+    for (let c = 0; c < 3; c++) { BOX[t * 6 + c] = Math.min(P[o + c], P[o + 3 + c], P[o + 6 + c]); BOX[t * 6 + 3 + c] = Math.max(P[o + c], P[o + 3 + c], P[o + 6 + c]); }
     for (let x = lo[0]; x <= hi[0]; x++) for (let y = lo[1]; y <= hi[1]; y++) for (let z = lo[2]; z <= hi[2]; z++) {
       const key = `${x},${y},${z}`;
       let list = cells.get(key);
-      if (!list) cells.set(key, (list = []));
+      if (!list) { cells.set(key, (list = [])); cellOf.set(list, [x, y, z]); }
       list.push(t);
     }
   }
-  const out: ZFight[] = [], seen = new Set<number>();
-  for (const list of cells.values()) {
-    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+  const out: ZFight[] = [];
+  // Normals that face the same way differ in y by less than this (PARALLEL is about half a degree): each cell's
+  // faces sorted by their normal's y, a face is matched only with the few next to it.
+  const NY = Math.sqrt(2 * PARALLEL) * 1.5;
+  for (const [list, [cx, cy, cz]] of cellOf) {
+    list.sort((p, q) => N[p * 3 + 1] - N[q * 3 + 1]);
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length && N[list[j] * 3 + 1] - N[list[i] * 3 + 1] < NY; j++) {
       const a = list[i], b = list[j];
       const dot = N[a * 3] * N[b * 3] + N[a * 3 + 1] * N[b * 3 + 1] + N[a * 3 + 2] * N[b * 3 + 2];
       if (dot < 1 - PARALLEL || Math.abs(D[a] - D[b]) > gap * 4 + 0.05) continue;
-      const pair = a < b ? a * tris + b : b * tris + a;
-      if (seen.has(pair)) continue;
-      seen.add(pair);
+      const wx = Math.max(0, Math.min(BOX[a * 6 + 3], BOX[b * 6 + 3]) - Math.max(BOX[a * 6], BOX[b * 6]));
+      const wy = Math.max(0, Math.min(BOX[a * 6 + 4], BOX[b * 6 + 4]) - Math.max(BOX[a * 6 + 1], BOX[b * 6 + 1]));
+      const wz = Math.max(0, Math.min(BOX[a * 6 + 5], BOX[b * 6 + 5]) - Math.max(BOX[a * 6 + 2], BOX[b * 6 + 2]));
+      if (wx * wy + wy * wz + wz * wx < minArea) continue;
+      if (Math.max(LO[a * 3], LO[b * 3]) !== cx || Math.max(LO[a * 3 + 1], LO[b * 3 + 1]) !== cy || Math.max(LO[a * 3 + 2], LO[b * 3 + 2]) !== cz) continue;
       const f = overlap(P, N, D, a, b, gap);
       if (!f || f.area < minArea) continue;
       const same = alike(mesh, vi, P, a, b, f.at);
@@ -132,7 +151,7 @@ function alike(m: ZMesh, vi: (t: number, k: number) => number, P: Float64Array, 
  */
 function hidden(P: Float64Array, N: Float64Array, ok: Uint8Array, cells: Map<string, number[]>, p: readonly number[], n: readonly number[], ground?: (x: number, z: number, y: number) => number | null): boolean {
   const g = ground?.(p[0], p[2], p[1] + 0.05);
-  if (g != null && (p[1] < g - 0.01 || (n[1] < -0.7 && p[1] < g + 0.01))) return true;
+  if (g != null && (p[1] < g - 0.01 || (n[1] < -0.7 && p[1] < g + DOWN_ONTO))) return true;
   const t1 = Math.abs(n[1]) < 0.9 ? [n[2], 0, -n[0]] : [0, -n[2], n[1]], l = Math.hypot(t1[0], t1[1], t1[2]);
   const u = t1.map((v) => v / l), v = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
   const from = [p[0] + n[0] * 3e-3, p[1] + n[1] * 3e-3, p[2] + n[2] * 3e-3];
