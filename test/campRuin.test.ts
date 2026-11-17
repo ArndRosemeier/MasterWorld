@@ -7,9 +7,9 @@ import { startWorld } from './frontierLand';
 
 // D69, Z4 in play: the big camps stand in great ruins that shape the ground they stand on (rule: what the hero walks on is what they see).
 /** A goblin war camp in a great ruin 600 m east of the start, on the start's land. */
-function warCamp() {
+function warCamp(camp = 'goblin-warcamp', seed = 4242) {
   const w = startWorld({ own: true }), t = w.terrain, x = w.home.x + 600, z = w.home.z;
-  const d: CampDecision = { kind: 'camp', id: 'camp:test:0', zone: 'zone:test', camp: 'goblin-warcamp', x, z, yaw: 0, r: 45, landmark: 'great-ruin', level: 3, posts: [], seed: 4242, at: 0 };
+  const d: CampDecision = { kind: 'camp', id: 'camp:test:0', zone: 'zone:test', camp, x, z, yaw: 0, r: 45, landmark: 'great-ruin', level: 3, posts: [], seed, at: 0 };
   return { t, d };
 }
 
@@ -45,7 +45,7 @@ test('camp ruin: its towers and walls stand in the way, its gate and halls\' doo
   const laid = layOutCamp(d, (x, z) => t.height(x, z), r)!;
   assert.ok(laid.mesh.index.length > 3000, 'the ruin is drawn');
   assert.deepEqual(laid.origin, [d.x, r.y0, d.z]);
-  for (const tw of r.plan.towers) {
+  for (const tw of r.plan.towers.filter((q) => !q.ways)) {
     const cx = tw.pts.reduce((a, p) => a + p[0], 0) / tw.pts.length, cz = tw.pts.reduce((a, p) => a + p[1], 0) / tw.pts.length;
     assert.ok(hitsSolid(solids, d.x + cx, d.z + cz, 0.4), 'a tower is solid');
   }
@@ -57,5 +57,20 @@ test('camp ruin: its towers and walls stand in the way, its gate and halls\' doo
   for (const bl of r.plan.blocks) {
     const [x0, z0, x1, z1] = bl.box;
     assert.ok(!hitsSolid(solids, d.x + (x0 + x1) / 2, d.z + (z0 + z1) / 2, 0.4), `inside a ${bl.kind} is walkable`);
+  }
+});
+
+test('camp ruin: a gatehouse lets the hero through its passage (halls of the dead in a citadel)', () => {
+  const { t, d } = warCamp('dead-halls', 5004);
+  t.settleMore([d]);
+  const r = t.ruinOf(d.id)!, solids = ruinSolids(r).map((poly) => ({ poly }));
+  assert.equal(r.plan.layout, 'citadel');
+  const gh = r.plan.towers.filter((q) => q.ways);
+  assert.ok(gh.length > 0, 'it has its gatehouse');
+  for (const q of gh) {
+    const xs = q.pts.map((p) => p[0]), zs = q.pts.map((p) => p[1]), mx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    // Front to back along its middle, a body's width clear.
+    for (let z = Math.min(...zs) - 1; z <= Math.max(...zs) + 1; z += 0.5) assert.ok(!hitsSolid(solids, d.x + mx, d.z + z, 0.4), `the gatehouse's passage at ${z}`);
+    assert.ok(hitsSolid(solids, d.x + Math.min(...xs) + 0.5, d.z + (Math.min(...zs) + Math.max(...zs)) / 2, 0.4), 'its sides stand');
   }
 });

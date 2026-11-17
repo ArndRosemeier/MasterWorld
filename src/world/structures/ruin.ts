@@ -38,6 +38,9 @@ export interface Block {
   readonly doors: readonly number[];
   readonly broken: number;
 }
+/** Half the width of a gatehouse's passage through it, metres. */
+export const GATEHOUSE_HALF = 1.8;
+
 export interface RTower { readonly pts: readonly P2[]; readonly top: number; readonly roof: TowerTop; readonly broken: number; readonly fallSide: number; readonly great: boolean; readonly ways?: readonly number[] }
 export interface Curtain { readonly a: P2; readonly b: P2; readonly height: number; readonly thick: number; readonly breaches: readonly [number, number][]; readonly gate: number | null }
 export interface Arcade { readonly a: P2; readonly b: P2; readonly height: number }
@@ -292,7 +295,7 @@ export function greatRuinMesh(p: GreatRuinPlan, ground: Ground): PlacedMesh {
     const [lo, hi] = span(t.pts);
     tower(site, style, {
       pts: t.pts, base: null, floor: lo === hi ? hi : hi + 0.02, top: hi + t.top, roof: t.roof, thick: (t.great ? 1.6 : 1.2) * style.builder.thick, broken: t.broken, fallSide: t.fallSide, slits: style.builder.id === 'dwarves' || !t.great, merlon: style.builder.merlon,
-      ways: t.ways ? { sides: t.ways, half: 1.8, spring: hi + 4.6 - archRise(arch, 3.6), arch, sill: lo === hi ? hi - 1 : hi } : undefined, noFloor: lo === hi,
+      ways: t.ways ? { sides: t.ways, half: GATEHOUSE_HALF, spring: hi + 4.6 - archRise(arch, 3.6), arch, sill: lo === hi ? hi - 1 : hi } : undefined, noFloor: lo === hi,
     });
     if (t.broken > 0.15) { const c = t.pts[t.fallSide]; rubble(site, c[0] + rng.range(-2, 2), c[1] + rng.range(-2, 2), 5 + t.broken * 6, 10 + Math.round(t.broken * 16), style.wall, style.tint, 1.3); }
   }

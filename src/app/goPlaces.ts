@@ -225,7 +225,9 @@ export function goSpots(h: GoHost): GoSpot[] {
       // Just outside the reach of its outermost posts; a great ruin from before its gate (its front faces −z).
       const ruin = d && h.terrain.ruinOf(d.id), from = ruin ? { x: d.x, z: d.z - 1 } : h.heroPos();
       // (A ruin from inside its open ground, its walls whole in view.)
-      return at(d && beside(d, from, ruin ? ruinReach(ruin) + RUIN_OPEN - 8 : d.r * 1.1 + 21), `${c.name} (only in zones laid out round the hero)`);
+      const s = d && beside(d, from, ruin ? ruinReach(ruin) + RUIN_OPEN - 8 : d.r * 1.1 + 21);
+      // (The camera level, a touch up to its towers, whatever it was before.)
+      return at(s && { ...s, pitch: 0.1 }, `${c.name} (only in zones laid out round the hero)`);
     });
   }
 

@@ -6,7 +6,7 @@
  */
 import type { CampDecision } from './decisions';
 import type { StructuresDef } from '../setting/contract';
-import { planGreatRuin, type GreatRuinPlan } from './structures/ruin';
+import { GATEHOUSE_HALF, planGreatRuin, type GreatRuinPlan } from './structures/ruin';
 import { ensureCCW, type Poly } from '@futuremagic/settlement';
 import { dist2 } from '@futuremagic/core';
 
@@ -86,7 +86,15 @@ function piecesOf(a: readonly [number, number], b: readonly [number, number], ga
  */
 export function ruinSolids(r: CampRuin): Poly[] {
   const { plan } = r, cx = r.d.x, cz = r.d.z, out: Poly[] = [];
-  for (const t of plan.towers) out.push(ensureCCW(t.pts.flatMap(([x, z]) => [cx + x, cz + z])));
+  const rectAt = (x0: number, z0: number, x1: number, z1: number): Poly => ensureCCW([cx + x0, cz + z0, cx + x1, cz + z0, cx + x1, cz + z1, cx + x0, cz + z1]);
+  for (const t of plan.towers) {
+    if (!t.ways) { out.push(ensureCCW(t.pts.flatMap(([x, z]) => [cx + x, cz + z]))); continue; }
+    // A gatehouse: its passage (GATEHOUSE_HALF each side of its middle) runs through it, front to back or side to side.
+    const xs = t.pts.map((q) => q[0]), zs = t.pts.map((q) => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    if (t.ways.includes(0) || t.ways.includes(2)) out.push(rectAt(x0, z0, mx - GATEHOUSE_HALF, z1), rectAt(mx + GATEHOUSE_HALF, z0, x1, z1));
+    else out.push(rectAt(x0, z0, x1, mz - GATEHOUSE_HALF), rectAt(x0, mz + GATEHOUSE_HALF, x1, z1));
+  }
   for (const c of plan.curtains) {
     const len = dist2(c.a[0], c.a[1], c.b[0], c.b[1]);
     for (const [a, b] of piecesOf(c.a, c.b, c.gate !== null ? [[len * c.gate - 2, len * c.gate + 2]] : [])) out.push(slab(cx, cz, a, b, c.thick));
