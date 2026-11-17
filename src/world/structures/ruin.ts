@@ -17,7 +17,7 @@
 import { Noise, Rng, deriveSeed, type Ground } from '@futuremagic/core';
 import type { StructureArch, StructureAddition, StructuresDef } from '../../setting/contract';
 import { MeshKit, WildMat, mixTint, scaleTint, type PlacedMesh, type Tint } from '../dungeon/meshKit';
-import { archRise, roundPts, floorOf, gable, inset, line, prism, rect, wallRing, rubble, steps, wall, type Opening, type P2, type Site } from './masonry';
+import { archRise, centroid, roundPts, floorOf, gable, inset, line, prism, rect, wallRing, rubble, steps, wall, type Opening, type P2, type Site } from './masonry';
 import { banner, bones, cage, coffin, grave, room, skull, stake } from './props';
 import { tower, type TowerTop } from './tower';
 import { apart, fallen, pickStructure, styleOf, type Picks, type Signature, type Style } from './style';
@@ -261,11 +261,28 @@ export function greatRuinMesh(p: GreatRuinPlan, ground: Ground): PlacedMesh {
     if (tr.walled) wallRing(tr.pts, 1.4, () => ({ base: null, top: () => tr.level - 0.01, mat: style.wall, tint: style.tint, trimMat: style.trimMat, trimTint: style.trim, capA: Infinity, capB: Infinity })).forEach((w) => wall(site, w));
     // (5 mm under its level: a sill or a step's top at the level draws over it, not into it.)
     floorOf(k, tr.walled ? inset(tr.pts, 1.4) : tr.pts, tr.level - 0.005, floorMat, floorTint);
+    // Buttresses along a tall retaining wall's outer face, so a terrace reads as built, not as a slab.
+    if (tr.walled) {
+      const c = centroid(tr.pts);
+      tr.pts.forEach((a, i) => {
+        const b = tr.pts[(i + 1) % tr.pts.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]), tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len;
+        const side = ((a[0] + b[0]) / 2 - c[0]) * -tz + ((a[1] + b[1]) / 2 - c[1]) * tx > 0 ? 1 : -1, nx = -tz * side, nz = tx * side;
+        const n = Math.floor((len - 4) / 7), w = 0.55 * style.builder.thick, d = 0.9 * style.builder.thick;
+        for (let j = 0; j <= n; j++) {
+          const s = n === 0 ? len / 2 : 2 + (j * (len - 4)) / n, ex = a[0] + tx * s, ez = a[1] + tz * s;
+          const top = tr.level - 0.55 - rng.range(0, 0.3);
+          if (ground(ex + nx * d, ez + nz * d) > top - 1.2) continue;
+          const q: P2[] = [[ex - tx * w, ez - tz * w], [ex + tx * w, ez + tz * w], [ex + tx * w * 0.8 + nx * d, ez + tz * w * 0.8 + nz * d], [ex - tx * w * 0.8 + nx * d, ez - tz * w * 0.8 + nz * d]];
+          prism(site, q, null, top, style.wall, style.tint, { open: [0], topMat: style.trimMat, topTint: style.trim });
+        }
+      });
+    }
   }
   const span = (pts: readonly P2[]) => { const ls = pts.map((q) => p.levelAt(q[0], q[1])); return [Math.min(...ls), Math.max(...ls)]; };
   // Wear: how far a wall has come down at a point, in courses.
   const worn = (broken: number, h: number, x: number, z: number) => (broken <= 0 ? 0 : Math.round(Math.max(0, broken * h * (0.15 + 0.85 * (noise.n2(x / 9, z / 9) * 0.5 + 0.5)) + (noise.n2(x / 2.2, z / 2.2) > 0.55 ? h * broken : 0)) / 0.45) * 0.45);
-  for (const bl of p.blocks) buildBlock(site, style, bl, span(boxPts(bl.box)), arch, worn, fall);
+  const byTower = (x: number, z: number) => p.towers.some((t) => { const xs = t.pts.map((q) => q[0]), zs = t.pts.map((q) => q[1]); return x > Math.min(...xs) - 1.5 && x < Math.max(...xs) + 1.5 && z > Math.min(...zs) - 1.5 && z < Math.max(...zs) + 1.5; });
+  for (const bl of p.blocks) buildBlock(site, style, bl, span(boxPts(bl.box)), arch, worn, fall, byTower);
   for (const t of p.towers) {
     const [lo, hi] = span(t.pts);
     tower(site, style, {
@@ -293,7 +310,7 @@ export function greatRuinMesh(p: GreatRuinPlan, ground: Ground): PlacedMesh {
 }
 
 /** A hall, wing, chapel or crypt house: its walls (gabled ends, broken tops), doors, windows, roof or ribs, columns. */
-function buildBlock(site: Site, style: Style, bl: Block, [lo, hi]: number[], arch: StructureArch, worn: (b: number, h: number, x: number, z: number) => number, fall: number): void {
+function buildBlock(site: Site, style: Style, bl: Block, [lo, hi]: number[], arch: StructureArch, worn: (b: number, h: number, x: number, z: number) => number, fall: number, byTower: (x: number, z: number) => boolean): void {
   // (A centimetre in from its box, so two blocks side by side never share a face's plane.)
   const { k, rng } = site, x0 = bl.box[0] + 0.01, z0 = bl.box[1] + 0.01, x1 = bl.box[2] - 0.01, z1 = bl.box[3] - 0.01, t = (bl.kind === 'hall' ? 1.2 : 0.9) * style.builder.thick;
   const crypt = bl.kind === 'crypt', floor = crypt ? hi + 0.6 : lo < hi ? hi + 0.02 : hi;
@@ -323,7 +340,8 @@ function buildBlock(site: Site, style: Style, bl: Block, [lo, hi]: number[], arc
     if (!crypt && len > 5) {
       const tall = bl.kind !== 'wing', ww = tall ? 1.4 : 1, slits = style.builder.id === 'dwarves';
       for (let st = 0; st < (tall ? 1 : bl.storeys); st++) for (let s = 2.6; s < len - 2.2; s += tall ? 4.6 : 3.6) {
-        if (openings.some((o) => s + ww > o.s0 - 0.8 && s - ww < o.s1 + 0.8)) continue;
+        // (No window where a tower stands against the wall: its jambs would lie in the tower's faces.)
+        if (openings.some((o) => s + ww > o.s0 - 0.8 && s - ww < o.s1 + 0.8) || byTower(a[0] + ux * s, a[1] + uz * s)) continue;
         const y0 = floor + st * storey + (tall ? 2.4 : 1.3), y1 = tall ? floor + H - 2.2 - archRise(arch, ww) : y0 + 1.6;
         openings.push(slits ? { s0: s - 0.18, s1: s + 0.18, y0, y1: y0 + 1.4, arch: 'flat' } : { s0: s - ww / 2, s1: s + ww / 2, y0, y1, arch });
       }
@@ -381,6 +399,11 @@ function curtainWall(site: Site, style: Style, p: GreatRuinPlan, c: Curtain, arc
   const nx = -uz, nz = ux, outSign = ((c.a[0] - p.cx) * nx + (c.a[1] - p.cz) * nz) > 0 ? 1 : -1;
   const flipped = outSign > 0 ? spec : { ...spec, a: spec.ia, b: spec.ib, ia: spec.a, ib: spec.b };
   wall(site, flipped);
+  // What fell from a breach lies in a heap at its outer foot.
+  for (const [a, b] of c.breaches) {
+    const sm = (a + b) / 2, off = outSign * (c.thick / 2 + 1.2 + rng.range(0, 1.5));
+    rubble(site, c.a[0] + ux * sm + nx * off, c.a[1] + uz * sm + nz * off, (b - a) * 0.45 + 1, 6 + Math.round((b - a) * 1.5), style.wall, style.tint, 1.2);
+  }
   // The parapet on the outer edge, its crenels; none over a breach.
   const pa = flipped.a, pb = flipped.b, ia = [pa[0] + (flipped.ia[0] - pa[0]) * 0.25, pa[1] + (flipped.ia[1] - pa[1]) * 0.25] as P2, ib = [pb[0] + (flipped.ib[0] - pb[0]) * 0.25, pb[1] + (flipped.ib[1] - pb[1]) * 0.25] as P2;
   const m = 0.9 * style.builder.merlon, g = 0.75, breaks: number[] = [];
