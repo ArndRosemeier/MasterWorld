@@ -58,3 +58,7 @@ export async function listSlots(): Promise<SlotInfo[]> {
     return [];
   }
 }
+
+export async function deleteSlot(slot: string): Promise<void> {
+  await withStore('readwrite', (s) => s.delete(slot));
+}
