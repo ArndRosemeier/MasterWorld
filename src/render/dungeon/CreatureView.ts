@@ -180,14 +180,12 @@ export class CreatureView {
   }
 
   /** `who` says `text`: their lips move with it (Actors' lip-sync; nothing for a beast or a skeleton's jaw). */
-  /** Off the stage for good (a camp the hero left far behind): its people and animals freed (shared packs stay loaded). */
-  dispose(): void {
+  /**
+   * Off the stage for good (a camp the hero left far behind). Only taken out of the scene: its textures stay alive, since a render
+   * bundle may still hold a binding to them (a freed one is a null sampler and a frozen picture, MW #599 on the GPU shots).
+   */
+  retire(): void {
     this.group.removeFromParent();
-    for (const s of this.shown) {
-      const b = s.body;
-      if (b.kind === 'person') b.ch.dispose();
-      else if (b.kind === 'animal') { b.actor?.dispose(); b.lib?.dispose(); }
-    }
     this.shown.length = 0;
   }
 

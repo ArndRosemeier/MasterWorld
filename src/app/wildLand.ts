@@ -55,7 +55,7 @@ export interface WildHost {
 const BUILD = 420;
 /** A camp is built this near (m): there are many of them (D69, Z5), and its landmark shows from far before its foes do. */
 const CAMP_BUILD = 320;
-/** Past this a camp's bodies are taken off the stage and freed (what happened there is kept): the land holds dozens of camps a zone. */
+/** Past this a camp's bodies are taken off the stage (what happened there is kept): the land holds dozens of camps a zone. */
 const CAMP_DROP = 900;
 
 interface Group {
@@ -71,7 +71,7 @@ interface Group {
   /** Once its bodies are warm. */
   encounter: Encounter | null;
   delve: Delve | null;
-  /** Its bodies as drawn (a camp's are freed once the hero is far off). */
+  /** Its bodies as drawn (a camp's are taken off the stage once the hero is far off). */
   view?: CreatureView;
 }
 
@@ -176,11 +176,11 @@ export class WildLand {
     }
   }
 
-  /** A camp far behind: what happened there is kept, its encounter retired and its bodies freed; it is raised again as the hero comes back. */
+  /** A camp far behind: what happened there is kept, its encounter retired and its bodies taken off the stage; it is raised again as the hero comes back. */
   private drop(g: Group): void {
     this.kept.set(g.territory.id, g.delve!.tally());
     g.encounter!.retired = true;
-    g.view?.dispose();
+    g.view?.retire();
     g.encounter = null;
     g.delve = null;
     g.view = undefined;
