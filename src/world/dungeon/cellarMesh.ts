@@ -230,8 +230,10 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
     const older = eraOf(r.id) === 'older';
     const [fm, ft] = floorLook(r.id);
     shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y0, true, fm, ft);
-    shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y1, false, older ? C.Brick : C.Boards, older ? scaleTint(BRICK, 0.8) : RAFTERS);
-    if (!older) for (let b = 0.6; b < r.w * CELL - 0.3; b += 1.4) shell.box(r.x * CELL + b, y1 - 0.22, (r.z + r.d / 2) * CELL, 0.2, 0.22, r.d * CELL, 0, M.Oak, DARK_OAK);
+    // (The ceiling 2 cm under the storey above's floor: in one plane with it, the feet of what stands up there
+    // flickered through it.)
+    shell.flat(r.x * CELL, r.z * CELL, (r.x + r.w) * CELL, (r.z + r.d) * CELL, y1 - 0.02, false, older ? C.Brick : C.Boards, older ? scaleTint(BRICK, 0.8) : RAFTERS);
+    if (!older) for (let b = 0.6; b < r.w * CELL - 0.3; b += 1.4) shell.box(r.x * CELL + b, y1 - 0.24, (r.z + r.d / 2) * CELL, 0.2, 0.22, r.d * CELL, 0, M.Oak, DARK_OAK);
     for (let j = r.z; j < r.z + r.d; j++) for (let i = r.x; i < r.x + r.w; i++) for (let k = 0; k < 4; k++) {
       const ni = i + DIRS[k][0], nj = j + DIRS[k][1];
       if (cellIn(r, ni, nj)) continue;
@@ -280,7 +282,7 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
   });
 
   // Door frames on every opening; door pieces for the doors with a state.
-  const doors: DoorPiece[] = [];
+  const doors: DoorPiece[] = [], framed = new Set<string>();
   // (A formed cave's shut ways are its own locks, world/cave/lockMesh.ts: the story's links have no place in it.)
   for (const pl of c.formed ? [] : L.links) pl.doors.forEach((door, end) => {
     if (end === 1 && pl.path.length === 0) return;
@@ -291,7 +293,11 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
     const kind = pl.link.kind;
     // Posts and lintel, standing a little into the room (a cave's openings are the rock's own).
     const ox = -DIRS[k][0] * 0.06, oz = -DIRS[k][1] * 0.06;
-    if (!carved) {
+    // One frame to an opening: two ways through the same one (from either side) framed it twice, the posts a few
+    // centimetres apart and their faces in one plane, flickering.
+    const edge = `${Math.round(mx * 100)},${Math.round(mz * 100)},${door.level}`;
+    if (!carved && !framed.has(edge)) {
+      framed.add(edge);
       for (const side of [-1, 1]) shell.box(mx + ox + ux * side * (DOOR_W / 2 + 0.08), y, mz + oz + uz * side * (DOOR_W / 2 + 0.08), 0.16, DOOR_H, 0.16, yaw, M.Oak, OAK);
       shell.box(mx + ox, y + DOOR_H, mz + oz, DOOR_W + 0.32, 0.18, 0.18, yaw, M.Oak, OAK);
     }
@@ -315,7 +321,8 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
     } else if (kind === 'drop' && !carved) {
       // The broken edge: splintered boards and a beam end over the drop.
       const rng = new Rng(deriveSeed(c.decision.seed, 'ledge', pl.link.id));
-      for (let n = 0; n < 4; n++) shell.box(mx + ux * rng.range(-0.5, 0.5) - out[0] * rng.range(0.2, 0.7), y - 0.08, mz + uz * rng.range(-0.5, 0.5) - out[1] * rng.range(0.2, 0.7), 0.22, 0.06, rng.range(0.6, 1.1), yaw + rng.range(-0.4, 0.4), M.Oak, DARK_OAK);
+      // (Each a few millimetres over the last: lying across each other in one plane they would flicker.)
+      for (let n = 0; n < 4; n++) shell.box(mx + ux * rng.range(-0.5, 0.5) - out[0] * rng.range(0.2, 0.7), y - 0.08 + n * 0.005, mz + uz * rng.range(-0.5, 0.5) - out[1] * rng.range(0.2, 0.7), 0.22, 0.06, rng.range(0.6, 1.1), yaw + rng.range(-0.4, 0.4), M.Oak, DARK_OAK);
     } else if (kind === 'locked' || kind === 'oneway' || kind === 'secret') {
       const kit = new MeshKit();
       let opens: DoorPiece['opens'] = 'swing', hinge: [number, number, number] | undefined, bar: BuildingMesh | undefined;
@@ -380,12 +387,12 @@ export function cellarMeshes(c: Cellar, models?: PropModels, throat = false): Ce
   });
 
   const lids: ChestLid[] = [], seal: BuildingMesh[] = [];
-  for (const p of c.props) {
+  for (const [n, p] of c.props.entries()) {
     // A cave walked into through its throat (caveThroat.ts) has no ladder up: its way out is the throat itself.
     if (throat && p === c.hatch) continue;
     if (p.kind === 'chest') lids.push(chest(propKit, p, models));
     else if (p.kind === 'breach') seal.push(...breach(propKit, p));
-    else if (!models || !modelProp(propKit, p, models)) prop(propKit, p);
+    else if (!models || !modelProp(propKit, p, models)) prop(propKit, p, n);
   }
   if (models) dress(propKit, c, models);
   for (const t of torchSpots(c)) sconce(shell, t.x, t.y, t.z, t.nx, t.nz);
@@ -580,8 +587,13 @@ function dress(k: MeshKit, c: Cellar, models: PropModels): void {
   }
 }
 
-/** One prop from the kit of simple pieces. */
-function prop(k: MeshKit, p: Prop): void {
+/**
+ * One prop from the kit of simple pieces; `n`, its number among the cellar's props. Heaps of straw and nests lie
+ * across each other: their tops step by a few millimetres per prop (and per box of a nest), so no two lie in one
+ * plane and flicker (z-fighting, `npm run zfight`). A nest's boxes rest a millimetre or so apart too: one by the
+ * stairwell hangs over it, and their undersides show from below.
+ */
+function prop(k: MeshKit, p: Prop, n = 0): void {
   const { x, y, z, yaw } = p;
   const rng = new Rng(deriveSeed(Math.round(x * 100), Math.round(z * 100), p.kind));
   const t = (base: Tint, v = 0.12): Tint => varyTint(rng, base, v);
@@ -603,8 +615,8 @@ function prop(k: MeshKit, p: Prop): void {
     case 'table': { const [a, b] = spot(0, -0.3); k.box(a, y + 0.72, b, 1.2, 0.06, 0.7, yaw, M.Oak, t(OAK)); for (const [u, w] of [[-0.5, -0.25], [0.5, -0.25], [-0.5, 0.25], [0.5, 0.25]]) { const [px, pz] = spot(u, w - 0.3); k.box(px, y, pz, 0.07, 0.72, 0.07, yaw, M.Oak, t(DARK_OAK)); } break; }
     case 'stool': k.cylinder(x, y, z, 0.18, 0.45, 8, M.Oak, t(OAK)); break;
     case 'cot': k.box(x, y, z, 1.9, 0.35, 0.8, yaw + Math.PI / 2, M.Oak, t(DARK_OAK)); k.box(x, y + 0.35, z, 1.8, 0.1, 0.7, yaw + Math.PI / 2, M.Thatch, t([180, 160, 110])); break;
-    case 'straw': k.box(x, y, z, 1.2, 0.18, 0.9, yaw + rng.range(-0.5, 0.5), M.Thatch, t([190, 165, 100], 0.2)); break;
-    case 'nest': for (let n = 0; n < 5; n++) k.box(x + rng.range(-0.4, 0.4), y, z + rng.range(-0.4, 0.4), rng.range(0.4, 0.8), rng.range(0.15, 0.35), rng.range(0.4, 0.8), rng.range(0, 3), M.Thatch, t([120, 100, 70], 0.25)); break;
+    case 'straw': k.box(x, y, z, 1.2, 0.18 + (n % 37) * 0.0011, 0.9, yaw + rng.range(-0.5, 0.5), M.Thatch, t([190, 165, 100], 0.2)); break;
+    case 'nest': for (const s of rng.shuffle([0, 1, 2, 3, 4])) k.box(x + rng.range(-0.4, 0.4), y + s * 0.0015, z + rng.range(-0.4, 0.4), rng.range(0.4, 0.8), 0.15 + s * 0.04 + (n % 37) * 0.0011, rng.range(0.4, 0.8), rng.range(0, 3), M.Thatch, t([120, 100, 70], 0.25)); break;
     case 'rubble': for (let n = 0; n < 7; n++) k.box(x + rng.range(-0.5, 0.5), y, z + rng.range(-0.5, 0.5), rng.range(0.2, 0.5), rng.range(0.15, 0.35), rng.range(0.2, 0.5), rng.range(0, 3), M.Rubble, t(STONE, 0.2)); break;
     case 'bones': for (let n = 0; n < 6; n++) k.box(x + rng.range(-0.4, 0.4), y, z + rng.range(-0.4, 0.4), 0.05, 0.05, rng.range(0.2, 0.45), rng.range(0, 3), M.Plaster, t([225, 215, 190])); k.cylinder(x + 0.2, y, z - 0.1, 0.1, 0.16, 8, M.Plaster, [225, 215, 190], 0.5); break;
     case 'candle': k.cylinder(x, y, z, 0.04, 0.25, 6, M.Plaster, [240, 230, 200]); break;

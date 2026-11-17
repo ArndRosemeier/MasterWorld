@@ -55,6 +55,11 @@ const FOOT: Readonly<Record<DungeonProp, readonly [number, number]>> = {
   vat: [0.7, 0.7], bricks: [0.42, 0.32], beam: [1.25, 0.5], puddle: [0.7, 0.5], bin: [0.55, 0.35], jar: [0.2, 0.2],
   ladder: [0.35, 0.3], door: [0.7, 0.3], breach: [0.75, 0.3],
 };
+/**
+ * Props drawn this far out from their spot, into the room (cellarMesh.ts: `spot(0, -0.3)`): their footprint lies
+ * there too, or two writing desks by one corner overlap and their tops flicker (z-fighting).
+ */
+const OUT: Partial<Record<DungeonProp, number>> = { table: 0.3, ledger: 0.3 };
 const LOOSE: ReadonlySet<DungeonProp> = new Set(['bones', 'straw', 'rubble', 'nest']);
 /** The floor kept clear before a doorway: half its width, and how far into the room (m). */
 const DOOR_CLEAR: readonly [number, number] = [DOOR_W / 2 + 0.2, 1.4];
@@ -76,8 +81,10 @@ function rectReach(r: Rect, ax: number, az: number): number {
 }
 
 /** The floor a prop takes up (its along-wall axis is (cos yaw, −sin yaw), as the props are drawn). */
-export const propRect = (p: { kind: DungeonProp; x: number; z: number; yaw: number }): Rect =>
-  ({ x: p.x, z: p.z, ux: Math.cos(p.yaw), uz: -Math.sin(p.yaw), a: FOOT[p.kind][0], b: FOOT[p.kind][1] });
+export const propRect = (p: { kind: DungeonProp; x: number; z: number; yaw: number }): Rect => {
+  const w = OUT[p.kind] ?? 0;
+  return { x: p.x - Math.sin(p.yaw) * w, z: p.z - Math.cos(p.yaw) * w, ux: Math.cos(p.yaw), uz: -Math.sin(p.yaw), a: FOOT[p.kind][0], b: FOOT[p.kind][1] };
+};
 
 /** The floor kept clear before a door, on the side of its room (a carved way opens the whole side of its cell). */
 export const doorRect = (d: { x: number; z: number; dir: number }, s: DungeonScale = BUILT, carved = false): Rect => {
