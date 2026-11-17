@@ -7,10 +7,10 @@ import { SHORE, Skeleton, emptySample } from './skeleton';
 import { BROOKS, HYDRO, Hydrology, emptyWater, inChannel, shapeByWater, type HydroOptions, type WaterHere } from './hydro';
 import type { SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
-import { settlementOf, type Decision, type DecisionLog, type HoldDecision, type RoadDecision, type TownDecision } from './decisions';
+import { settlementOf, type CampDecision, type Decision, type DecisionLog, type HoldDecision, type RoadDecision, type TownDecision } from './decisions';
 import { holdBare, holdGround } from './hold';
 import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
-import { SIGHT_CLEARING } from './sites';
+import { CAMP_PIECE_R, SIGHT_CLEARING, campPiece } from './sites';
 import { RoadNet } from './roads';
 import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
@@ -120,6 +120,8 @@ export class Terrain {
   /** Town plans made elsewhere for the towns of the last `settle` (by town id): taken instead of planning them again. */
   private givenPlans: ReadonlyMap<string, TownPlan> | null = null;
   private holdList: HoldDecision[] = [];
+  /** The camps in the log (D69, Z2): roads keep out of their reach (Z5). */
+  private readonly campMap = new Map<string, CampDecision>();
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
@@ -149,6 +151,7 @@ export class Terrain {
     // Volumes read the ground as the towns have shaped it.
     for (const d of log) if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
     this.clearingMap.clear();
+    this.campMap.clear();
     // Roads, clearings, and the settlements founded in regions (after the towns of the log, in its order).
     this.settleMore(log);
   }
@@ -178,6 +181,10 @@ export class Terrain {
         // A teacher's tower (C3) stands in the open like a ruined tower's.
         const c = clearingOf(RETREAT_CLEARING, d);
         if (c) this.clearingMap.set(d.id, c);
+      } else if (d.kind === 'camp') {
+        // A camp (D69): its landmark piece stands in a clearing of its own; roads keep out of its reach.
+        this.campMap.set(d.id, d);
+        if (campPiece(d)) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: Math.min(d.r, CAMP_PIECE_R) + 4 });
       } else if (d.kind === 'sight') {
         // A sight by the way (C9) stands in a glade of its own.
         this.clearingMap.set(d.id, { x: d.x, z: d.z, r: SIGHT_CLEARING });
@@ -212,6 +219,9 @@ export class Terrain {
   }
 
   /** Ground kept free of trees round the places out on the land (by the place's id). */
+  /** The camps settled so far (D69). */
+  get camps(): Iterable<CampDecision> { return this.campMap.values(); }
+
   get clearings(): ReadonlyMap<string, Clearing> {
     return this.clearingMap;
   }

@@ -28,6 +28,9 @@ export interface ZoneContext {
   readonly avoid?: readonly { readonly x: number; readonly z: number; readonly r: number }[];
 }
 
+/** What a worker needs to lay a zone out (it has the land, the setting and the seed). */
+export type ZoneAsk = Omit<ZoneContext, 'seed' | 'terrain' | 'setting'> & { readonly key: RegionKey };
+
 /** The zone square holding a point. */
 export const zoneKeyAt = (c: CampsDef, x: number, z: number): RegionKey => keyAt(c.zoneLevel, x, z);
 

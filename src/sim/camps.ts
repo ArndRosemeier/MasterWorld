@@ -10,6 +10,7 @@ import { deriveSeed, hash2f } from '@futuremagic/core';
 import type { CampDef, CampsDef, CreatureDef, GrowthDef } from '../setting/contract';
 import { evenDanger, levelOfDanger } from '../game/growth';
 import type { CampDecision } from '../world/decisions';
+import type { Territory } from './wild';
 
 /**
  * A creature's kind at `level` (Z2: a camp's foes are scaled to its zone's band): its danger the even fight for that level, its health,
@@ -121,4 +122,19 @@ export function returned(s: CampSave, post: number): CampSave {
   const dead = { ...s.dead };
   delete dead[post];
   return { dead, rounds: { ...s.rounds, [post]: (s.rounds[post] ?? 0) + 1 } };
+}
+
+/** How far a body at a camp's post strays from it (m), and how wide its post is. */
+export const POST_GATHER = 2.5, POST_R = 2.5;
+
+/**
+ * A camp as the world simulation lives it (sim/wild.ts Territory): its posts each a body's home, each body its post's kind this time
+ * (`save`: how often each post has come back, for who stands there now: the usual one or the named one).
+ */
+export function campTerritory(camp: CampDecision, def: CampDef, rules: CampsDef, defs: readonly CreatureDef[], g: GrowthDef, save?: CampSave): Territory {
+  return {
+    kind: camp.camp, encounter: camp.camp, x: camp.x, z: camp.z, r: camp.r, seed: camp.seed, id: camp.id,
+    members: camp.posts.map((p) => p.creature),
+    posts: camp.posts.map((p, i) => ({ x: p.x, z: p.z, def: postDef(camp, def, rules, defs, g, i, save?.rounds[i] ?? 0), ...(p.round ? { round: p.round } : {}) })),
+  };
 }

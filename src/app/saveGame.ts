@@ -4,6 +4,7 @@
  * hero went (per-site diffs: doors opened, keys taken, notes read), what the townsfolk learned and the
  * journal. Loading builds the world from the seed again and lays the save over it.
  */
+import type { CampsSave } from '../sim/camps';
 import type { CharacterPatch } from '@actors/generator';
 import type { CharacterSave } from '../game/character';
 import { remainsLead, type GameMode, type Remains } from '../game/death';
@@ -54,6 +55,8 @@ export interface SaveData {
   readonly cellars: Readonly<Record<string, CellarDiff>>;
   /** The wild's groups met, by territory id: who died, was spared, was searched (none in older saves). */
   readonly wild?: Readonly<Record<string, DelveSave>>;
+  /** The camps' respawn clock and who of each camp is dead since when (D69, Z2; none in older saves). */
+  readonly camps?: CampsSave;
   readonly talk: TownTalkSave | null;
   /** What the people of each hamlet and village knew, by town id (plan B3; saves before every town kept its own `towns`). */
   readonly talks?: Readonly<Record<string, TownTalkSave>>;

@@ -79,6 +79,7 @@ import { cleanWhys, PACING, vgmLines, whyOf, WHY_KEPT, type VgmWhy } from './vgm
 import { findIn, travellerFor } from './vgm/answers';
 import { offTheCoast, washedUpFor, wreckFor } from './vgm/wrecks';
 import { territoryOf, wildFor, wildOf } from './vgm/wild';
+import { campsOf, zonesWanted } from './vgm/zones';
 import { NightWatch } from './vgm/watch';
 import { ARRIVAL, arrivalEntry } from './vgm/guide';
 import { Hails } from './app/hails';
@@ -117,7 +118,7 @@ import { Decks } from './world/deck';
 import { seaPace, underWay } from './world/fleet';
 import type { Township } from './game/township';
 import { cap, type TownTalk } from './talk/townTalk';
-import { settlementsOf, walkFrontier } from './vgm/frontier';
+import { regionDecisions, settlementsOf, walkFrontier } from './vgm/frontier';
 import { SmallLife } from './sim/smallLife';
 import { SmallLifeView } from './render/wildlife/SmallLifeView';
 import { dungeonOf, type CastawayDecision, type Decision, type DungeonDecision, type EventDecision, type RegionDecision, type RoadDecision, type RoadWay, type SightDecision } from './world/decisions';
@@ -645,10 +646,38 @@ export async function start(b: Boot): Promise<void> {
         if (road && !log.some((x) => x.id === road.id)) { log = [...log, road]; await roadWork.lay(road); }
       }).catch((e: unknown) => console.warn('founding a settlement:', e));
     };
+    // Zones laid out ahead (D69, Z3): a zone the hero comes within ZONE_NEAR of is laid out whole in the world worker (its regions, then
+    // its camps); the frontier waits meanwhile, and an answer is taken only while no region opened since it was asked.
+    let zoning = false, zoneClock = 0;
+    const ZONE_NEAR = 1200;
+    const zoneStep = (dt: number): void => {
+      const rules = setting.camps;
+      if (!rules || !wild || zoning || (zoneClock -= dt) > 0) return;
+      zoneClock = 1;
+      const p = player.walker.pos, k = zonesWanted(log, rules, p, ZONE_NEAR)[0];
+      if (!k) return;
+      zoning = true;
+      const regionsThen = regionDecisions(log).length;
+      void jobs.zoneJob({ log, home: start?.decision ?? opened.home, hours: hours(), avoid: wild.territories, key: k }).then((ds) => {
+        if (regionDecisions(log).length === regionsThen) zoneLaid(ds);
+      }, (e: unknown) => console.warn('laying out a zone:', e)).finally(() => { zoning = false; });
+    };
+    /** A zone laid out (its regions, the zone, its camps) into the log: its regions as the frontier's, its camps drawn and built near. */
+    const zoneLaid = (ds: readonly Decision[]): void => {
+      if (!ds.length || log.some((d) => d.id === ds.find((x) => x.kind === 'zone')?.id)) return;
+      for (const d of ds) if (d.kind === 'region') regionOpened(d);
+      const rest = ds.filter((d) => d.kind !== 'region');
+      log = [...log, ...rest];
+      regionSites?.sync(log);
+      for (const d of rest) {
+        if (d.kind === 'zone') { noteMade(madeBy('zone', d, `${d.name}, levels ${d.band[0]} to ${d.band[1]} (${rest.length - 1} camps)`, hours())); console.info(`[vgm] zone ${d.name} levels ${d.band[0]}-${d.band[1]}, ${rest.length - 1} camps`); }
+        if (d.kind === 'camp') { void roadWork.clear(d); wild?.addCamp(d); }
+      }
+    };
     // The land the VGM opened as the hero walked (plan 5.5): replayed from the log; trees keep out of its places.
     if (setting.regions && params.regions) {
       regionSites = new RegionSites({ stage: view.stage, terrain, regions: setting.regions, seed, home: start?.decision ?? opened.home, sights: setting.sights, jobs: { frontier: (a) => jobs.frontier(a), site: (j) => terrainJobs.site(j) } }, log);
-      for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight') void roadWork.clear(d);
+      for (const d of log) if ((d.kind === 'region' && d.site) || d.kind === 'sight' || d.kind === 'camp') void roadWork.clear(d);
       // `site=<place or fill>`: walk out from the start until one opens, then stand before it (a harbour town: on
       // its quay, facing the sea). `site=harbour` with a start town by the sea: its own quay.
       const kind = params.site, ids = new Set(setting.regions.fills.filter((f) => f.place === kind || f.id === kind).map((f) => f.id));
@@ -927,7 +956,7 @@ export async function start(b: Boot): Promise<void> {
       // The sea's waves: a shark keeps under them (S9).
       surface: (x, z) => sea.surfaceAt(x, z),
       // Trunks only near the hero (farther off they would be placed on the spot, a cell at a time).
-      blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
+      blocked: (x, z, r) => !!towns?.solid(x, z, r) || bridgeView.side(x, z, r) || !!regionSites?.standsIn(x, z, r) || (Math.hypot(x - player.walker.pos.x, z - player.walker.pos.z) < 60 && trunks.blocks(x, z, r)),
     };
     const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, standing, seed, director, journal, hud: fightHud, fight: fightHost,
@@ -935,7 +964,12 @@ export async function start(b: Boot): Promise<void> {
       out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.
       light: () => (view.sky.hour > 6 && view.sky.hour < 19.5 ? 40 : 14),
-    }, start, openLand, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log)) : null;
+    }, start, openLand, save?.wild ?? {}, wildOf(log, start.decision.id).map(territoryOf), openBands(log), save?.camps) : null;
+    // The fixed camps the VGM laid out so far (D69, Z2), built as the hero comes near; the hero's own zone laid out before play.
+    for (const d of campsOf(log)) wild?.addCamp(d);
+    if (wild && setting.camps) {
+      for (const k of zonesWanted(log, setting.camps, player.walker.pos, 0)) zoneLaid(await jobs.zoneJob({ log, home: start?.decision ?? opened.home, hours: hours(), avoid: wild.territories, key: k }));
+    }
     // A town's watch and able folk meet raiders that come in; the rest go indoors (D65, R6).
     const townDefence = wild ? new TownDefence({
       setting, seed, land: openLand,
@@ -1828,6 +1862,7 @@ export async function start(b: Boot): Promise<void> {
           hero: { x: w.x, y: w.y, z: w.z, yaw: rooms?.outside?.yaw ?? player.walker.yaw, below: !!visit(), ...(visit() ? { cellar: visit()!.cellar.decision.id } : {}) },
           cellars: cellars?.diffs() ?? {},
           wild: wild?.diffs() ?? save?.wild ?? {},
+          ...(wild || save?.camps ? { camps: wild?.campsSave() ?? save?.camps } : {}),
           talk: null,
           towns: towns?.toSave() ?? {},
           journal: journal.entries(),
@@ -2463,6 +2498,8 @@ export async function start(b: Boot): Promise<void> {
       if (!rooms?.inside) {
         cellars.step(dt);
         if (!visit()) wild?.near(player.walker.pos.x, player.walker.pos.z);
+        // The camps' dead come back at their posts in their time (D69, Z2), played where the hero could see it.
+        wild?.keepCamps(dt, player.walker.pos);
         const seen = lookWild ? wild?.sight(lookWild) : null;
         if (seen) {
           lookWild = null;
@@ -2475,7 +2512,8 @@ export async function start(b: Boot): Promise<void> {
         // The VGM opens the land ahead (plan 5.5): a region at a time into the log, its place drawn as the hero nears.
         part('regionSites');
         if (regionSites && !visit()) {
-          const asking = !title?.holding && !creator?.showing && !!window.__mwReady;
+          const asking = !title?.holding && !creator?.showing && !!window.__mwReady && !zoning;
+          if (asking && !player.flying) zoneStep(dt);
           const opened = regionSites.heroAt(dt, player.flying ? view.camera.position : player.walker.pos, asking ? () => ({ log, hours: hours(), avoid: wild?.territories ?? [] }) : null);
           if (opened) regionOpened(opened);
           // A place come upon for the first time meets Discovery (C9): a sight in full, with its words; a region's place half.
