@@ -2195,6 +2195,74 @@ export interface SettingModule {
   readonly caves?: CavesDef;
   /** How the hero notices the places the VGM put on the land (D66, K9). None: they are never marked. */
   readonly noticing?: NoticingDef;
+  /** The memorable structures camps are built round (D69, Z4): who builds, who holds, which kinds. None: no camp structures. */
+  readonly structures?: StructuresDef;
+}
+
+/** An sRGB colour, 0..255 a channel (a tint multiplying a texture). */
+export type Rgb = readonly [number, number, number];
+
+/** The surfaces a structure's builder lays (the building shader's layers, world/dungeon/meshKit.ts). */
+export type StructureStone = 'ashlar' | 'rubble' | 'brick' | 'flagstone';
+export type StructureRoof = 'slate' | 'tile' | 'shingle' | 'thatch';
+export type StructureArch = 'round' | 'pointed' | 'segmental' | 'flat';
+export type StructureTower = 'square' | 'round' | 'octagon';
+/** What a builder dresses its work with: string courses, buttresses, pilasters, machicolations (corbelled galleries), statues (figures on pedestals), timber hoardings. */
+export type StructureOrnament = 'courses' | 'buttresses' | 'pilasters' | 'machicolations' | 'statues' | 'hoardings';
+
+/**
+ * A hand that builds (Z4: "who built it": the old realm, dwarves, men of the valley): its stone and colours, its
+ * proportions, the arches, towers and ornament it uses. Two works of one hand share a look; two hands never do.
+ */
+export interface StructureBuilderDef {
+  readonly id: string;
+  readonly name: string;
+  readonly stone: StructureStone;
+  readonly tint: Rgb;
+  /** The dressed stone of its quoins, arches and courses. */
+  readonly trim: Rgb;
+  /** The road or floor it lays. */
+  readonly floor: StructureStone;
+  readonly roof: StructureRoof;
+  readonly roofTint: Rgb;
+  readonly timber: Rgb;
+  readonly arches: readonly StructureArch[];
+  readonly towers: readonly StructureTower[];
+  readonly ornament: readonly StructureOrnament[];
+  /** How tall it builds against how wide (1 plain; 1.3 slender and high; 0.75 squat). */
+  readonly tall: number;
+  /** How thick its walls and piers, against the plain (1.4 massive). */
+  readonly thick: number;
+  /** Merlons, as wide as the gaps (1) or broad blocks (2). */
+  readonly merlon: number;
+}
+
+/** What those who hold a structure now add to it (Z4: goblin hides and spikes, bandit palisades and lookouts, the dead's grave goods). */
+export type StructureAddition = 'hides' | 'spikes' | 'skulls' | 'palisade' | 'barricade' | 'lookout' | 'tents' | 'banners' | 'graves' | 'bones' | 'coffins' | 'cages' | 'cart' | 'totem' | 'ropes';
+export interface StructureHolderDef {
+  readonly id: string;
+  readonly name: string;
+  /** What they add, the first ones always, the rest by the seed. */
+  readonly always: readonly StructureAddition[];
+  readonly adds: readonly StructureAddition[];
+  /** Their cloth, hides and banners. */
+  readonly cloth: readonly Rgb[];
+}
+
+/** A kind of structure (Z4): its grammar is the generator's (world/structures), its hands and holders are the setting's. */
+export interface StructureKindDef {
+  readonly id: string;
+  readonly name: string;
+  /** Builders it can be the work of, weighted. */
+  readonly builders: Readonly<Record<string, number>>;
+  /** Who can hold it now, weighted. */
+  readonly holders: Readonly<Record<string, number>>;
+}
+
+export interface StructuresDef {
+  readonly builders: readonly StructureBuilderDef[];
+  readonly holders: readonly StructureHolderDef[];
+  readonly kinds: readonly StructureKindDef[];
 }
 
 /**

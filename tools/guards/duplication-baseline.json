@@ -540,10 +540,6 @@
     "reason": "Calls into the spells' particle bits (spellFx/particles.ts SpellBits): each effect throws its own sprites; the shared part is SpellBits itself."
   },
   {
-    "key": "idiom: [.from Array] in masterworld/app/spellFx/portalStoneFx.ts + masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts + masterworld/world/rocks.ts",
-    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper (rocks.ts: the rock models, variants of each shape)."
-  },
-  {
     "key": "idiom: [.setAttribute .setIndex] in masterworld/render/materials/flame.ts + masterworld/render/materials/portal.ts + masterworld/render/portal/PortalView.ts + masterworld/render/volcano/VolcanoView.ts + masterworld/render/water/WaterView.ts + stage/stage.ts",
     "reason": "Three's BufferGeometry built by hand (attributes, then the index); each mesh builds its own shape."
   },
@@ -914,5 +910,93 @@
   {
     "key": "idiom: [.map .person] in masterworld/app/hails.ts + masterworld/main.ts + masterworld/sim/townFight.ts",
     "reason": "Unrelated reads of an agent's person inside a map (hailers, the start town's friends, a fight's spawns); only the two names match. It crossed the finder's threshold when the stage package grew (StaticBundle), not from a copy."
+  },
+  {
+    "key": "idiom: [.Oak] in masterworld/world/structures/bridge.ts + masterworld/world/structures/props.ts + masterworld/world/structures/tower.ts",
+    "reason": "Timber pieces (beams, posts, rafters) drawn in the oak layer of the building shader: each structure part draws its own (a bridge's patch planks, props' poles, a tower's burned rafters); the layer name is the shared part."
+  },
+  {
+    "key": "idiom: [.footing] in masterworld/main.ts + masterworld/workers/terrain.worker.ts + masterworld/world/rocks.ts",
+    "reason": "Not from a copy: the rocks' footing read where they are placed; it crossed the idiom finder's threshold when the camp structures (Z4) shifted its statistics."
+  },
+  {
+    "key": "idiom: [.from Array] in masterworld/app/spellFx/portalStoneFx.ts + masterworld/render/terrain/groundTextures.ts + masterworld/vgm/encounters.ts + masterworld/world/flora.ts + masterworld/world/rocks.ts + masterworld/world/structures/bridge.ts + masterworld/world/structures/masonry.ts",
+    "reason": "Array.from({ length }) to build a list: the language idiom, not a copied helper (rocks.ts: the rock models; structures: a bridge's piers, the points of a round tower)."
+  },
+  {
+    "key": "idiom: [.onGround .stone] in masterworld/world/dungeon/barrowMesh.ts + masterworld/world/dungeon/towerMesh.ts + masterworld/world/structures/masonry.ts + masterworld/world/structures/props.ts",
+    "reason": "A fallen stone set on the land with MeshKit.onGround and stone(): the one way to lay a loose stone (meshKit), called by each generator for its own stones (a barrow's kerb, a ruined tower's fallen blocks, a structure's rubble)."
+  },
+  {
+    "key": "idiom: [.range .sqrt Math] in masterworld/world/cave/lava.ts + masterworld/world/cave/solution.ts + masterworld/world/structures/bridge.ts",
+    "reason": "Seeded draws scaled by a square root (an even spread over a disc, a size by a builder's thickness): each draws its own thing."
+  },
+  {
+    "key": "idiom: [.tint .wall] in masterworld/world/structures/bridge.ts + masterworld/world/structures/ruin.ts + masterworld/world/structures/tower.ts",
+    "reason": "Reading a structure builder's Style (its wall layer and tint, world/structures/style.ts) to draw a wall: the Style is the shared seam, each part draws its own walls."
+  },
+  {
+    "key": "same name: masterworld/app/title/Toys.ts#along + masterworld/world/structures/bridge.ts#along",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/render/hero/MapSheet.ts#y + masterworld/world/structures/bridge.ts#y",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/setting/contract.ts#span + masterworld/world/structures/ruin.ts#span",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#at + masterworld/world/structures/masonry.ts#at",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/sim/dungeonNav.ts#floorAt + masterworld/world/structures/ruin.ts#floorAt",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/sim/formedSpace.ts#floorAt + masterworld/world/structures/ruin.ts#floorAt",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/caveMouth.ts#top + masterworld/world/structures/bridge.ts#top",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/caveMouth.ts#top + masterworld/world/structures/ruin.ts#top",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/cellarMesh.ts#t + masterworld/world/structures/masonry.ts#t",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/meshKit.ts#P + masterworld/world/structures/masonry.ts#P",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/meshKit.ts#P + masterworld/world/structures/props.ts#P",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/holdRock.ts#top + masterworld/world/structures/tower.ts#top",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/structures/bridge.ts#top + masterworld/world/structures/ruin.ts#top",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/structures/bridge.ts#top + masterworld/world/structures/tower.ts#top",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/structures/masonry.ts#P + masterworld/world/structures/props.ts#P",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "same name: masterworld/world/structures/ruin.ts#top + masterworld/world/structures/tower.ts#top",
+    "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
   }
 ]
