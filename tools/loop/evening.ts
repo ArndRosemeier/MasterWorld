@@ -26,8 +26,8 @@ const runs: { seed: string; opts: EveningOptions; what: string }[] = [
   { seed: seeds[0], opts: { evenings: 1, settlement: 'capital' }, what: 'an evening in the capital' },
   // Coverage (gate Q): the kinds of task that come by chance in the runs above, each played end to end at least once.
   ...(['parley', 'thief', 'watch'] as const).map((kind) => ({ seed: seeds[0], opts: { evenings: 3, only: [kind] }, what: `3 evenings asking ${kind} where it fits` })),
-  // A household that lied about whose heirloom it is (Q3): the seed is one where the first fetches turn out so.
-  { seed: 'x4', opts: { evenings: 3, only: ['heirloom'] }, what: '3 evenings asking heirloom (a lie)' },
+  // A household that lied about whose heirloom it is (Q3): the seed is one where the first fetches turn out so (x12 since Z1's aggro changed x4's evenings).
+  { seed: 'x12', opts: { evenings: 3, only: ['heirloom'] }, what: '3 evenings asking heirloom (a lie)' },
   // A person's favour (D68, N3): evening one begins with someone of the town asking the hero for something of their own calling.
   { seed: seeds[0], opts: { evenings: 2, favour: true }, what: '2 evenings with a favour asked' },
   // A mage (plan C3): asks the bard, opens a school at its teacher and casts in the first place.

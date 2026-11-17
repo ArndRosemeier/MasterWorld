@@ -491,15 +491,17 @@ export class Den {
   }
 
   /**
-   * A pull brings its links (D69): every hostile one of the den (the group) within the link distance of the one pulled comes too, and
-   * nobody farther, so a camp is taken apart by careful pulls.
+   * A pull brings its links (D69): every hostile one of the den (the group) within the link distance of the one pulled and in sight of
+   * it comes too, and nobody farther, so a camp is taken apart by careful pulls.
    */
   private link(c: Creature, out: DenEvent[]): void {
     const q = this.quarry, reach = (this.rules?.aggro ?? PLAIN_AGGRO).link;
     let called = false;
     for (const o of this.creatures) {
       if (o === c || o.def.temper !== 'hostile' || (o.state !== 'idle' && o.state !== 'alert' && o.state !== 'brawl')) continue;
-      if (Math.hypot(o.x - c.x, o.z - c.z, o.y - c.y) > reach || (q && !this.against(o, q))) continue;
+      // Its group in sight of it (a wall between: another room, not linked), or right beside it.
+      const d = Math.hypot(o.x - c.x, o.z - c.z, o.y - c.y);
+      if (d > reach || (d > 2.5 && !this.ground.sees(c.x, c.y, c.z, o.x, o.y, o.z, 0.6)) || (q && !this.against(o, q))) continue;
       o.aware = 1;
       o.seen = c.seen ?? (q ? { x: q.x, y: q.y, z: q.z } : null);
       o.lost = 0;
