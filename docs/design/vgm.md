@@ -23,6 +23,8 @@ What the VGM should become, and where it falls short today: [The VGM we want](ht
 
 **One toolbox (D51).** Everything the VGM can make lives in `src/vgm` (pure: no three.js, so it runs in workers, tests and the loop bot). Each kind of thing is a **tool** with the same shape (section 6). The game (`src/app`, `src/main.ts`) only *applies* what a tool decided: it builds, draws and tells it. It never decides on its own what the world gets.
 
+**Changing with D69 (phase Z, proposed 2026-11-17, waits for Arnd's review).** The VGM stays, but its decisions become permanent: it lays out whole **zones** ahead of the hero (camps, sights, roads, settlements, each zone with a level band) and never moves, empties or replaces what it placed. Camps respawn at their posts. Retired then: the ambush and wild groups placed for an overdue need, the story events that change places (spill, raid, take), move-in and retake, and the stance tool (D64). Tasks point at camps already there. The rows below stay as they are until each step is built; implementation plan phase Z says what changes.
+
 ## 2. The tools today
 
 | Tool | What it makes | When | Writes | How the player hears of it | How it ends | Code |
