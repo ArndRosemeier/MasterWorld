@@ -219,8 +219,11 @@ export function planGreatRuin(defs: StructuresDef, seed: number, ground: Ground,
     return terraces[0].level;
   };
   const front = Math.min(...terraces[0].pts.map((p) => p[1]));
-  const gy = ground(gate[0], front - 2), fl = levelAt(gate[0], gate[1] + 1);
-  if (fl - gy > 0.5 && layout !== 'citadel') { const run = (fl - gy) / 0.3 * 0.4; stairs.push({ a: [gate[0], front - run], b: [gate[0], front], y0: gy, y1: fl, half: 2.5, onGround: true }); }
+  const fl = levelAt(gate[0], gate[1] + 1);
+  // The gate stair's foot stands on the land where it ends (down a slope that is further out than 2 m before the front).
+  let run = 0, gy = ground(gate[0], front - 2);
+  for (let i = 0; i < 4 && fl - gy > 0.5; i++) { run = Math.min(40, ((fl - gy) / 0.3) * 0.4); gy = ground(gate[0], front - run); }
+  if (fl - gy > 0.5 && layout !== 'citadel') stairs.push({ a: [gate[0], front - run], b: [gate[0], front], y0: gy, y1: fl, half: 2.5, onGround: true });
   const adds = [...picks.holder.always, ...rng.sample(picks.holder.adds, rng.int(2, 3))];
   let low = Infinity;
   for (let x = bx0; x <= bx1; x += 4) for (let z = bz0; z <= bz1; z += 4) low = Math.min(low, ground(x, z));

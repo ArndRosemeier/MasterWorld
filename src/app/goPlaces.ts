@@ -10,6 +10,7 @@ import type { SettingModule, SituationKind } from '../setting/contract';
 import type { DecisionLog, DungeonDecision, EventDecision, RegionDecision } from '../world/decisions';
 import { onLand } from '../world/dungeon/site';
 import type { Terrain } from '../world/terrain';
+import { RUIN_OPEN, ruinReach } from '../world/campRuin';
 import { nearestCoast } from '../world/coast';
 import { woodsOf } from '../world/flora';
 import { COURT } from '../world/hold';
@@ -222,8 +223,9 @@ export function goSpots(h: GoHost): GoSpot[] {
     add(L, `Camp: ${c.name}`, async () => {
       const d = nearestTo(decisionsOf(h.log(), 'camp').filter((x) => x.camp === c.id), h.heroPos());
       // Just outside the reach of its outermost posts; a great ruin from before its gate (its front faces −z).
-      const from = d?.landmark === 'great-ruin' ? { x: d.x, z: d.z - 1 } : h.heroPos();
-      return at(d && beside(d, from, d.r * 1.1 + 21), `${c.name} (only in zones laid out round the hero)`);
+      const ruin = d && h.terrain.ruinOf(d.id), from = ruin ? { x: d.x, z: d.z - 1 } : h.heroPos();
+      // (A ruin from inside its open ground, its walls whole in view.)
+      return at(d && beside(d, from, ruin ? ruinReach(ruin) + RUIN_OPEN - 8 : d.r * 1.1 + 21), `${c.name} (only in zones laid out round the hero)`);
     });
   }
 

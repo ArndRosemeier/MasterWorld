@@ -11,7 +11,8 @@ import type { Mesh } from 'three/webgpu';
 import type { Stage } from '@futuremagic/stage';
 import type { RegionsDef, SightDef } from '../setting/contract';
 import { settlementOf, type DecisionLog, type RegionDecision, type SightDecision } from '../world/decisions';
-import { SIGHT_R, hitsSolid, layOut, type SiteJob, type SiteLayout } from '../world/sites';
+import { SIGHT_R, hitsSolid, layOut, type SiteJob, type SiteLayout, type Solid } from '../world/sites';
+import { ruinSolids } from '../world/campRuin';
 import { sightsOf } from '../vgm/answers';
 import { campsOf } from '../vgm/zones';
 import { CAMP_PIECE_R, campPiece } from '../world/sites';
@@ -43,6 +44,8 @@ interface Site {
   readonly decision?: SightDecision;
   /** The hero has stood by it (Discovery is met the first time). */
   found: boolean;
+  /** A camp's ruin's walls and towers before its layout is back from the workers (its foes are placed out of them). */
+  early?: readonly Solid[] | null;
 }
 
 /** The hero has come upon a place within this of its edge (m). */
@@ -212,10 +215,19 @@ export class RegionSites {
   standsIn(x: number, z: number, r: number): boolean {
     for (const s of this.sites) {
       const site = s.at;
-      if (!s.layout || Math.abs(x - site.x) > site.r + r + 5 || Math.abs(z - site.z) > site.r + r + 5) continue;
-      if (hitsSolid(s.layout.solids, x, z, r)) return true;
+      if (Math.abs(x - site.x) > site.r + r + 5 || Math.abs(z - site.z) > site.r + r + 5) continue;
+      const solids = s.layout ? s.layout.solids : this.earlyOf(s);
+      if (solids && hitsSolid(solids, x, z, r)) return true;
     }
     return false;
+  }
+
+  /** A camp's ruin stands in the way as soon as the terrain has it (the same walls its layout will have). */
+  private earlyOf(s: Site): readonly Solid[] | null {
+    if (s.early !== undefined) return s.early;
+    if (!('camp' in s.job) || s.job.camp.landmark !== 'great-ruin') return (s.early = null);
+    const r = this.host.terrain.ruinOf(s.job.camp.id);
+    return r ? (s.early = ruinSolids(r).map((poly) => ({ poly }))) : null;
   }
 
   /** The HUD's part: regions open, places drawn. */

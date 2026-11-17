@@ -11,7 +11,7 @@ import { settlementOf, type CampDecision, type Decision, type DecisionLog, type 
 import { holdBare, holdGround } from './hold';
 import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
 import { SIGHT_CLEARING, campPiece } from './sites';
-import { campRuin, onRuins, ruinReach, type CampRuin } from './campRuin';
+import { RUIN_OPEN, campRuin, onRuins, ruinReach, type CampRuin } from './campRuin';
 import { RoadNet } from './roads';
 import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
@@ -191,7 +191,7 @@ export class Terrain {
         // A camp (D69): its landmark piece stands in a clearing of its own; roads keep out of its reach.
         this.campMap.set(d.id, d);
         const ruin = this.ruinFor(d);
-        if (ruin) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: ruinReach(ruin) + 6 });
+        if (ruin) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: ruinReach(ruin) + RUIN_OPEN });
         // (Its whole ground is open: the camp reads as a place from its edge, not a few stones in the trees.)
         else if (campPiece(d)) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: d.r + 6 });
       } else if (d.kind === 'sight') {

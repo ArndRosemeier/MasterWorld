@@ -33,6 +33,9 @@ export function campRuin(d: CampDecision, defs: StructuresDef, land: (x: number,
   return { d, plan, y0, land: fromMiddle, box: [x0, z0, x1, z1] };
 }
 
+/** The open ground kept round a ruin's reach, metres: the trees keep back from its walls, and it is seen whole from its edge. */
+export const RUIN_OPEN = 30;
+
 /** How far a ruin reaches from its camp's middle, metres (the land it shapes, the clearing round it). */
 export const ruinReach = (r: CampRuin): number => Math.max(-r.box[0], -r.box[1], r.box[2], r.box[3], r.plan.radius);
 

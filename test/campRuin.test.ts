@@ -32,7 +32,10 @@ test('camp ruin: the terrain stands the ruin on the land, its terraces level and
   for (const s of r.plan.stairs) {
     const mu = (s.a[0] + s.b[0]) / 2, mv = (s.a[1] + s.b[1]) / 2, y = ruinGround(r, d.x + mu, d.z + mv, -1e9) - r.y0;
     assert.ok(y >= Math.min(s.y0, s.y1) - 0.01 && y <= Math.max(s.y0, s.y1) + 0.01, `stair ramp ${y} in ${s.y0}..${s.y1}`);
+    // The gate stair starts on the land: no lip at its foot.
+    if (s.onGround) assert.ok(Math.abs(s.y0 - r.land(s.a[0], s.a[1])) < 0.01, `gate stair's foot ${s.y0} on the land ${r.land(s.a[0], s.a[1])}`);
   }
+  assert.ok(r.plan.stairs.some((s) => s.onGround), 'this ruin has its gate stair');
 });
 
 test('camp ruin: its towers and walls stand in the way, its gate and halls\' doors let the hero through', () => {
