@@ -37,7 +37,9 @@ test('cave locks (K6): a story\'s shut ways stand where the cave narrows and no 
       }
     }
   }
-  assert.ok(locks >= 6, `${locks} of ${links} shut ways found a place`);
+  // (Fewer since the concession also ramps drops into pits and the reader no longer climbs up under shelves, 2026-11-17: more ways
+  // round a narrows. Over six caves 34 of 96 shut ways found a place, 44 before.)
+  assert.ok(locks >= 4, `${locks} of ${links} shut ways found a place`);
 });
 
 test('cave locks (K6): a shut lock is solid and keeps the creatures back; a boulder is levered out from its near side, a grate opens with its key, stacked stones are found by lingering', () => {

@@ -13,7 +13,7 @@ import { limbGoals } from '../render/hero/puppet';
 import { CLIMB_CUTS } from '../render/hero/clips';
 import { HoldSteps, SIZED_FOR, type LimbKey } from './climbHolds';
 
-/** The face is this far in front of the walker's body (game/walker.ts OFF_FACE). */
+/** The face is this far in front of the walker's body on a ladder or out of doors (game/walker.ts OFF_FACE; in a cave it is `face.off`). */
 const FACE = 0.35;
 /** How far in front of the face the hips hang, hands and feet on it (m, for a body with hips at the pack's height). */
 const HIPS = 0.42;
@@ -88,7 +88,8 @@ export class ClimbPose {
         this.vu += ((p.y - last.y) / dt - this.vu) * f;
       }
       this.last = { x: p.x, y: p.y, z: p.z };
-      this.holds.stepHolds({ p, nx: F.nx, nz: F.nz, face: FACE, k, vs: this.vs, vu: this.vu, dt });
+      // (The hands and feet on the face where it is: in a cave the body leans out from it round a bulge or hangs under a lip, walker `face.off`.)
+      this.holds.stepHolds({ p, nx: F.nx, nz: F.nz, face: F.off, k, vs: this.vs, vu: this.vu, dt });
       // The sway of the clip follows the paces, but no quicker than a body can sway (a small body's paces are quick).
       const cycles = this.holds.cycles, step = MAX_RATE * dt;
       this.shown = this.grip < 1 / 60 / GRAB * 2 ? cycles : this.shown + Math.max(-step, Math.min(step, cycles - this.shown));

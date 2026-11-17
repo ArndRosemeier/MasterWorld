@@ -21,7 +21,7 @@ export interface Opened {
   readonly b: readonly [number, number, number];
 }
 
-/** Pits of fewer cells than this are not worth a way out. */
+/** Pits of fewer cells than this are not worth a way out (a way cut for a nook of a cell or two left steps in the floor round it: the lava test's walk). */
 const PIT_MIN = 4;
 /** Rounds of read and open at the most. */
 const ROUNDS = 8;
@@ -80,16 +80,21 @@ const RAMP_ROUNDS = 16;
  * is found; where a tall face is the way from it to ground it cannot walk (not reached, or not left), the cheapest such face of each lump
  * gets a rubble ramp at its foot, if the ramp has room (headroom all along and a foot on the ground). Returns the ramps built.
  */
-function ramps(f: BrickField, r: Reading, caves: CavesDef): Opened[] {
+function ramps(f: BrickField, r: Reading, caves: CavesDef, drops: boolean): Opened[] {
   const way = caves.way, { above, slope, steep, half } = way.ramp, out: Opened[] = [];
-  const tall = (a: number, e: number): boolean => r.edgeKind[e] === 1 && Math.abs(r.y[r.edgeTo[e]] - r.y[a]) > above;
+  const climb = (a: number, e: number): boolean => r.edgeKind[e] === 1 && Math.abs(r.y[r.edgeTo[e]] - r.y[a]) > above;
+  // (A ramp's face may be a drop too, down from good ground into a pit: the ramp is then the only way back up out of it.)
+  const tall = (a: number, e: number): boolean => climb(a, e) || (drops && r.edgeKind[e] === 2 && r.y[a] - r.y[r.edgeTo[e]] > above);
   // Reached from a way in, and able to walk back to one, over no tall face.
   const fwd = reachFree(r, above, r.entries).reached, bck = new Uint8Array(r.count), rev: number[][] = Array.from({ length: r.count }, () => []);
-  for (let a = 0; a < r.count; a++) for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) if (!tall(a, e)) rev[r.edgeTo[e]].push(a);
+  for (let a = 0; a < r.count; a++) for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) if (!climb(a, e)) rev[r.edgeTo[e]].push(a);
   const queue: number[] = [];
   for (const c of r.entries) { bck[c] = 1; queue.push(c); }
   for (let n = 0; n < queue.length; n++) { const b = queue[n]; for (const a of rev[b]) if (!bck[a]) { bck[a] = 1; queue.push(a); } }
   const good = (c: number): boolean => fwd[c] === 1 && bck[c] === 1;
+  // Every link into each cell (its far end and its index), tall or not.
+  const into: [number, number][][] = Array.from({ length: r.count }, () => []);
+  for (let a = 0; a < r.count; a++) for (let e = r.edgeStart[a]; e < r.edgeStart[a + 1]; e++) into[r.edgeTo[e]].push([a, e]);
   // The lumps of the rest (cells joined by any link), each with its cheapest tall face to good ground.
   const lump = new Int32Array(r.count).fill(-1), faces: { rise: number; lo: number; up: number }[] = [];
   let lumps = 0;
@@ -105,7 +110,7 @@ function ramps(f: BrickField, r: Reading, caves: CavesDef): Opened[] {
         if (good(b) && tall(a, e)) { const rise = Math.abs(r.y[b] - r.y[a]), lo = r.y[a] < r.y[b] ? a : b; if (!best || rise < best.rise) best = { rise, lo, up: lo === a ? b : a }; }
       }
       // (Faces from good ground into the lump are the lump's too: the edge b -> a is stored with b.)
-      for (const b of rev[a]) if (good(b)) for (let e = r.edgeStart[b]; e < r.edgeStart[b + 1]; e++) if (r.edgeTo[e] === a && tall(b, e)) { const rise = Math.abs(r.y[b] - r.y[a]), lo = r.y[a] < r.y[b] ? a : b; if (!best || rise < best.rise) best = { rise, lo, up: lo === a ? b : a }; }
+      for (const [b, e] of into[a]) { if (good(b) && tall(b, e)) { const rise = Math.abs(r.y[b] - r.y[a]), lo = r.y[a] < r.y[b] ? a : b; if (!best || rise < best.rise) best = { rise, lo, up: lo === a ? b : a }; } }
     }
     if (best && members.length >= PIT_MIN) faces.push(best);
   }
@@ -223,19 +228,24 @@ function cutWays(f: BrickField, sk: Skeleton, caves: CavesDef, dressing: Dressin
 export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?: Dressing, stopwatch: () => number = Date.now): { reading: Reading; opened: Opened[]; sealed: Squeeze[]; ms: number } {
   const t0 = stopwatch(), opened: Opened[] = [];
   let reading = cutWays(f, sk, caves, dressing, stopwatch, readField(f, sk, caves, dressing, stopwatch), opened);
-  // Tall faces the only way on climbs get a rubble ramp (read again after each round: a ramp joins what lay behind it). A ramp must never cost
-  // ground: if the cave reads smaller than before the ramps (one filled a way), the field and the reading are put back as they were.
-  const before = { reading, count: opened.length, bricks: f.bricks.map((b) => (b ? b.slice() : null)) };
+  // Tall faces the only way on climbs, and drops into pits, get a rubble ramp (read again after each round: a ramp joins what lay behind it).
+  // A ramp must never cost ground: a round after which the cave reads smaller, or with more of it that cannot be left, than before it (a ramp
+  // filled a way) is put back as it was and tried again with the climbs' ramps alone (as before the drops had ramps); if that costs ground
+  // too, it is put back and the ramps stop there.
+  let drops = true;
   for (let round = 0; round < RAMP_ROUNDS && reading.entries.length; round++) {
-    const built = ramps(f, reading, caves);
+    const before = { reading, count: opened.length, bricks: f.bricks.map((b) => (b ? b.slice() : null)) };
+    const built = ramps(f, reading, caves, drops);
     if (!built.length) break;
     opened.push(...built);
     reading = readField(f, sk, caves, dressing, stopwatch);
-  }
-  if (reading.stats.reached < before.reading.stats.reached) {
-    f.bricks.splice(0, f.bricks.length, ...before.bricks);
-    opened.length = before.count;
-    reading = before.reading;
+    if (reading.stats.reached < before.reading.stats.reached || reading.stats.trapped > before.reading.stats.trapped) {
+      f.bricks.splice(0, f.bricks.length, ...before.bricks);
+      opened.length = before.count;
+      reading = before.reading;
+      if (!drops) break;
+      drops = false;
+    }
   }
   // A ramp's rubble may have dammed a way behind it: what it left out is cut to again.
   if (lumps(reading).length) reading = cutWays(f, sk, caves, dressing, stopwatch, reading, opened);
