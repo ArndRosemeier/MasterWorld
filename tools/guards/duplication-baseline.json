@@ -1026,5 +1026,117 @@
   {
     "key": "same name: masterworld/main.ts#height + masterworld/world/terrain.ts#height",
     "reason": "Only the name matches: main.ts hands the hero's walker a height() (the cellar's floor, else the drawn land); Terrain.height is the land itself as holds and camps' ruins shape it."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/outline.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/outline.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/formedCave.ts + masterworld/render/materials/water.ts + masterworld/render/underwater.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL arithmetic (.add/.mul node chains) in shader code: how the shading language is written, not a copied routine. Surfaced when the idiom finder's statistics shifted as the light rig moved to @futuremagic/sky (render/sky.ts, materials/weather.ts lost their chains)."
+  },
+  {
+    "key": "same name: masterworld/app/cellarVisit.ts#update + masterworld/render/sky.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the sky's light on top of the shared rig vs this one); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/flyCamera.ts#update + masterworld/render/sky.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the sky's light on top of the shared rig vs this one); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/render/sky.ts#update + masterworld/render/terrain/TerrainView.ts#update",
+    "reason": "Per-frame update methods of unrelated systems (the sky's light on top of the shared rig vs this one); only the name matches."
+  },
+  {
+    "key": "same name: masterworld/world/regions.ts#all + stage/kinds.ts#all",
+    "reason": "Kinds.all (@futuremagic/stage, the material registry) and the regions' list: each returns its own collection; only the name matches."
+  },
+  {
+    "key": "same name: masterworld/app/savesUi.ts#make + stage/kinds.ts#make",
+    "reason": "A kind's make (@futuremagic/stage Kinds: its one material, built on first use) and the saves panel's new-save action; only the name matches."
   }
 ]

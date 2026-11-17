@@ -6,6 +6,7 @@
  */
 import { Color, DoubleSide, MeshBasicNodeMaterial, Vector2, Vector3, type Texture } from 'three/webgpu';
 import { skyToward } from '@futuremagic/sky/node';
+import { fullSky } from '@futuremagic/sky/rig';
 import {
   Fn, attribute, cameraPosition, clamp, cross, dot, exp, float, fog, fract, length, max, mix, mod, normalize, positionGeometry,
   positionWorld, select, sin, smoothstep, uniform, vec2, vec3, vec4,
@@ -46,15 +47,6 @@ export const FOG = inRenderGroup({
   /** 1: one colour everywhere (`color`: under water, below ground); 0: the sky's colour toward each view. */
   flat: uniform(0),
 });
-
-/**
- * The sky's light in the shade is its environment map; Preetham's clear sky is too saturated a blue for
- * that, so the env copy is drawn with this much of its colour (sky.ts), and the fog puts it back.
- */
-export const ENV_SATURATION = 0.6;
-
-/** A colour read from the sky's environment map with its full colour back (see ENV_SATURATION). */
-export const fullSky = (c) => mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, 1 / ENV_SATURATION).max(0);
 
 /**
  * The fog node for `scene.fogNode` (set before the warm-up: it is part of every shader's key). `env` is the

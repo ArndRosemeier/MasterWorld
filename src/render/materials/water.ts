@@ -14,7 +14,8 @@ import type { Node } from 'three/webgpu';
 import { defineKind } from '../materials';
 import { HULLS, HULL_STATIONS, WATER, waterAt } from './waterInputs';
 import { WAVES, waveMotion } from '../../world/swell';
-import { WEATHER, fullSky, rainRings } from './weather';
+import { WEATHER, rainRings } from './weather';
+import { fullSky } from '@futuremagic/sky/rig';
 import { rippleSlope, streakFoam } from './waterSurface';
 import { EYE, WORLD } from '../origin';
 
@@ -109,7 +110,7 @@ export const WATER_KIND = defineKind('water', ['position'], () => {
     // The sky and the sun in it.
     const R = reflect(V.negate(), N);
     const Rup = normalize(vec3(R.x, max(abs(R.y), mix(float(0.12), float(0.25), rough)), R.z));
-    // The env copy of the sky is drawn with less colour (weather.ts ENV_SATURATION): the mirror gives it back.
+    // The env copy of the sky is drawn with less colour (@futuremagic/sky ENV_SATURATION): the mirror gives it back.
     const sky = fullSky(pmremTexture(envTex!, Rup, mix(float(0.06), float(0.2), rough)).rgb).mul(W.env);
     const rs = max(dot(R, W.sunDir), 0);
     const spec = pow(rs, 900).mul(30).add(pow(rs, 80).mul(0.6));
