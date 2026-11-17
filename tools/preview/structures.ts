@@ -46,12 +46,13 @@ function build(seed: number): { land: Land; built: Built } {
   if (kind === 'bridge') {
     const land = bridgeLand(seed), plan = planBridge(classic.structures!, seed, land.ground), mesh = fortifiedBridgeMesh(plan, land.ground);
     const s = bridgeSignature(plan);
-    const mid = (plan.xs + plan.xe) / 2, y = deckAt(plan, plan.lipA);
+    // Standing on the road a few steps before the first tower or span, looking along the deck.
+    const mid = (plan.xs + plan.xe) / 2, x0 = Math.max(plan.xs, Math.min(plan.spans[0]?.x0 ?? plan.lipA, ...plan.towers.map((t) => t.cx - t.hx)) - 8);
     return {
       land, built: {
         mesh, label: `${seed}: ${plan.picks.builder.id}, ${s.form}, ${plan.spans.length} spans${plan.tiers > 1 ? ` in ${plan.tiers} tiers` : ''}, ${s.gates} gate ${s.gateType}, ${s.mids} on piers, ${plan.picks.state}, ${plan.picks.holder.id} (${land.kind})`,
         centre: new T.Vector3(mid, (plan.low + plan.high) / 2, 0), radius: Math.max(plan.xe - plan.xs, plan.high - plan.low) / 2 + 6,
-        eye: new T.Vector3(plan.xs - 7, deckAt(plan, plan.xs) + 1.7 + 0.5, -plan.hw * 0.3), look: new T.Vector3(plan.xs + 30, deckAt(plan, plan.xs + 30) + 2.2, 0), hero: new T.Vector3(plan.xs + 2.5, y, 1),
+        eye: new T.Vector3(x0 - 7, deckAt(plan, x0) + 2.2, -plan.hw * 0.3), look: new T.Vector3(x0 + 30, deckAt(plan, x0 + 30) + 2.2, 0), hero: new T.Vector3(x0 + 2.5, deckAt(plan, x0 + 2.5), 1),
       },
     };
   }
@@ -61,7 +62,7 @@ function build(seed: number): { land: Land; built: Built } {
     land, built: {
       mesh, label: `${seed}: ${plan.picks.builder.id}, ${s.layout}, ${s.halls} halls, ${s.towers} towers, ${s.terraces} terraces, ${plan.picks.state} (${land.kind})`,
       centre: new T.Vector3(plan.cx, (plan.low + plan.high) / 2, plan.cz), radius: plan.radius,
-      eye: new T.Vector3(plan.gate[0], plan.gate[2] + 1.7, plan.gate[1] - 8), look: new T.Vector3(plan.cx, plan.gate[2] + 4, plan.cz), hero: new T.Vector3(plan.gate[0] + 1, plan.gate[2], plan.gate[1] - 3),
+      eye: new T.Vector3(plan.gate[0], plan.gate[2] + 1.7, plan.gate[1] - 8), look: new T.Vector3(plan.cx, plan.gate[2] + 4, plan.cz), hero: new T.Vector3(plan.gate[0] + 1, land.ground(plan.gate[0] + 1, plan.gate[1] - 3), plan.gate[1] - 3),
     },
   };
 }
