@@ -19,7 +19,7 @@
 import { Rng, deriveSeed, type Ground } from '@futuremagic/core';
 import type { StructureArch, StructureTower, StructuresDef, StructureAddition } from '../../setting/contract';
 import { BuildingMat, CellarMat, MeshKit, scaleTint, type PlacedMesh, type Tint } from '../dungeon/meshKit';
-import { archRise, beam, roundPts, floorOf, gable, prism, rect, wallRing, rubble, spire, wall, type Opening, type P2, type Site } from './masonry';
+import { archRise, grimed, beam, roundPts, floorOf, gable, prism, rect, wallRing, rubble, spire, wall, type Opening, type P2, type Site } from './masonry';
 import { banner, barricade, bones, cage, cart, coffin, grave, pelt, lookout, onLand, palisade, rope, room, skull, stakeRow, statue, tent, totem, type Floor } from './props';
 import { tower, type TowerTop } from './tower';
 import { apart, fallen, pickStructure, styleOf, type Picks, type Signature, type Style } from './style';
@@ -254,8 +254,9 @@ export const bridgesApart = (a: BridgePlan, b: BridgePlan): number => apart(brid
 /** The bridge as one mesh in the building format, in its own frame (the road along x). */
 export function fortifiedBridgeMesh(p: BridgePlan, ground: Ground): PlacedMesh {
   const k = new MeshKit(), rng = new Rng(deriveSeed(p.seed, 'bridge-mesh'));
-  const site: Site = { k, rng, ground, moss: p.picks.moss };
-  const style = styleOf(p.picks.builder), fall = fallen(p.picks.state), hw = p.hw;
+  // Kept up, its stone is clean; the further it has fallen, the older and dirtier it looks.
+  const site: Site = { k, rng, ground, moss: p.picks.moss, wear: fallen(p.picks.state) * 0.85 };
+  const base = styleOf(p.picks.builder), style: Style = { ...base, floorTint: grimed(base.floorTint, site.wear!) }, fall = fallen(p.picks.state), hw = p.hw;
   const deck = (x: number) => deckAt(p, x);
   const towerX = p.towers.map((t) => [t.cx - t.hx, t.cx + t.hx] as const);
   // Masonry runs: from end to end, less the towers and the gaps.

@@ -17,7 +17,7 @@
 import { Noise, Rng, deriveSeed, type Ground } from '@futuremagic/core';
 import type { StructureArch, StructureAddition, StructuresDef } from '../../setting/contract';
 import { MeshKit, WildMat, mixTint, scaleTint, type PlacedMesh, type Tint } from '../dungeon/meshKit';
-import { archRise, centroid, roundPts, floorOf, gable, inset, line, prism, rect, wallRing, rubble, steps, wall, type Opening, type P2, type Site } from './masonry';
+import { archRise, grimed, centroid, roundPts, floorOf, gable, inset, line, prism, rect, wallRing, rubble, steps, wall, type Opening, type P2, type Site } from './masonry';
 import { banner, bones, cage, coffin, grave, room, skull, stake } from './props';
 import { tower, type TowerTop } from './tower';
 import { apart, fallen, pickStructure, styleOf, type Picks, type Signature, type Style } from './style';
@@ -251,8 +251,9 @@ const DARK: Tint = [12, 11, 10];
 
 export function greatRuinMesh(p: GreatRuinPlan, ground: Ground): PlacedMesh {
   const k = new MeshKit(), rng = new Rng(deriveSeed(p.seed, 'ruin-mesh')), noise = new Noise(deriveSeed(p.seed, 'ruin-wear'));
-  const site: Site = { k, rng, ground, moss: p.picks.moss };
-  const style = styleOf(p.picks.builder), fall = fallen(p.picks.state), arch: StructureArch = p.picks.arch === 'flat' ? 'segmental' : p.picks.arch;
+  // A ruin is old whatever is left of it: its stone grimed and streaked, more so the further it has fallen.
+  const site: Site = { k, rng, ground, moss: p.picks.moss, wear: 0.6 + fallen(p.picks.state) * 0.4 };
+  const base = styleOf(p.picks.builder), style: Style = { ...base, floorTint: grimed(base.floorTint, site.wear!) }, fall = fallen(p.picks.state), arch: StructureArch = p.picks.arch === 'flat' ? 'segmental' : p.picks.arch;
   const floorMat = p.picks.moss > 0.6 ? WildMat.Grass : style.floor;
   const floorTint = p.picks.moss > 0.6 ? ([196, 206, 168] as Tint) : mixTint(style.floorTint, [120, 132, 96], p.picks.moss * 0.5);
   // Terraces: retaining walls to their level and their floor.
