@@ -181,7 +181,6 @@ import { UPKEEP_SERVICES, UpkeepUi } from './app/upkeepUi';
 import { HoldGate } from './app/holdGate';
 import { Retreats } from './app/retreats';
 import { PEOPLE_SERVICES, PeoplesTalk } from './app/peoples';
-import { stanceFor } from './vgm/stance';
 import { Standing, changeLine, householdOf, peopleOf, tierFloor } from './game/standing';
 import type { HoldDecision } from './world/decisions';
 import { COURT } from './world/hold';
@@ -856,7 +855,6 @@ export async function start(b: Boot): Promise<void> {
       stilled: (id) => comeDown?.(id) ?? false,
       failed: (id) => failedPlace?.(id) ?? true,
       slain: (faction) => { for (const c of standing.slain(faction)) if (c.tier) notes.say(changeLine(c), 5); },
-      struckFirst: (faction, key) => { for (const c of standing.struckFirst(key, faction)) if (c.tier) notes.say(changeLine(c), 5); },
       say: (text, at) => overHead(text, at),
     };
     // The hero's fall, seen through to its end whichever fight dealt it.
@@ -887,7 +885,6 @@ export async function start(b: Boot): Promise<void> {
     cellars = new Cellars({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, lantern: view.lantern, warm: view.warm, sky: view.sky, notes, setting, character, standing, seed, director, journal, hud: fightHud,
       fight: fightHost,
-      known: (group) => stanceFor({ setting, log, towns: terrain.towns, hours: hours(), group }),
       swapped: () => autosave(),
       cue: (c) => sounds?.cue(c),
       dweller: params.dweller,
@@ -934,7 +931,6 @@ export async function start(b: Boot): Promise<void> {
     };
     const wild = start && params.wild ? new WildLand({
       stage: view.stage, renderer: view.renderer, camera: view.camera, canvas, player, notes, setting, character, standing, seed, director, journal, hud: fightHud, fight: fightHost,
-      known: (group) => stanceFor({ setting, log, towns: terrain.towns, hours: hours(), group }),
       cue: (c) => sounds?.cue(c),
       out: () => !visit() && !rooms?.inside && !player.offFoot,
       // Seen far off by day, near by night.

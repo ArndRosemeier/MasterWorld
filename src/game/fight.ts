@@ -8,12 +8,13 @@
 import { Rng, angleDiff, deriveSeed } from '@futuremagic/core';
 import { abilityOf, type AbilityDef, type DamageKind, type SettingModule } from '../setting/contract';
 import { strike, threatOf, type Blow, type Strike, type Threat } from '../sim/combat';
-import { radiusOf, type BreakCause, type Creature, type Den, type DenEvent, type Quarry, type WarnTurn } from '../sim/creatures';
+import { radiusOf, type Creature, type Den, type DenEvent, type Quarry } from '../sim/creatures';
 import type { Character } from './character';
 import { defOf, rollLoot, type Item, type Loot } from './items';
 import { blowOf, mendCaster, Recipes, SELF, type Mark, type RecipeEvent, type RecipeWorld, type TerrainEdit } from './recipe';
 import { WEAR, type WearState } from './upkeep';
-import { dauntsFrom, evenDanger, fightXp } from './growth';
+import { evenDanger, fightXp } from './growth';
+import { conOf, foeLevel, type Con } from '../sim/aggro';
 import type { Standing } from './standing';
 import { opposed } from '../sim/factions';
 
@@ -33,10 +34,8 @@ export type FightEvent =
   | { readonly kind: 'hurt'; readonly by: Creature; readonly strike: Strike }
   | { readonly kind: 'swing'; readonly who: Creature }
   | { readonly kind: 'notice'; readonly who: Creature }
-  /** A band of foes speaks to the hero before any blow (D64): `who` speaks for it, `turn` is what it says. */
-  | { readonly kind: 'warn'; readonly who: Creature; readonly turn: WarnTurn }
-  /** The warning ended in a fight: `who` speaks for the band, `cause` is why. */
-  | { readonly kind: 'break'; readonly who: Creature; readonly cause: BreakCause }
+  /** A humanoid foe attacks of its own accord (D69): its one short cry. */
+  | { readonly kind: 'cry'; readonly who: Creature }
   /** `byHero`: the hero hurt it (D65: only then it gives experience and counts against its faction); else others brought it down. */
   | { readonly kind: 'killed'; readonly who: Creature; readonly loot: Loot; readonly xp: number; readonly byHero: boolean }
   | { readonly kind: 'flee'; readonly who: Creature }
@@ -52,8 +51,6 @@ export type FightEvent =
   /** A foe lifted a door's bar (link) standing at `from` (the den's frame): the door is seen swinging away from it. */
   | { readonly kind: 'unbarred'; readonly link: number; readonly from: readonly [number, number] };
 
-/** The hero looks weak to a jeering band below this share of their health (D64). */
-const FRAIL = 0.5;
 /** Hero body radius, metres. */
 const HERO_R = 0.35;
 /** The hero must face the target within this to strike (radians). */
@@ -90,6 +87,7 @@ export class Fight implements RecipeWorld {
     this.rng = new Rng(deriveSeed(seed, 'fight'));
     this.recipes = new Recipes(hero, this, setting.effects ?? [], deriveSeed(seed, 'recipes'));
     den.feud = (a, b) => opposed(setting, a, b);
+    den.rules = setting;
   }
 
   /** The den's view of the hero now. */
@@ -100,8 +98,14 @@ export class Fight implements RecipeWorld {
     const veil = 1 - this.recipes.veilOf(SELF);
     const noise = Math.max(this.quiet < 3 ? 1 : 0, moving * (1 - stealth / 160)) * veil;
     const g = this.hero.guard(this.hero.stamina <= 0 || this.recipes.isHeld(SELF));
-    // Foes the hero has outgrown so far they give no experience dare not start a fight (D58).
-    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) }, daunts: dauntsFrom(this.setting.growth, this.hero.level), frail: this.hero.health < this.hero.maxHealth * FRAIL, ...(this.standing ? { regard: (faction: string) => this.standing!.tier(faction) } : {}) };
+    // Every foe's aggro radius is weighed against the hero's level (D69); a veil and the stealth worn (gear, not the level) take their share off it.
+    const hide = 1 - veil * (1 - Math.min(0.5, this.hero.bonus('stealth') / 100));
+    return { x: p.x, y: p.y, z: p.z, noise, light: this.light * veil, alive: this.hero.alive, guard: { ...g, armour: g.armour + this.recipes.wardOf(SELF) }, level: this.hero.level, hide, ...(this.standing ? { regard: (faction: string) => this.standing!.tier(faction) } : {}) };
+  }
+
+  /** How a foe's level stands against the hero's (D69): the colour its name is shown in. */
+  con(c: Creature): Con {
+    return conOf(this.setting.aggro, foeLevel(this.setting.growth, c.def), this.hero.level);
   }
 
   /**
@@ -314,8 +318,7 @@ export class Fight implements RecipeWorld {
       }
       case 'swing': out.push({ kind: 'swing', who: e.who }); break;
       case 'notice': out.push({ kind: 'notice', who: e.who }); break;
-      case 'warn': out.push({ kind: 'warn', who: e.who, turn: e.turn }); break;
-      case 'break': out.push({ kind: 'break', who: e.who, cause: e.cause }); break;
+      case 'cry': out.push({ kind: 'cry', who: e.who }); break;
       case 'flee': out.push({ kind: 'flee', who: e.who }); break;
       case 'plea': out.push({ kind: 'plea', who: e.who, text: e.text }); break;
       case 'spared': out.push({ kind: 'spared', who: e.who }); break;

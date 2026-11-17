@@ -160,9 +160,11 @@ test('fight: the begging goblin pleads in broken Common and is spared when left 
   const g = den.creatures[0];
   const pleas: string[] = [];
   let spared = false;
+  // Close by where it can see the hero (D69: in its sight), then far off.
+  const side = ([[2, 0], [-2, 0], [0, 2], [0, -2]] as const).find(([dx, dz]) => den.ground.sees(g.x, g.y, g.z, g.x + dx, g.y, g.z + dz, 0.8)) ?? [2, 0];
   for (let t = 0; t < 40 && !spared; t += 0.1) {
     const near = t < 20;
-    for (const e of den.step(0.1, { ...away, x: g.x + (near ? 2 : 30), y: g.y, z: g.z, noise: 1, light: 9 })) {
+    for (const e of den.step(0.1, { ...away, x: g.x + (near ? side[0] : 30), y: g.y, z: g.z + (near ? side[1] : 0), noise: 1, light: 9 })) {
       if (e.kind === 'plea') pleas.push(e.text);
       if (e.kind === 'spared') spared = true;
     }

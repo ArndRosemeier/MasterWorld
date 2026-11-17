@@ -14,6 +14,7 @@ import { names, talk } from './people';
 import { factions } from './factions';
 import { peoples, standing } from './peoples';
 import { growth } from './growth';
+import { aggro } from './aggro';
 import { creatures } from './creatures';
 import { hero } from './hero';
 import { routines } from './routines';
@@ -84,6 +85,7 @@ export const classic: SettingModule = {
   standing,
   factions,
   growth,
+  aggro,
   talk,
   schools,
   creatures,

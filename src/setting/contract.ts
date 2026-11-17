@@ -9,7 +9,7 @@
 import type { GradeKey } from '@futuremagic/stage';
 import type { SettlementSize } from '@futuremagic/settlement';
 
-export const CONTRACT_VERSION = 17;
+export const CONTRACT_VERSION = 18;
 
 /**
  * The ground surfaces the engine can draw on open land (each is a tileable material layer). Rock on steep
@@ -973,72 +973,32 @@ export interface BirdKindDef {
 }
 
 /**
- * What a humanoid foe wants of the hero (D64). `guard`: warns and holds a line; `rob`: walks up and demands a share of the purse;
- * `jeer`: taunts, and attacks once many or the hero looks weak; `bar`: a hold's warden (the hold's own watch, game/hold.ts, speaks for it);
- * `mindless`: the walking dead attack at once; `murderous`: attacks at once with a war cry that says why (cutthroats).
+ * What a hold's wardens show the hero with their bodies (plan 11.6, game/hold.ts): `warn` a raised hand as they come near, `last` the
+ * weapons drawn, `settle` giving way once the hero has gone back, `greet` a wave to someone welcome. (The D64 bands that warned, robbed and
+ * jeered are retired by D69: a foe now simply attacks within its aggro radius.)
  */
-export const STANCE_KINDS = ['guard', 'rob', 'jeer', 'bar', 'mindless', 'murderous'] as const;
-export type StanceKind = (typeof STANCE_KINDS)[number];
-
-/** The kinds that warn before they fight (a bar's warning belongs to the hold). */
-export const WARNING_STANCES: readonly StanceKind[] = ['guard', 'rob', 'jeer'];
-/** The kinds whose speaker has lines: the warning ones, and the murderous with their war cry (R8). */
-export const SPEAKING_STANCES: readonly StanceKind[] = [...WARNING_STANCES, 'murderous'];
-
-/**
- * What a warning band says (D64): `warn` its first word (a guard's challenge, a robber's halt), `last` the final one, `demand` a robber's
- * price, `jeer` a goblin's jibe, `settle` giving way once the hero has gone back, `greet` its word to a friend, `yield` backing off from
- * a hero far above it (D58).
- */
-export const WARN_TURNS = ['warn', 'last', 'demand', 'jeer', 'settle', 'greet', 'yield'] as const;
+export const WARN_TURNS = ['warn', 'last', 'settle', 'greet'] as const;
 export type WarnTurn = (typeof WARN_TURNS)[number];
 
 /**
- * What the speaker of a band says when the hero talks to it during its warning (R7): `terms` what it wants, `deal` its word once the
- * hero agrees, `short` when the hero cannot pay. A robber's terms are a price (`{coins}` copper), a guard's a pact (the hero keeps away).
+ * Simple aggro (D69, phase Z1): a foe hostile to the hero attacks once the hero is within its aggro radius and in its sight. The radius is
+ * `even` at the hero's level (a kind may set its own, `CreatureDef.aggro`), `up` metres wider for each level the foe stands above the hero
+ * to `max`, `down` metres narrower for each level below to `min`; a foe `grey` or more levels below the hero starts nothing. Pulling one
+ * brings those of its group within `link` metres. A foe chased more than `leash` metres from where it was pulled, or `chase` seconds with
+ * no blow either way, gives up, goes home and heals. `con`: the level differences where the name's colour changes (grey at `-grey` and
+ * below, green to `-green`, blue to `-blue`, white at even, yellow below `+red`, red from it).
  */
-export const TALK_TURNS = ['terms', 'deal', 'short'] as const;
-export type TalkTurn = (typeof TALK_TURNS)[number];
-
-/** Why a warning ends in a fight: the hero crossed the line or struck first, a robber's or a jeerer's patience ran out, the hero looks weak, their faction hates the hero, a cutthroat wants them dead (`murder`: R8, no warning at all), or the VGM knows a reason (the hero was hired against them, or killed their kin: `vgm/stance.ts`). */
-export const BREAK_CAUSES = ['line', 'struck', 'patience', 'many', 'frail', 'hated', 'hired', 'kin', 'murder'] as const;
-export type BreakCause = (typeof BREAK_CAUSES)[number];
-
-/** What each warning stance says, and the ways its warning ends (the lines the setting must give). */
-export const STANCE_SPEECH: Readonly<Record<'guard' | 'rob' | 'jeer' | 'murderous', { readonly turns: readonly WarnTurn[]; readonly breaks: readonly BreakCause[] }>> = {
-  guard: { turns: ['warn', 'last', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin'] },
-  rob: { turns: ['warn', 'demand', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'patience'] },
-  jeer: { turns: ['jeer', 'settle', 'greet', 'yield'], breaks: ['line', 'struck', 'hated', 'hired', 'kin', 'many', 'frail'] },
-  murderous: { turns: [], breaks: ['murder', 'struck'] },
-};
-
-/** The lines of one stance: a pool for each turn it speaks (one picked, seeded) and for each way its warning ends. */
-export interface StanceWords {
-  readonly turns: Readonly<Partial<Record<WarnTurn, readonly string[]>>>;
-  readonly breaks: Readonly<Partial<Record<BreakCause, readonly string[]>>>;
-  /** What it says when the hero talks to it (only the stances that can be talked to: `StanceDef.talk`). */
-  readonly talk?: Readonly<Partial<Record<TalkTurn, readonly string[]>>>;
-}
-
-export interface StanceDef {
-  readonly kind: StanceKind;
-  /** Warning kinds: it speaks to a hero this near (m) once it has noticed them. */
-  readonly warn?: number;
-  /** Warning kinds: a hero nearer than this (m) starts the fight. */
-  readonly line?: number;
-  /** `rob`: it walks up to the hero until it stands this far off (m), and demands. */
-  readonly close?: number;
-  /** `rob`, `jeer`: seconds after its demand or first jibe before it loses patience and fights. */
-  readonly patience?: number;
-  /** `jeer`: with at least this many of its band, it fights when its patience is spent (a lone one only jeers). */
-  readonly many?: number;
-  /**
-   * Talking to the band during its warning (R7): `price` it names a share of the hero's purse and lets them pass once it is paid; `pact`
-   * it lets them pass on their word to keep away; none: it does not talk. The band then keeps its word until the hero strikes.
-   */
-  readonly talk?: 'price' | 'pact';
-  /** `talk: price`: the share of the hero's purse it asks, between these two (seeded by who asks and the purse). */
-  readonly toll?: readonly [number, number];
+export interface AggroDef {
+  readonly even: number;
+  readonly up: number;
+  readonly down: number;
+  readonly min: number;
+  readonly max: number;
+  readonly grey: number;
+  readonly link: number;
+  readonly leash: number;
+  readonly chase: number;
+  readonly con: { readonly green: number; readonly blue: number; readonly red: number };
 }
 
 /**
@@ -1063,12 +1023,16 @@ export interface CreatureDef {
   readonly attacks: readonly AttackDef[];
   /** Sees this far in the dark (m) and much farther by the hero's light; hears a running hero this far. */
   readonly senses: { readonly sight: number; readonly hearing: number };
-  /** skittish: keeps away unless cornered or many; hostile: attacks on sight (D64: a humanoid's `stance` says what it wants first); placid: takes no notice of the hero at all, afraid of nothing, and defends itself only once struck (the peaceful giants, D67). */
-  readonly temper: 'skittish' | 'hostile' | 'placid';
+  /**
+   * skittish: keeps away unless cornered; hostile: attacks a hero hostile to its faction within its aggro radius (D69); neutral: watches
+   * the hero and fights only once struck (a boar, D69); placid: takes no notice of the hero at all, afraid of nothing, and defends itself
+   * only once struck (the peaceful giants, D67).
+   */
+  readonly temper: 'skittish' | 'hostile' | 'neutral' | 'placid';
+  /** Its aggro radius at the hero's level (m, D69); none: the setting's (`AggroDef.even`). */
+  readonly aggro?: number;
   /** Who it belongs to (D65): a people's id or one of `factions.others`. It never changes. */
   readonly faction: string;
-  /** What a humanoid wants of the hero before any blow (D64, phase R); every humanoid has one, beasts none (they only fight or flee). */
-  readonly stance?: StanceDef;
   /**
    * A shy beast's flight distance, metres (deer): farther off it only lifts its head and watches the hero,
    * nearer it bolts, and it runs until twice this far before it grazes again, never back towards the hero.
@@ -2118,10 +2082,13 @@ export interface FactionsDef {
   readonly others: readonly FactionDef[];
   /** Each pair that is not neutral, both ways round (a faction is its own ally). */
   readonly matrix: readonly (readonly [string, string, Hostility])[];
-  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. Striking a band first (R7, once per band) moves it by `first`. */
-  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number; readonly first: number };
-  /** What the one who speaks for a band says to the hero (D64), by stance: a short speech bubble, never anywhere else (rule 11). */
-  readonly words: Readonly<Partial<Record<'guard' | 'rob' | 'jeer' | 'murderous', StanceWords>>>;
+  /** The hero kills one of an aware faction: standing with it moves by `own` (negative), and with every faction hostile to it by `foes`, never raised past `upTo` that way. */
+  readonly kill: { readonly own: number; readonly foes: number; readonly upTo: number };
+  /**
+   * The one short cry a humanoid foe of a faction shouts in a bubble as it attacks (D69, open question 9: "Intruder!"), by faction; a
+   * faction with none attacks in silence (the walking dead). Nothing is said before the fight.
+   */
+  readonly cries: Readonly<Partial<Record<string, readonly string[]>>>;
 }
 
 export interface SettingModule {
@@ -2144,6 +2111,8 @@ export interface SettingModule {
   readonly factions: FactionsDef;
   /** Levels and experience (D58). */
   readonly growth: GrowthDef;
+  /** Simple aggro, links, leash and con colours (D69, Z1). */
+  readonly aggro: AggroDef;
   readonly talk: TalkDef;
   /** The schools of magic (plan 10, D59): its spells' families and looks. */
   readonly schools: readonly SchoolDef[];
@@ -2388,6 +2357,7 @@ export function validateSetting(m: SettingModule): string[] {
   out.push(...validateFight(m, where));
   out.push(...validatePeoples(m, where));
   out.push(...validateFactions(m, where));
+  out.push(...validateAggro(m.aggro, where));
   out.push(...validateRoutines(m.routines, where));
   out.push(...validateAsks(m, where));
   if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
@@ -2400,21 +2370,6 @@ export function validateSetting(m: SettingModule): string[] {
 }
 
 /** Formed caves (D63): the rocks their kinds name exist, the ranges run the right way, the chances add up, no way squeezes. */
-/** A humanoid has a stance (D64), a beast none; a warning stance has its distances, the line inside the warning. */
-export function validateStance(c: CreatureDef, where: string): string[] {
-  const out: string[] = [], st = c.stance, at = `${where}: creature "${c.id}"`;
-  if (c.body.kind !== 'humanoid') { if (st) out.push(`${at} is no humanoid and has a stance`); return out; }
-  if (!st) return [`${at} is a humanoid and needs a stance (D64)`];
-  if (!STANCE_KINDS.includes(st.kind)) return [`${at} has an unknown stance "${st.kind}"`];
-  if (!WARNING_STANCES.includes(st.kind)) return out;
-  if (!(st.warn! > 0) || !(st.line! > 0) || st.line! >= st.warn!) out.push(`${at} stance ${st.kind} needs warn > line > 0`);
-  if (st.kind === 'rob' && (!(st.close! > st.line!) || st.close! >= st.warn! || !(st.patience! > 0))) out.push(`${at} stance rob needs warn > close > line and a patience`);
-  if (st.kind === 'jeer' && (!(st.many! >= 2) || !(st.patience! > 0))) out.push(`${at} stance jeer needs many (2 or more) and a patience`);
-  if (st.talk === 'price' && (!st.toll || !(st.toll[0] > 0 && st.toll[0] <= st.toll[1] && st.toll[1] <= 1))) out.push(`${at} stance talk price needs a toll of two shares, 0 < low <= high <= 1`);
-  if (st.talk !== 'price' && st.toll) out.push(`${at} has a toll without asking a price`);
-  return out;
-}
-
 export function validateCaves(c: CavesDef, kinds: readonly string[], where: string): string[] {
   const out: string[] = [];
   const ids = new Set<string>();
@@ -2499,6 +2454,16 @@ function validateAsks(m: SettingModule, where: string): string[] {
 
 /** The peoples: one for every people with names, sensible regard, and a hold's guard that exists. */
 /** Factions (D65): every creature has a known one, the matrix names known factions and says each pair once. */
+/** Aggro (D69): the radius stays within its bounds, a link, a leash and a chase time, and the con colours step outwards. */
+export function validateAggro(a: AggroDef, where: string): string[] {
+  const out: string[] = [];
+  if (!(a.min > 0 && a.min <= a.even && a.even <= a.max)) out.push(`${where}: aggro needs 0 < min <= even <= max`);
+  if (!(a.up >= 0 && a.down >= 0 && a.grey >= 1)) out.push(`${where}: aggro needs up and down of 0 or more and grey of 1 or more`);
+  if (!(a.link > 0 && a.leash > a.max && a.chase > 0)) out.push(`${where}: aggro needs a link, a leash longer than the widest radius, and a chase time`);
+  if (!(a.con.blue >= 1 && a.con.green > a.con.blue && a.grey > a.con.green && a.con.red >= 2)) out.push(`${where}: aggro con needs 1 <= blue < green < grey and red of 2 or more`);
+  return out;
+}
+
 export function validateFactions(m: SettingModule, where: string): string[] {
   const out: string[] = [], f = m.factions;
   const ids = new Set([...m.peoples.map((p) => p.id), ...f.others.map((o) => o.id)]);
@@ -2515,12 +2480,9 @@ export function validateFactions(m: SettingModule, where: string): string[] {
     seen.add(key);
   }
   if (!(f.kill.own < 0 && f.kill.foes > 0 && f.kill.upTo > 0)) out.push(`${where}: factions.kill needs own below 0, foes and upTo above 0`);
-  for (const kind of ['guard', 'rob', 'jeer', 'murderous'] as const) {
-    const need = STANCE_SPEECH[kind], w = f.words[kind];
-    if (!w) { out.push(`${where}: stance ${kind} has no words`); continue; }
-    for (const t of need.turns) if (!w.turns[t]?.length) out.push(`${where}: stance ${kind} has no line for ${t}`);
-    for (const b of need.breaks) if (!w.breaks[b]?.length) out.push(`${where}: stance ${kind} has no line for breaking on ${b}`);
-    for (const l of [...Object.values(w.turns), ...Object.values(w.breaks), ...Object.values(w.talk ?? {})].flat()) if (l.length > 60) out.push(`${where}: stance ${kind} line "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
+  for (const [id, lines] of Object.entries(f.cries)) {
+    if (!ids.has(id)) out.push(`${where}: cries for unknown faction "${id}"`);
+    for (const l of lines ?? []) if (l.length > 60) out.push(`${where}: cry "${l.slice(0, 20)}…" is over 60 characters (a bubble is short)`);
   }
   return out;
 }
@@ -2610,9 +2572,7 @@ function validateFight(m: SettingModule, where: string): string[] {
     if (!(c.morale >= 0 && c.morale <= 1)) out.push(`${where}: creature "${c.id}" morale must be 0..1`);
     for (const a of c.attacks) if (!DAMAGE_KINDS.includes(a.kind) || !(a.time > 0)) out.push(`${where}: creature "${c.id}" attack "${a.name}" needs a known kind and time > 0`);
     if (c.loot && !tables.has(c.loot)) out.push(`${where}: creature "${c.id}" loot "${c.loot}" is unknown`);
-    out.push(...validateStance(c, where));
-    const talk = c.stance?.talk ? m.factions.words[c.stance.kind as 'guard']?.talk : undefined;
-    if (c.stance?.talk) for (const t of TALK_TURNS) if (!talk?.[t]?.length) out.push(`${where}: creature "${c.id}" can be talked to and its stance ${c.stance.kind} has no line for ${t}`);
+    if (c.aggro !== undefined && !(c.aggro > 0)) out.push(`${where}: creature "${c.id}" aggro radius must be above 0`);
     if (c.body.kind === 'humanoid' && c.body.held && !items.has(c.body.held)) out.push(`${where}: creature "${c.id}" holds unknown item "${c.body.held}"`);
   }
   const encounter = (id: string) => m.encounters.find((e) => e.id === id);

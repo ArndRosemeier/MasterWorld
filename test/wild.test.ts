@@ -157,6 +157,9 @@ test('wild (S9): a shark keeps to deep water under the surface, comes for a hero
   let swimmer: Quarry = { x: t.x + 12, y: surface - 1, z: t.z, noise: 0.6, light: 0, alive: true, guard };
   const den = new Den(new OpenGround(land, [t], () => swimmer.y), t.members.map((creature) => ({ creature, room: 0 })), classic.creatures, deriveSeed(t.seed, 'den'));
   const shark = den.creatures[0];
+  // The swimmer comes out towards where the shark circles, until within its radius (D69: it feels a swimmer 15 m off).
+  const gap = Math.hypot(swimmer.x - shark.x, swimmer.z - shark.z), k = Math.min(1, 12 / gap);
+  swimmer = { ...swimmer, x: shark.x + (swimmer.x - shark.x) * k, z: shark.z + (swimmer.z - shark.z) * k };
   let bit = 0;
   for (let i = 0; i < 400 && !bit; i++) {
     for (const e of den.step(0.1, swimmer)) if (e.kind === 'blow') bit++;

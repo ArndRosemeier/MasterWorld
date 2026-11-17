@@ -107,6 +107,7 @@ export class HoldWatch {
       if (off > CALM_AGAIN && !this.den.fighting.length) {
         this.mood = 'calm';
         this.den.peace = true;
+        this.den.war = false;
         for (const c of this.den.creatures) c.armed = false;
         this.struck = false;
         this.hailed = false;
@@ -142,6 +143,7 @@ export class HoldWatch {
   private war(out: HoldEvent[], said: boolean, trespass = false): void {
     this.mood = 'war';
     this.den.peace = false;
+    this.den.charge();
     if (said) out.push({ kind: 'attack', text: this.def.attack });
     if (trespass) { const c = this.standing.change(this.site.people, this.rules.trespass); if (c) out.push({ kind: 'standing', change: c }); }
   }

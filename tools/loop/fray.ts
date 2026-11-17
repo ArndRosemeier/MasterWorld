@@ -2,8 +2,8 @@
  * The loop check's fights without the hero (phase R, D65): wolves come into the start town by night (the VGM's foray event) and
  * its watch and able folk meet them while the rest go indoors, with nobody of the town dying; and a wolf pack and a herd of deer
  * on open ground fight though no hero is near. Headless: the town, its people, the wild's creatures and the VGM's event are
- * the game's own (sim/townFight.ts, sim/creatures.ts). Also (R7): a hero met by highwaymen on the road pays a holdup once (the band
- * keeps its word) and refuses once (it fights, and says why). `node --import tsx tools/loop/fray.ts [seed...]`; run by `npm run loop`.
+ * the game's own (sim/townFight.ts, sim/creatures.ts). Also (D69, Z1): a bandit camp is passed outside its aggro radius, pulled with
+ * its link, and leashed home. `node --import tsx tools/loop/fray.ts [seed...]`; run by `npm run loop`.
  * Exits 1 if a fight broke.
  */
 import { parseSeed } from '@futuremagic/core';
@@ -77,35 +77,33 @@ function brawl(name: string): string | null {
   return null;
 }
 
-/** The road: highwaymen halt a hero, who pays them once and is let by, and refuses another band and is fought. */
-function holdup(name: string): string | null {
+/**
+ * A camp pulled (D69, Z1): a fresh hero runs past a bandit camp 2 m outside its aggro radius and nobody stirs; one step inside pulls the
+ * camp and its link within 12 m, not the one farther off; the hero runs and the leash brings them home, whole again.
+ */
+function pull(name: string): string | null {
   const seed = parseSeed(name);
   const flat: Land = { height: () => 0, waterDepth: () => 0, blocked: () => false };
   const hero = new Character(classic);
-  hero.coins = 150;
-  const meet = (x: number) => {
-    const d = new Den(new OpenGround(flat, [{ x, z: 0, r: 0.01 }]), Array.from({ length: 3 }, () => ({ creature: 'highwayman', room: 0 })), classic.creatures, seed);
-    d.creatures.forEach((c, i) => { c.x = x - i * 0.8; c.z = 0; });
-    return new Delve(null, d, classic, hero, seed);
+  const posts = [[0, 0], [1.2, 0.6], [8, 0], [24, 0]] as const;
+  const d = new Den(new OpenGround(flat, [{ x: 0, z: 0, r: 0.01 }]), posts.map(() => ({ creature: 'highwayman', room: 0 })), classic.creatures, seed);
+  d.creatures.forEach((c, i) => { c.x = posts[i][0]; c.z = posts[i][1]; c.until = 1e9; });
+  const delve = new Delve(null, d, classic, hero, seed);
+  const r = d.aggroOf(d.creatures[0], delve.fight.quarry({ x: 0, y: 0, z: 0, yaw: 0, speed: 0 }));
+  const go = (secs: number, at: (t: number) => readonly [number, number]) => {
+    for (let t = 0; t < secs; t += DT) { const [x, z] = at(t); delve.step(DT, { x, y: 0, z, yaw: 0, speed: 7 }, false); }
   };
-  const pose = (x: number) => ({ x, y: 0, z: 0, yaw: 0, speed: 0 });
-  const say = (d: Delve, secs: number, at: number): string[] => {
-    const turns: string[] = [];
-    for (let t = 0; t < secs; t += DT) for (const e of d.step(DT, pose(at), false)) if (e.kind === 'warn') turns.push(e.turn); else if (e.kind === 'break') turns.push(`break:${e.cause}`);
-    return turns;
-  };
-  const a = meet(0);
-  say(a, 6, 20);
-  const terms = a.speak(), deal = a.speak();
-  if (terms?.kind !== 'terms' || deal?.kind !== 'struck') return 'the holdup was not paid';
-  if (hero.coins >= 150 || hero.coins < 150 * 0.5) return `the toll was not a share of the purse (${150 - hero.coins})`;
-  const toll = 150 - hero.coins, after = say(a, 90, 4);
-  if (a.den.fighting.length || after.some((t) => t.startsWith('break'))) return 'a band that was paid fought on';
-  const b = meet(500);
-  say(b, 6, 520);
-  const refused = say(b, 20, 505);
-  if (!refused.includes('break:patience') || b.den.fighting.length !== 3) return 'a refused holdup did not end in a fight';
-  console.log(`  ${name}: paid ${toll} copper of 150 and was let by, not a word more in 90 s; refused the next band and it fought on ${refused.at(-1)}`);
+  go(20, (t) => [-40 + 4 * t, -(r + 2)]);
+  if (d.fighting.length) return `running by ${r + 2} m off pulled ${d.fighting.length}`;
+  go(1, () => [-r + 1, 0]);
+  const pulled = d.creatures.map((c) => c.state === 'fight');
+  if (pulled.join() !== 'true,true,true,false') return `one step inside pulled ${pulled.join()}`;
+  d.creatures[0].health *= 0.5;
+  go(30, (t) => [-r + 1 - 7 * t, 0]);
+  // Back on their camp's ground (they chased the hero 40 m west), at ease, whole.
+  const home = d.creatures.slice(0, 3).filter((c) => c.state === 'idle' && Math.hypot(c.x, c.z) < 16 && c.health === c.def.health).length;
+  if (home !== 3) return `the leash brought ${home} of 3 home whole: ${d.creatures.map((c) => `${c.state} ${c.x.toFixed(1)},${c.z.toFixed(1)} ${c.health}/${c.def.health}`).join(' / ')}`;
+  console.log(`  ${name}: ran by a camp ${r + 2} m off (radius ${r} m) and nobody stirred; one step in pulled 3 (their link 8 m off too), not the one 24 m off; the leash took all 3 home, whole`);
   return null;
 }
 
@@ -153,7 +151,7 @@ function giants(name: string): string | null {
 
 let failed = 0;
 for (const name of seeds) {
-  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a holdup on the road', holdup], ['giants: the peaceful take no notice, the struck one fights, the boar hunts', giants]] as const) {
+  for (const [what, run] of [['a town fights off wolves', fray], ['creatures fight creatures', brawl], ['a camp pulled, linked and leashed', pull], ['giants: the peaceful take no notice, the struck one fights, the boar hunts', giants]] as const) {
     console.log(`== ${name}: ${what}`);
     const why = run(name);
     if (why) { console.log(`FAILED: ${why}`); failed++; }

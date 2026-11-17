@@ -20,7 +20,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'goblin', name: 'goblin', plural: 'goblins', body: { kind: 'humanoid', race: 'goblin', height: 1.25, outfit: 'rags', held: 'knife' },
-    health: 20, armour: 1, defence: 18, speed: 4.4, senses: { sight: 9, hearing: 16 }, faction: 'goblins', temper: 'hostile', stance: { kind: 'jeer', warn: 10, line: 3.5, patience: 7, many: 3 }, morale: 0.55, pack: true, role: 'melee', danger: 7,
+    health: 20, armour: 1, defence: 18, speed: 4.4, senses: { sight: 9, hearing: 16 }, faction: 'goblins', temper: 'hostile', morale: 0.55, pack: true, role: 'melee', danger: 7,
     attacks: [{ name: 'rusty knife', damage: [2, 6], kind: 'cut', reach: 0.8, time: 1.7, prowess: 22 }],
     loot: 'goblin', tell: 'Whispering in a hissing tongue, and the smell of smoke and turnips.',
     pleas: [
@@ -31,7 +31,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'bandit', name: 'smuggler', plural: 'smugglers', body: { kind: 'humanoid', race: 'human', height: 1.78, outfit: 'bandit', held: 'short-sword' },
-    health: 34, armour: 2, defence: 22, speed: 4.8, senses: { sight: 11, hearing: 14 }, faction: 'smugglers', temper: 'hostile', stance: { kind: 'guard', warn: 12, line: 5, talk: 'pact' }, morale: 0.6, pack: true, role: 'melee', danger: 11,
+    health: 34, armour: 2, defence: 22, speed: 4.8, senses: { sight: 11, hearing: 14 }, faction: 'smugglers', temper: 'hostile', morale: 0.6, pack: true, role: 'melee', danger: 11,
     attacks: [{ name: 'short sword', damage: [3, 8], kind: 'cut', reach: 1.0, time: 2.0, prowess: 28 }],
     loot: 'bandit', tell: 'Low voices, a laugh, the clink of a bottle.',
   },
@@ -43,13 +43,13 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'skeleton', name: 'skeleton', plural: 'skeletons', body: { kind: 'humanoid', race: 'human', height: 1.74, skin: '#d8ccb4', outfit: 'grave', gaunt: true, held: 'arming-sword', bones: true },
-    health: 32, armour: 3, defence: 14, speed: 3.6, senses: { sight: 10, hearing: 12 }, faction: 'undead', temper: 'hostile', stance: { kind: 'mindless' }, morale: 1, pack: true, role: 'melee', danger: 11,
+    health: 32, armour: 3, defence: 14, speed: 3.6, senses: { sight: 10, hearing: 12 }, faction: 'undead', temper: 'hostile', morale: 1, pack: true, role: 'melee', danger: 11,
     attacks: [{ name: 'rusted sword', damage: [4, 8], kind: 'cut', reach: 1.0, time: 2.0, prowess: 28 }],
     loot: 'grave', tell: 'A dry rattle, like sticks in a sack, and it stops when you stop.',
   },
   {
     id: 'ghoul', name: 'ghoul', plural: 'ghouls', body: { kind: 'humanoid', race: 'umbral', height: 1.7, skin: '#8a9086', outfit: 'grave', gaunt: true },
-    health: 58, armour: 2, defence: 24, speed: 4.6, senses: { sight: 8, hearing: 18 }, faction: 'undead', temper: 'hostile', stance: { kind: 'mindless' }, morale: 1, pack: false, role: 'leader', danger: 21,
+    health: 58, armour: 2, defence: 24, speed: 4.6, senses: { sight: 8, hearing: 18 }, faction: 'undead', temper: 'hostile', morale: 1, pack: false, role: 'leader', danger: 21,
     attacks: [{ name: 'claws', damage: [5, 11], kind: 'claw', reach: 0.9, time: 1.5, prowess: 40 }],
     loot: 'grave', tell: 'Cold breath on your neck, and the sweet smell of the grave.',
   },
@@ -57,7 +57,7 @@ export const creatures: readonly CreatureDef[] = [
   // outsider who will not turn back (game/hold.ts). Never run, and hard: the hold is no place to brawl.
   {
     id: 'hold-warden', name: 'warden', plural: 'wardens', body: { kind: 'humanoid', race: 'dwarf', height: 1.42, outfit: 'guard', held: 'bearded-axe' },
-    health: 74, armour: 5, defence: 34, speed: 4.4, senses: { sight: 32, hearing: 22 }, faction: 'dwarf', temper: 'hostile', stance: { kind: 'bar', warn: 26, line: 6 }, morale: 1, pack: true, role: 'melee', danger: 24,
+    health: 74, armour: 5, defence: 34, speed: 4.4, senses: { sight: 32, hearing: 22 }, faction: 'dwarf', temper: 'hostile', morale: 1, pack: true, role: 'melee', danger: 24,
     attacks: [{ name: 'bearded axe', damage: [7, 13], kind: 'cut', reach: 1.0, time: 2.3, prowess: 46 }],
     loot: 'hold', tell: 'Iron on stone, and a horn somewhere above the gate.',
   },
@@ -65,26 +65,26 @@ export const creatures: readonly CreatureDef[] = [
   // the folk themselves (the town's people are drawn, not these); nobody of them dies of a raid, they are knocked down and get up.
   {
     id: 'watchman', name: 'watchman', plural: 'the watch', body: { kind: 'humanoid', race: 'human', height: 1.78, outfit: 'guard', held: 'arming-sword' },
-    health: 42, armour: 3, defence: 30, speed: 5.4, senses: { sight: 40, hearing: 30 }, faction: 'watch', temper: 'hostile', stance: { kind: 'bar', warn: 20, line: 5 }, morale: 1, pack: true, role: 'melee', danger: 12,
+    health: 42, armour: 3, defence: 30, speed: 5.4, senses: { sight: 40, hearing: 30 }, faction: 'watch', temper: 'hostile', morale: 1, pack: true, role: 'melee', danger: 12,
     attacks: [{ name: 'sword', damage: [4, 9], kind: 'cut', reach: 1.0, time: 1.8, prowess: 34 }],
     tell: 'Boots on the cobbles, and a horn.',
   },
   {
     id: 'townsman', name: 'townsman', plural: 'townsfolk', body: { kind: 'humanoid', race: 'human', height: 1.7, outfit: 'guard', held: 'knife' },
-    health: 26, armour: 0, defence: 16, speed: 5.0, senses: { sight: 40, hearing: 30 }, faction: 'watch', temper: 'hostile', stance: { kind: 'bar', warn: 20, line: 5 }, morale: 1, pack: true, role: 'swarm', danger: 4,
+    health: 26, armour: 0, defence: 16, speed: 5.0, senses: { sight: 40, hearing: 30 }, faction: 'watch', temper: 'hostile', morale: 1, pack: true, role: 'swarm', danger: 4,
     attacks: [{ name: 'billhook', damage: [2, 6], kind: 'cut', reach: 1.0, time: 2.0, prowess: 20 }],
     tell: 'Shouting, and a pitchfork.',
   },
   // The land around the town (plan 9.3: the world simulation's wild).
   {
     id: 'highwayman', name: 'bandit', plural: 'bandits', body: { kind: 'humanoid', race: 'human', height: 1.8, outfit: 'bandit', held: 'short-sword' },
-    health: 34, armour: 2, defence: 22, speed: 5, senses: { sight: 24, hearing: 18 }, faction: 'bandits', temper: 'hostile', stance: { kind: 'rob', warn: 24, close: 5, line: 2.5, patience: 10, talk: 'price', toll: [0.18, 0.4] }, morale: 0.55, pack: true, role: 'melee', danger: 11,
+    health: 34, armour: 2, defence: 22, speed: 5, senses: { sight: 24, hearing: 18 }, faction: 'bandits', temper: 'hostile', morale: 0.55, pack: true, role: 'melee', danger: 11,
     attacks: [{ name: 'short sword', damage: [3, 8], kind: 'cut', reach: 1.0, time: 2.0, prowess: 28 }],
     loot: 'bandit', tell: 'Woodsmoke where no farm is, and a whistle that is not a bird.',
   },
   {
     id: 'cutthroat', name: 'cutthroat', plural: 'cutthroats', body: { kind: 'humanoid', race: 'human', height: 1.84, outfit: 'bandit', held: 'bearded-axe' },
-    health: 48, armour: 3, defence: 28, speed: 5.4, senses: { sight: 24, hearing: 18 }, faction: 'cutthroats', temper: 'hostile', stance: { kind: 'murderous' }, morale: 0.8, pack: true, role: 'melee', danger: 18,
+    health: 48, armour: 3, defence: 28, speed: 5.4, senses: { sight: 24, hearing: 18 }, faction: 'cutthroats', temper: 'hostile', morale: 0.8, pack: true, role: 'melee', danger: 18,
     attacks: [{ name: 'axe', damage: [5, 11], kind: 'cut', reach: 1.0, time: 2.2, prowess: 34 }],
     loot: 'bandit', tell: 'Crows lifting from a ditch, and a silence where birds should be.',
   },
@@ -96,7 +96,7 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     id: 'boar', name: 'boar', plural: 'boars', body: { kind: 'beast', species: 'boar', length: 1.4, color: '#4a3c30' },
-    health: 42, armour: 2, defence: 14, speed: 6.2, senses: { sight: 10, hearing: 20 }, faction: 'beasts', temper: 'hostile', morale: 0.85, pack: false, role: 'melee', danger: 9,
+    health: 42, armour: 2, defence: 14, speed: 6.2, senses: { sight: 10, hearing: 20 }, faction: 'beasts', temper: 'neutral', morale: 0.85, pack: false, role: 'melee', danger: 9,
     attacks: [{ name: 'tusks', damage: [4, 9], kind: 'pierce', reach: 0.8, time: 1.8, prowess: 28 }],
     loot: 'boar', tell: 'The earth turned over under the oaks, and a grunting in the undergrowth.',
   },
@@ -109,9 +109,9 @@ export const creatures: readonly CreatureDef[] = [
   },
   {
     // Out in deep water (S9): it circles at its depth and comes up at a hero who swims; it cannot follow into the shallows.
-    // Once it bites it fights to the end (a hero cannot swim after a shark that breaks off, PC round 33).
+    // Once it bites it fights to the end (a hero cannot swim after a shark that breaks off, PC round 33). It feels a swimmer from farther off than a foe on land sees one (its aggro radius).
     id: 'shark', name: 'shark', plural: 'sharks', body: { kind: 'beast', species: 'shark', length: 3.2, color: '#5c6a72' },
-    health: 40, armour: 1, defence: 18, speed: 5.5, senses: { sight: 18, hearing: 30 }, faction: 'predators', temper: 'hostile', morale: 1, pack: false, role: 'melee', danger: 8,
+    health: 40, armour: 1, defence: 18, speed: 5.5, senses: { sight: 18, hearing: 30 }, faction: 'predators', temper: 'hostile', aggro: 15, morale: 1, pack: false, role: 'melee', danger: 8,
     attacks: [{ name: 'bite', damage: [4, 9], kind: 'bite', reach: 1.1, time: 1.8, prowess: 28 }],
     loot: 'shark', tell: 'A fin cutting the swell farther out, and then nothing.',
   },

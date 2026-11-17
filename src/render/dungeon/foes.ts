@@ -81,17 +81,16 @@ export interface FoeDoing {
   readonly action: 'stab' | 'swing_1h' | 'slam' | 'flinch' | null;
   /** Which of two blows (alternates). */
   readonly variant: number;
-  /** What the speaker of a band shows now (D64), standing still: the gesture of the turn. */
+  /** What a hold's warden shows now (game/hold.ts), standing still: the gesture of the turn. */
   readonly signal?: WarnTurn | null;
 }
 
 /**
- * The gesture of each turn of a band's words (D64), motion-capture takes cut into clips (src/render/folk/moves.ts MOVE_CUTS): a raised
- * hand (the free one) for a warning, a laugh for a jibe, a shrug for giving way, a wave for a friend; a shaken head settles a quarrel.
- * A last warning and a demand have no clip of their own: the band's weapons are drawn (`armed`, the grip changes) and it stands in its
- * fighting stance (null here). Pointing and handing over coin have no take cut yet.
+ * The gesture of each turn of a hold's wardens (plan 11.6), motion-capture takes cut into clips (src/render/folk/moves.ts MOVE_CUTS): a
+ * raised hand (the free one) for a warning, a wave for a friend; a shaken head settles it. A last warning has no clip of its own: the
+ * weapons are drawn (`armed`, the grip changes) and they stand in their fighting stance (null here).
  */
-export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string | null>> = { warn: 'raised hand', last: null, demand: null, jeer: 'laugh', settle: 'shake head', greet: 'wave hello', yield: 'shrug' };
+export const SIGNAL_CLIPS: Readonly<Record<WarnTurn, string | null>> = { warn: 'raised hand', last: null, settle: 'shake head', greet: 'wave hello' };
 
 /** The clip for it; the dead and the gaunt (ghouls) shamble and claw. */
 export function foeClip(def: CreatureDef, d: FoeDoing): string {

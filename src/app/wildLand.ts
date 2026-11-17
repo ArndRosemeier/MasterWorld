@@ -12,7 +12,6 @@ import { deriveSeed } from '@futuremagic/core';
 import type { Stage } from '@futuremagic/stage';
 import type { Character } from '../game/character';
 import type { Standing } from '../game/standing';
-import type { GroupFacts, Known } from '../vgm/stance';
 import { Delve, type DelveSave } from '../game/delve';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SettingModule } from '../setting/contract';
@@ -38,8 +37,6 @@ export interface WildHost {
   readonly character: Character;
   /** What the factions make of the hero (D65): the foes read it before they fight. */
   readonly standing: Standing;
-  /** Why a group woken or placed attacks the hero at once, if the VGM knows (vgm/stance.ts); null: it does not. */
-  known?(group: GroupFacts): Known | null;
   readonly seed: number;
   readonly director: Director;
   readonly journal: Journal;
@@ -167,7 +164,6 @@ export class WildLand {
     const den = new Den(new OpenGround(this.land, [t], prey, bedOf(t.members, h.setting.creatures)), t.members.map((creature) => ({ creature, room: 0 })), h.setting.creatures, deriveSeed(t.seed, 'den'), saved?.dead ?? []);
     const delve = new Delve(null, den, h.setting, h.character, h.seed, saved);
     delve.fight.standing = h.standing;
-    den.knows = h.known?.({ id: t.id, members: t.members, town: this.town }) ?? null;
     const creatures = await CreatureView.build(den, deriveSeed(h.seed, 'wild'), { x: 0, y: 0, z: 0 }, h.renderer);
     creatures.group.visible = false;
     await creatures.warm(h.stage);
