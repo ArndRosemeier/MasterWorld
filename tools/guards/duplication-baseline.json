@@ -764,7 +764,7 @@
     "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
   },
   {
-    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/building.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/formedWater.ts + masterworld/render/materials/spellFx.ts",
+    "key": "idiom: [.mul .sub] in masterworld/render/materials.ts + masterworld/render/materials/building.ts + masterworld/render/materials/formedWater.ts + masterworld/render/materials/spellFx.ts",
     "reason": "Shader node math (TSL): the same short operator chains in unrelated shaders (stone, water, spell effects); not a copy of a pattern."
   },
   {
