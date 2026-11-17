@@ -234,15 +234,19 @@ console.log('cave:', await go('Down in: cave'));
 await page.waitForTimeout(8000);
 const realm = await page.evaluate(() => window.game.stone.host?.realm?.() ?? null);
 console.log('realm', realm);
-// Turn to where there is room (eight ways round, then a few steps on, only onto floor). Below ground the teleport keeps the feet's height: with none it would look for the ground from far above the cave.
+// The cave mouth is tight and uneven: look for the nearest spot within 12 m where the floor is under the hero's feet (a step down or less; a floor above
+// them means rock, and a teleport into rock lifts the hero out through the mountain) and a portal has room, whichever way they face.
 console.log('cave spot', await page.evaluate(() => {
-  const g = window.game, p = g.player, w = p.walker, x0 = w.pos.x, z0 = w.pos.z;
-  for (const d of [0, 2, 4, 6]) for (let i = 0; i < 8; i++) {
-    const yaw = w.yaw + (i * Math.PI) / 4, x = x0 - Math.sin(yaw) * d, z = z0 - Math.cos(yaw) * d;
-    // The hero's own spot must be a floor (its support at the feet's height is the feet): a teleport into rock lifts them out through the mountain.
-    if (Math.abs(w.support(x, z, w.pos.y) - w.pos.y) > 0.3) continue;
-    const k = g.stone.wouldOpen({ x, y: w.pos.y, z }, yaw);
-    if (k !== null) { p.teleport(x, w.pos.y, z, yaw); return `${d} m, ${i}/8 round, size ${k}`; }
+  const g = window.game, p = g.player, w = p.walker, x0 = w.pos.x, z0 = w.pos.z, feet = w.pos.y, near = [];
+  for (let dx = -12; dx <= 12; dx++) for (let dz = -12; dz <= 12; dz++) near.push([dx, dz, Math.hypot(dx, dz)]);
+  near.sort((a, b) => a[2] - b[2]);
+  for (const [dx, dz, d] of near) {
+    const x = x0 + dx, z = z0 + dz, floor = w.support(x, z, feet);
+    if (floor > feet + 0.3 || floor < feet - 3) continue;
+    for (let i = 0; i < 8; i++) {
+      const yaw = w.yaw + (i * Math.PI) / 4, k = g.stone.wouldOpen({ x, y: floor, z }, yaw);
+      if (k !== null) { p.teleport(x, floor, z, yaw); return `${d.toFixed(1)} m off, ${i}/8 round, floor ${(floor - feet).toFixed(2)} m from the go-to height, size ${k}`; }
+    }
   }
   return 'none found';
 }));
