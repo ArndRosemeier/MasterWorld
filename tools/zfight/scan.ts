@@ -31,6 +31,9 @@ import { Terrain } from '../../src/world/terrain';
 import { mergeMeshes, openHouse } from '../../src/world/townMesh';
 import { LEVEL } from '../../src/world/dungeon/meshKit';
 import { seenFights, zFights, zFightSpots } from '../../src/world/zFight';
+import { fortifiedBridgeMesh, planBridge } from '../../src/world/structures/bridge';
+import { greatRuinMesh, planGreatRuin } from '../../src/world/structures/ruin';
+import { bridgeLand, ruinLand } from '../../src/world/structures/land';
 
 type Mesh = BuildingMesh;
 /** Per generator: meshes and triangles scanned; fighting pairs that show, their area; pairs that do not (drawn twice alike, or inside a solid). */
@@ -58,6 +61,15 @@ for (let seed = 1; seed <= 12; seed++) {
   scan('sealed barrow', sealedBarrowMesh(seed, slope), `seed ${seed}`, slope);
 }
 for (let seed = 1; seed <= 4; seed++) scan('hold', holdMesh(seed), `seed ${seed}`, LEVEL);
+// The camps' memorable structures (D69, Z4), each on its own land.
+for (let seed = 1; seed <= 12; seed++) {
+  const land = bridgeLand(seed);
+  scan('fortified bridge (camp)', fortifiedBridgeMesh(planBridge(classic.structures!, seed, land.ground), land.ground), `seed ${seed}`, land.ground);
+}
+for (let seed = 1; seed <= 8; seed++) {
+  const land = ruinLand(seed);
+  scan('great ruin (camp)', greatRuinMesh(planGreatRuin(classic.structures!, seed, land.ground), land.ground), `seed ${seed}`, land.ground);
+}
 scan('hold warden', warden(), '', LEVEL);
 for (const grave of [false, true]) for (let i = 0; i < 4; i++) scan(grave ? 'remains: grave' : 'remains: pack', remainsMesh({ grave, seed: `s${i}` }), `seed s${i}`, LEVEL);
 const places: Place[] = ['camp', 'ruin', 'barrows'];

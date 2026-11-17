@@ -11,6 +11,7 @@ import { settles, type RegionDecision, type SightDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
 import { onLand } from './dungeon/site';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type PlacedMesh, type Tint } from './dungeon/meshKit';
+import { ridgeTent } from './structures/props';
 
 /** What the walker cannot go through: a circle or a polygon (x, z pairs). */
 export type Solid = { readonly x: number; readonly z: number; readonly r: number } | { readonly poly: Poly };
@@ -115,8 +116,6 @@ function stack(at: At, k: MeshKit, x: number, z: number, yaw: number): void {
   }, 0.02);
 }
 
-const CANVAS: Tint = [214, 198, 160];
-const POLE: Tint = [110, 84, 62];
 const ROCK: Tint = [176, 172, 160];
 
 /** A camp (hunters, charcoal burners, travellers): two or three ridge tents round a ring of stones, logs to sit on, a woodpile. */
@@ -137,40 +136,11 @@ function camp(at: At, k: MeshKit, solids: Solid[]): void {
   }
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + at.yaw + r.range(-0.2, 0.2), [tx, tz] = onCircle(at, a, r.range(4.8, 5.8));
-    k.onGround(at.ground, () => tent(at, k, tx, tz, a, r.range(2.4, 3), r.range(1.9, 2.3), r.range(1.4, 1.7)), 0.05);
+    k.onGround(at.ground, () => ridgeTent(k, at.rng, tx - at.x, tz - at.z, a, r.range(2.4, 3), r.range(1.9, 2.3), r.range(1.4, 1.7)), 0.05);
     solids.push({ x: tx, z: tz, r: 1.5 });
   }
   const [wx, wz] = onCircle(at, at.yaw + Math.PI + 0.6, 7.5);
   stack(at, k, wx, wz, at.yaw);
-}
-
-/**
- * A ridge tent at (x, z): its opening towards the middle (`a`: the angle from the middle out to it), canvas
- * down both sides to the ground, a pole at each end standing a hand above the ridge.
- */
-function tent(at: At, k: MeshKit, x: number, z: number, a: number, len: number, wide: number, high: number): void {
-  // Along the ridge: from the opening (towards the middle) to the back.
-  const ax = -Math.cos(a), az = -Math.sin(a), bx = -az, bz = ax;
-  // Drawn on y 0: the camp sets it on the ground (MeshKit.onGround).
-  const y = 0;
-  const onTent = (s: number, t: number, h: number) => [x - at.x + ax * s + bx * t, y + h, z - at.z + az * s + bz * t];
-  const L = len / 2, W = wide / 2, tint = varyTint(at.rng, CANVAS, 0.08);
-  const shade: Tint = [Math.round(tint[0] * 0.8), Math.round(tint[1] * 0.8), Math.round(tint[2] * 0.8)];
-  const side = Math.hypot(W, high);
-  // The two slopes, outside and in (the canvas is seen from inside through the opening).
-  for (const t of [1, -1]) {
-    const q = [onTent(L, t * W, 0), onTent(L, 0, high), onTent(-L, 0, high), onTent(-L, t * W, 0)], uv = [[0, 0], [0, side], [len, side], [len, 0]];
-    if (t > 0) { k.quad(q[0], q[1], q[2], q[3], uv, CellarMat.Limewash, tint); k.quad(q[3], q[2], q[1], q[0], uv, CellarMat.Limewash, shade); }
-    else { k.quad(q[3], q[2], q[1], q[0], uv, CellarMat.Limewash, tint); k.quad(q[0], q[1], q[2], q[3], uv, CellarMat.Limewash, shade); }
-  }
-  // Closed at the back; the opening's flaps drawn back to either side, so the dark inside shows.
-  k.tri(onTent(-L, W, 0), onTent(-L, 0, high), onTent(-L, -W, 0), CellarMat.Limewash, tint);
-  k.tri(onTent(-L, -W, 0), onTent(-L, 0, high), onTent(-L, W, 0), CellarMat.Limewash, shade);
-  k.tri(onTent(L, -W, 0), onTent(L, 0, high), onTent(L, -W * 0.45, 0), CellarMat.Limewash, tint);
-  k.tri(onTent(L, W * 0.45, 0), onTent(L, 0, high), onTent(L, W, 0), CellarMat.Limewash, tint);
-  const floor = onTent(0, 0, 0.02);
-  k.box(floor[0], floor[1], floor[2], len * 0.95, 0.02, wide * 0.85, Math.atan2(-az, ax), CellarMat.Earth, [52, 46, 40]);
-  for (const s of [L, -L]) { const p = onTent(s, 0, 0); k.box(p[0], p[1], p[2], 0.07, high + 0.15, 0.07, 0, BuildingMat.Oak, POLE); }
 }
 
 const WALL: Tint = [206, 200, 186];
