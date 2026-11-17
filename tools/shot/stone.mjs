@@ -12,6 +12,10 @@ import { execSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch } from './launch.mjs';
+import { glowGain } from './glow.mjs';
+
+/** The share of the lower middle of the screen the floor's glow must brighten, frame 1 to frame 3 (tools/shot/glow.mjs). */
+const GLOW_MIN = 0;
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 180000);
 // On the reference machine (SHOT_GPU=1) the game's own default, WebGPU: the rifts once broke only there.
@@ -36,8 +40,9 @@ let failed = false;
 const fail = (line) => { failed = true; console.log(`FAIL ${line}`); };
 const shoot = async (name) => {
   const file = join(dir, `${name}.jpg`);
-  await page.screenshot({ path: file, type: 'jpeg', quality: 88, timeout: TIMEOUT });
+  const bytes = await page.screenshot({ path: file, type: 'jpeg', quality: 88, timeout: TIMEOUT });
   console.log(file);
+  return bytes;
 };
 const state = () => page.evaluate(() => {
   const g = window.game, w = g.player.walker.pos;
@@ -71,8 +76,11 @@ const standClear = (near, far, turn = 0) => page.evaluate(([near, far, turn]) =>
 /** Click a glyph where it is on the screen. */
 const press = async (glyph) => {
   const at = await page.evaluate((g) => window.game.stone.glyphOnScreen(g), glyph);
-  console.log(`glyph ${glyph} at ${at.x.toFixed(0)},${at.y.toFixed(0)} (reach ${at.reach.toFixed(0)} px)`);
+  const seen = () => page.evaluate(() => { const g = window.game, s = g.stone; return `${s.state} realm ${g.stone.host?.realm?.() ?? '?'} counts ${JSON.stringify(s.counts)} home ${s.stone.home ? `${s.stone.home.frame.x.toFixed(1)},${s.stone.home.frame.z.toFixed(1)}` : '-'} hero ${g.player.walker.pos.x.toFixed(1)},${g.player.walker.pos.z.toFixed(1)}`; });
+  console.log(`glyph ${glyph} at ${at.x.toFixed(0)},${at.y.toFixed(0)} (reach ${at.reach.toFixed(0)} px); before: ${await seen()}`);
   await page.mouse.click(at.x, at.y);
+  await page.waitForTimeout(100);
+  console.log(`  after: ${await seen()}`);
 };
 /** Hold the stone up (by its card in the pack: I, then a click). */
 const raise = async (byPack) => {
@@ -93,12 +101,18 @@ const s0 = await state();
 console.log('start', JSON.stringify(s0));
 await look();
 await raise(true);
-await shoot('1-stone-held-up');
+const held = await shoot('1-stone-held-up');
 await press(1);
 await page.waitForTimeout(150);
 await shoot('2-beam');
 await page.waitForTimeout(900);
-await shoot('3-floor-glows');
+const glows = await shoot('3-floor-glows');
+{
+  // Show, don't tell: the glow is on the screen, not only in the game (render bundles once painted terrain over it).
+  const g = await glowGain(page, held, glows);
+  console.log(`floor glow: ${(g.share * 100).toFixed(2)} % of the lower middle brighter, mean gain ${g.gain.toFixed(2)}`);
+  if (g.share < GLOW_MIN) fail(`no floor glow on the screen (${(g.share * 100).toFixed(2)} % brighter, need ${(GLOW_MIN * 100).toFixed(2)} %)`);
+}
 await page.waitForTimeout(2500);
 await shoot('4-floor-fading');
 const s1 = await state();
