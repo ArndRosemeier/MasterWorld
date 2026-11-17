@@ -50,16 +50,17 @@ export interface Picks {
   readonly moss: number;
 }
 
-export function pickStructure(defs: StructuresDef, kindId: string, rng: Rng): Picks {
+export function pickStructure(defs: StructuresDef, kindId: string, rng: Rng, holder?: string): Picks {
   const kind = defs.kinds.find((k) => k.id === kindId);
   if (!kind) throw new Error(`no structure kind ${kindId}`);
   const byWeight = <T extends { id: string }>(list: readonly T[], w: Readonly<Record<string, number>>): T => {
     const ok = list.filter((d) => (w[d.id] ?? 0) > 0);
     return rng.weighted(ok, (d) => w[d.id]);
   };
-  const builder = byWeight(defs.builders, kind.builders), holder = byWeight(defs.holders, kind.holders);
+  // (A camp's own holders hold it whatever the kind's usual ones: goblins in a great ruin.)
+  const builder = byWeight(defs.builders, kind.builders), held = byWeight(defs.holders, holder ? { [holder]: 1 } : kind.holders);
   const state = rng.weighted(STATES, (_, i) => [1, 3, 3, 2][i]);
-  return { kind, builder, holder, arch: rng.pick(builder.arches), tower: rng.pick(builder.towers), state, moss: rng.chance(0.4) ? rng.range(0.5, 1) : rng.range(0, 0.3) };
+  return { kind, builder, holder: held, arch: rng.pick(builder.arches), tower: rng.pick(builder.towers), state, moss: rng.chance(0.4) ? rng.range(0.5, 1) : rng.range(0, 0.3) };
 }
 
 /** How broken a state is, 0 whole .. 1 ruinous. */

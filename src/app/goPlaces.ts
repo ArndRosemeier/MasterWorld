@@ -221,7 +221,9 @@ export function goSpots(h: GoHost): GoSpot[] {
   for (const c of h.setting.camps?.camps ?? []) {
     add(L, `Camp: ${c.name}`, async () => {
       const d = nearestTo(decisionsOf(h.log(), 'camp').filter((x) => x.camp === c.id), h.heroPos());
-      return at(d && beside(d, h.heroPos(), d.r * 1.1 + 24), `${c.name} (only in zones laid out round the hero)`);
+      // Just outside the reach of its outermost posts; a great ruin from before its gate (its front faces −z).
+      const from = d?.landmark === 'great-ruin' ? { x: d.x, z: d.z - 1 } : h.heroPos();
+      return at(d && beside(d, from, d.r * 1.1 + 21), `${c.name} (only in zones laid out round the hero)`);
     });
   }
 

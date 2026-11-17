@@ -23,6 +23,8 @@ import { freeMesh } from '../render/materials';
 
 /** Places are drawn once the hero is this near (m), and let go again beyond `DROP`. */
 const BUILD = 1600;
+/** How much farther than its camp's reach a camp's great ruin may stand (m): its walls are tested that far out. */
+const RUIN_MARGIN = 40;
 const DROP = 2400;
 /** Seconds between two asks of the frontier (it opens one region at a time). */
 const ASK = 0.5;
@@ -112,7 +114,9 @@ export class RegionSites {
     // The camps' landmarks (D69, Z2): the pieces of the land they are built round (a hunting ground with none draws nothing). Never "come upon" as a place.
     const camps = campsOf(log);
     for (const d of camps.slice(this.campsSeen)) {
-      if (campPiece(d)) this.sites.push({ at: { x: d.x, z: d.z, r: Math.min(d.r, CAMP_PIECE_R) }, label: `${d.landmark} ${d.id}`, job: { camp: d }, layout: undefined, laying: false, mesh: null, sight: null, found: true });
+      // (A great ruin reaches past its camp's posts: the room its terraces and towers take.)
+      const ruin = d.landmark === 'great-ruin';
+      if (ruin || campPiece(d)) this.sites.push({ at: { x: d.x, z: d.z, r: ruin ? d.r + RUIN_MARGIN : Math.min(d.r, CAMP_PIECE_R) }, label: `${d.landmark} ${d.id}`, job: { camp: d }, layout: undefined, laying: false, mesh: null, sight: null, found: true });
     }
     this.campsSeen = camps.length;
     this.synced = true;
@@ -192,7 +196,7 @@ export class RegionSites {
         built = true;
         if (s.layout === undefined) {
           s.laying = true;
-          const laid = this.host.jobs ? this.host.jobs.site(s.job) : Promise.resolve(layOut(s.job, this.heightAt));
+          const laid = this.host.jobs ? this.host.jobs.site(s.job) : Promise.resolve(layOut(s.job, this.heightAt, (id) => this.host.terrain.ruinOf(id)));
           void laid.then((l) => { s.layout = l; }, (e: unknown) => { s.layout = null; console.warn(`laying out ${s.label}:`, e); }).finally(() => { s.laying = false; });
           continue;
         }

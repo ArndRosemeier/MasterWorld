@@ -67,9 +67,10 @@ export interface GreatRuinPlan {
 const boxPts = (b: Box): P2[] => [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
 const overlaps = (a: Box, b: Box, m = 0) => a[0] < b[2] + m && b[0] < a[2] + m && a[1] < b[3] + m && b[1] < a[3] + m;
 
-export function planGreatRuin(defs: StructuresDef, seed: number, ground: Ground): GreatRuinPlan {
+/** `holder`: who holds it (a camp's own, D69), else the kind's usual ones. */
+export function planGreatRuin(defs: StructuresDef, seed: number, ground: Ground, holder?: string): GreatRuinPlan {
   const rng = new Rng(deriveSeed(seed, 'ruin'));
-  const picks = pickStructure(defs, 'great-ruin', rng), b = picks.builder, fall = fallen(picks.state);
+  const picks = pickStructure(defs, 'great-ruin', rng, holder), b = picks.builder, fall = fallen(picks.state);
   const slope = Math.abs(ground(0, 40) - ground(0, -40)) / 80;
   const layout = rng.weighted<RuinLayout>(['axial', 'cloister', 'terraced', 'citadel', 'scattered'], (l) => ({ axial: 2, cloister: 2, terraced: slope > 0.08 ? 4 : 1, citadel: 2, scattered: 1 })[l]);
   const S = rng.range(62, 96), t = b.thick;

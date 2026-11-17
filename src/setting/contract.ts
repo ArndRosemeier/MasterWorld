@@ -2267,6 +2267,9 @@ export interface CampsDef {
   readonly namedChance: number;
 }
 
+/** A camp kind of the setting by its id. */
+export const campDefOf = (c: CampsDef | undefined, id: string): CampDef | undefined => c?.camps.find((k) => k.id === id);
+
 /** An sRGB colour, 0..255 a channel (a tint multiplying a texture). */
 export type Rgb = readonly [number, number, number];
 

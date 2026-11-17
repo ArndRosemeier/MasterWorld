@@ -138,3 +138,18 @@ export function campTerritory(camp: CampDecision, def: CampDef, rules: CampsDef,
     posts: camp.posts.map((p, i) => ({ x: p.x, z: p.z, def: postDef(camp, def, rules, defs, g, i, save?.rounds[i] ?? 0), ...(p.round ? { round: p.round } : {}) })),
   };
 }
+
+/**
+ * A post's spot moved out of whatever stands on it (a ruin's tower, a hall's wall: Z4 in play), to the nearest free spot
+ * on rings round it, a metre and a half apart; as it is when free (or when nothing near is).
+ */
+export function freePost(x: number, z: number, blocked: ((x: number, z: number, r: number) => boolean) | undefined, r = 0.8): { x: number; z: number } {
+  if (!blocked?.(x, z, r)) return { x, z };
+  for (let ring = 1.5; ring <= 15; ring += 1.5) {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2, px = x + Math.cos(a) * ring, pz = z + Math.sin(a) * ring;
+      if (!blocked(px, pz, r)) return { x: px, z: pz };
+    }
+  }
+  return { x, z };
+}

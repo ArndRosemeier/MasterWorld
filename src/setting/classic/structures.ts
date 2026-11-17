@@ -48,6 +48,6 @@ export const structures: StructuresDef = {
   ],
   kinds: [
     { id: 'fortified-bridge', name: 'a fortified bridge', builders: { 'old-realm': 2, dwarves: 1.5, valley: 2, river: 2 }, holders: { bandits: 3, goblins: 2, undead: 1 } },
-    { id: 'great-ruin', name: 'a great ruin of the old realm', builders: { 'old-realm': 2.5, dwarves: 1.5, valley: 1.2, river: 1.5 }, holders: { undead: 1 } },
+    { id: 'great-ruin', name: 'a great ruin of the old realm', builders: { 'old-realm': 2.5, dwarves: 1.5, valley: 1.2, river: 1.5 }, holders: { undead: 1 }, play: true },
   ],
 };

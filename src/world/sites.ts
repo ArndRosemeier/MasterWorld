@@ -12,6 +12,8 @@ import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
 import { onLand } from './dungeon/site';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type PlacedMesh, type Tint } from './dungeon/meshKit';
 import { ridgeTent } from './structures/props';
+import { greatRuinMesh } from './structures/ruin';
+import { ruinSolids, type CampRuin } from './campRuin';
 
 /** What the walker cannot go through: a circle or a polygon (x, z pairs). */
 export type Solid = { readonly x: number; readonly z: number; readonly r: number } | { readonly poly: Poly };
@@ -51,8 +53,12 @@ export const CAMP_PIECE_R = 20;
 /** The land's pieces a camp can be built round (D69, Z2) while no structure kind of Z4 is in play for it. */
 const CAMP_PIECES: Readonly<Record<string, (at: At, k: MeshKit, solids: Solid[]) => void>> = { ruin: (at, k, s) => ruin(at, k, s), stones: (at, k, s) => stoneRing(at, k, s), barrows: (at, k, s) => barrows(at, k, s), cairn: (at, k, s) => cairn(at, k, s), tents: (at, k, s) => camp(at, k, s) };
 
-/** The landmark piece of a camp, as the land draws it (null: a hunting ground with none, or a structure kind drawn elsewhere). */
-export function layOutCamp(d: CampDecision, height: (x: number, z: number) => number): SiteLayout | null {
+/**
+ * The landmark of a camp, as the land draws it: a structure kind in play (`ruin`: the camp's great ruin as the terrain
+ * planned it, Z4), else a piece of the land's (null: a hunting ground with none).
+ */
+export function layOutCamp(d: CampDecision, height: (x: number, z: number) => number, ruin?: CampRuin | null): SiteLayout | null {
+  if (ruin) return { origin: [d.x, ruin.y0, d.z], mesh: greatRuinMesh(ruin.plan, ruin.land), solids: ruinSolids(ruin).map((poly) => ({ poly })) };
   const draw = CAMP_PIECES[d.landmark];
   return draw ? laidOut({ x: d.x, z: d.z, yaw: d.yaw, r: Math.min(d.r, CAMP_PIECE_R), seed: d.seed }, 'camp', height, draw) : null;
 }
@@ -63,9 +69,9 @@ export const campPiece = (d: CampDecision): boolean => d.landmark in CAMP_PIECES
 /** What to lay out (a region's place, a sight or a camp's landmark), for a terrain worker: laying out a barrow takes tens of milliseconds. */
 export type SiteJob = { readonly region: RegionDecision; readonly place: Place } | { readonly sight: SightDecision; readonly shape: SightShape } | { readonly camp: CampDecision };
 
-/** A region's place, a sight or a camp's landmark laid out (null: nothing stands there). */
-export function layOut(job: SiteJob, height: (x: number, z: number) => number): SiteLayout | null {
-  return 'region' in job ? layOutSite(job.region, job.place, height) : 'camp' in job ? layOutCamp(job.camp, height) : layOutSight(job.sight, job.shape, height);
+/** A region's place, a sight or a camp's landmark laid out (null: nothing stands there); `ruinOf`: a camp's great ruin, as the terrain planned it. */
+export function layOut(job: SiteJob, height: (x: number, z: number) => number, ruinOf?: (id: string) => CampRuin | null): SiteLayout | null {
+  return 'region' in job ? layOutSite(job.region, job.place, height) : 'camp' in job ? layOutCamp(job.camp, height, ruinOf?.(job.camp.id)) : layOutSight(job.sight, job.shape, height);
 }
 
 /** A place's pieces drawn round its middle (`draw`), seeded from it, on the land's heights. */

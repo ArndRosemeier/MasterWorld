@@ -76,7 +76,7 @@ serve<TerrainJob, TerrainResult>((job) => {
   }
   // A region's place or a sight by the way (tens of milliseconds for a barrow): here, off the main thread (floor F2).
   if (job.kind === 'site') {
-    const t = terrain, laid = layOut(job.site, (x, z) => t.height(x, z));
+    const t = terrain, laid = layOut(job.site, (x, z) => t.height(x, z), (id) => t.ruinOf(id));
     return { result: laid, transfer: laid ? meshBuffers(laid.mesh) : [] };
   }
   // A building drawn open (D38) as one comes up to its door: its plan and mesh, off the main thread (floor F2).

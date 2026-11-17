@@ -5,12 +5,13 @@
 import { Noise, deriveSeed, lerp, smin, smoothstep } from '@futuremagic/core';
 import { SHORE, Skeleton, emptySample } from './skeleton';
 import { BROOKS, HYDRO, Hydrology, emptyWater, inChannel, shapeByWater, type HydroOptions, type WaterHere } from './hydro';
-import type { SettingModule } from '../setting/contract';
+import { campDefOf, type SettingModule } from '../setting/contract';
 import { ArchField, BLEND } from './volumes';
 import { settlementOf, type CampDecision, type Decision, type DecisionLog, type HoldDecision, type RoadDecision, type TownDecision } from './decisions';
 import { holdBare, holdGround } from './hold';
 import { RETREAT_CLEARING, clearingOf, type Clearing } from './dungeon/site';
-import { CAMP_PIECE_R, SIGHT_CLEARING, campPiece } from './sites';
+import { SIGHT_CLEARING, campPiece } from './sites';
+import { campRuin, onRuins, ruinReach, type CampRuin } from './campRuin';
 import { RoadNet } from './roads';
 import { brookCuts } from './bridges';
 import type { Field, TownPlan } from '@futuremagic/settlement';
@@ -122,6 +123,9 @@ export class Terrain {
   private holdList: HoldDecision[] = [];
   /** The camps in the log (D69, Z2): roads keep out of their reach (Z5). */
   private readonly campMap = new Map<string, CampDecision>();
+  /** The camps' great ruins (D69, Z4 in play): they shape the ground they stand on. */
+  private readonly ruinMap = new Map<string, CampRuin>();
+  private ruinList: CampRuin[] = [];
   private readonly probe = emptySample();
   private readonly wet = { river: 0, lake: 0 };
   private roadNet = new RoadNet();
@@ -152,6 +156,8 @@ export class Terrain {
     for (const d of log) if (d.kind === 'volume') this.fields.push(new ArchField(this, d.site));
     this.clearingMap.clear();
     this.campMap.clear();
+    this.ruinMap.clear();
+    this.ruinList = [];
     // Roads, clearings, and the settlements founded in regions (after the towns of the log, in its order).
     this.settleMore(log);
   }
@@ -184,7 +190,10 @@ export class Terrain {
       } else if (d.kind === 'camp') {
         // A camp (D69): its landmark piece stands in a clearing of its own; roads keep out of its reach.
         this.campMap.set(d.id, d);
-        if (campPiece(d)) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: Math.min(d.r, CAMP_PIECE_R) + 4 });
+        const ruin = this.ruinFor(d);
+        if (ruin) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: ruinReach(ruin) + 6 });
+        // (Its whole ground is open: the camp reads as a place from its edge, not a few stones in the trees.)
+        else if (campPiece(d)) this.clearingMap.set(d.id, { x: d.x, z: d.z, r: d.r + 6 });
       } else if (d.kind === 'sight') {
         // A sight by the way (C9) stands in a glade of its own.
         this.clearingMap.set(d.id, { x: d.x, z: d.z, r: SIGHT_CLEARING });
@@ -221,6 +230,22 @@ export class Terrain {
   /** Ground kept free of trees round the places out on the land (by the place's id). */
   /** The camps settled so far (D69). */
   get camps(): Iterable<CampDecision> { return this.campMap.values(); }
+
+  /** A camp's great ruin (D69, Z4), if it stands in one. */
+  ruinOf(id: string): CampRuin | null { return this.ruinMap.get(id) ?? null; }
+
+  /** A camp's great ruin planned on the land as it lies (the ground before any ruin), once; null if its landmark is no ruin. */
+  private ruinFor(d: CampDecision): CampRuin | null {
+    const known = this.ruinMap.get(d.id);
+    if (known) return known;
+    const defs = this.setting.structures;
+    if (d.landmark !== 'great-ruin' || !defs?.kinds.find((k) => k.id === d.landmark)?.play) return null;
+    const holder = campDefOf(this.setting.camps, d.camp)?.holder;
+    const r = campRuin(d, defs, (x, z) => this.beforeRuins(x, z), holder);
+    this.ruinMap.set(d.id, r);
+    this.ruinList.push(r);
+    return r;
+  }
 
   get clearings(): ReadonlyMap<string, Clearing> {
     return this.clearingMap;
@@ -349,8 +374,13 @@ export class Terrain {
     return Math.max(Math.abs(this.height(x + d, z) - h), Math.abs(this.height(x, z + d) - h)) / d;
   }
 
-  /** Ground height above the sea surface, metres: the land's own, as the holds shape it. */
+  /** Ground height above the sea surface, metres: the land's own, as the holds and the camps' great ruins shape it. */
   height(x: number, z: number): number {
+    return onRuins(this.ruinList, x, z, this.beforeRuins(x, z));
+  }
+
+  /** The land as the holds shape it, before the camps' ruins stand on it (what a ruin is planned on). */
+  private beforeRuins(x: number, z: number): number {
     let h = this.landHeight(x, z);
     for (let i = 0; i < this.holdList.length; i++) h = holdGround(this.holdList[i], x, z, h);
     return h;
