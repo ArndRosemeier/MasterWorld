@@ -46,6 +46,8 @@ export function placeOf(d: Decision, log: DecisionLog, depth = 0): readonly [num
     case 'order': case 'festivity': return by(d.town);
     case 'journey': return by(d.to);
     case 'delay': return by(d.journey);
+    // A zone is its square's middle.
+    case 'zone': { const s = 250 * 2 ** d.level; return [(d.x + 0.5) * s, (d.z + 0.5) * s]; }
     // Open land has nothing placed in it to see.
     case 'region': return d.site ? [d.site.x, d.site.z] : null;
     case 'road': {
@@ -82,6 +84,7 @@ export function toolFor(d: Decision, log: DecisionLog): string {
     case 'stray': return 'stray-beast';
     case 'castaway': return 'castaway';
     case 'festivity': return 'festivity';
+    case 'zone': case 'camp': return 'zone';
   }
 }
 
@@ -108,6 +111,8 @@ export function decisionSays(d: Decision): string {
     case 'festivity': return `${d.festivity} in ${d.town}, ${Math.round(d.from)} to ${Math.round(d.to)} h`;
     case 'stray': return `a beast out of its paddock in ${d.town}, wandering to ${Math.round(d.x)}, ${Math.round(d.z)}`;
     case 'castaway': return `a fisher of ${d.town} clinging to their upturned boat ${at(d.x, d.z)}`;
+    case 'zone': return `the zone ${d.name} (${d.theme}, levels ${d.band[0]} to ${d.band[1]})`;
+    case 'camp': return `${d.camp} at level ${d.level} round ${d.landmark} in ${d.zone} ${at(d.x, d.z)} (${d.posts.length})`;
     case 'traveller': return `the traveller of ${d.town} ${d.situation ? 'hurt' : 'resting'} by the hero's way at ${Math.round(d.x)}, ${Math.round(d.z)}`;
   }
 }

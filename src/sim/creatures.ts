@@ -99,6 +99,10 @@ export interface Creature {
   spurn: number;
   /** Its hunt of a shy beast (creep, then burst), while it brawls with one. */
   stalk: Stalk | null;
+  /** How often it has come back (a camp's post, D69 Z2): its body carries what this life had. */
+  lives: number;
+  /** Seconds left of rising out of the ground (a camp's dead coming back, rule 11), and how deep it starts. */
+  rise: number;
   /** Seconds it rests after a hunt that failed, before it looks for another quarrel. */
   winded: number;
   rng: Rng;
@@ -135,6 +139,8 @@ const LUNGE = 2.5;
 const STALK_CREEP = 0.4, WINDED = 30, FED = 90;
 /** A hunter in its burst springs this much further (m) at prey that runs. */
 const BOUND = 2.5;
+/** A camp's dead rise out of the ground over this long (s), from this deep (m). */
+const RISE = 3.5, RISE_DEPTH = 1.9;
 /** A body knocked down lies this long (s) before it gets up, and gets up with this share of its health. */
 export const DOWN_FOR = 45;
 const UP_WITH = 0.3;
@@ -282,14 +288,14 @@ export class Den {
   constructor(ground: DungeonSpace | DenGround, spawns: readonly Spawn[], defs: readonly CreatureDef[], seed: number, dead: readonly number[] = []) {
     this.ground = 'layout' in ground ? new DungeonGround(ground) : ground;
     spawns.forEach((s, id) => {
-      const def = defs.find((d) => d.id === s.creature);
+      const def = s.def ?? defs.find((d) => d.id === s.creature);
       if (!def) throw new Error(`no creature "${s.creature}"`);
       const rng = new Rng(deriveSeed(seed, 'den', id));
       const p = this.ground.spot(s.room, rng);
       const c: Creature = {
         id, def, home: s.room, x: p.x, y: p.y, z: p.z, dir: rng.range(-Math.PI, Math.PI), state: 'idle', act: 'stand', health: def.health,
         aware: 0, leader: id === 0 && def.pack, post: null, chased: 0, prey: null, din: 0, eye: id * 0.13 % LOOK, downFor: 0, struck: false, signal: null, signalLeft: 0, armed: false, stagger: 0, slow: 0, ready: 0, windup: 0, until: rng.range(0, 4), path: [], pi: 0, lost: 0, seen: null,
-        repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, stalk: null, winded: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
+        repath: 0, pleas: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, wants: false, balked: 0, hopIn: 0, hop: null, spurn: 0, stalk: null, winded: 0, lives: 0, rise: 0, rng, ...(s.surprise ? { surprise: s.surprise } : {}),
       };
       if (dead.includes(id)) { c.state = 'dead'; c.act = 'dead'; c.health = 0; }
       this.creatures.push(c);
@@ -297,6 +303,24 @@ export class Den {
   }
 
   get alive(): Creature[] { return this.creatures.filter((c) => c.state !== 'dead'); }
+
+  /**
+   * A dead one comes back (a camp's post, D69 Z2), as `def` (its post's kind this time), shown (rule 11): `rise` out of the ground at
+   * `from` (the dead), or `walk` in from `from` (beyond the camp's edge) to its post, taking no notice of the hero on the way.
+   */
+  revive(id: number, def: CreatureDef, from: { x: number; z: number }, arrive: 'rise' | 'walk'): Creature | null {
+    const c = this.creatures[id];
+    if (!c || c.state !== 'dead') return null;
+    const y = this.ground.floorAt(from.x, from.z, c.y) ?? c.y;
+    Object.assign(c, {
+      def, x: from.x, y, z: from.z, health: def.health, aware: 0, post: null, chased: 0, prey: null, din: 0, downFor: 0, struck: false, stagger: 0, slow: 0,
+      ready: 0, windup: 0, path: [], pi: 0, lost: 0, seen: null, repath: 0, blows: 0, calm: 0, close: false, made: 0, pushing: 0, balked: 0, hop: null,
+      spurn: 0, stalk: null, winded: 0, lives: c.lives + 1, rise: 0, act: 'stand',
+    });
+    if (arrive === 'rise') { c.state = 'idle'; c.rise = RISE; c.y = y - RISE_DEPTH; c.until = RISE; }
+    else { c.state = 'home'; this.headTo(c, this.ground.spot(c.home, c.rng)); c.act = 'walk'; }
+    return c;
+  }
 
   /** Those hunting the hero now. */
   get fighting(): Creature[] { return this.creatures.filter((c) => c.state === 'fight'); }
@@ -320,6 +344,7 @@ export class Den {
     const out: DenEvent[] = [];
     for (const c of this.creatures) {
       if (c.state === 'dead') { c.y = this.ground.floatAt?.(c.x, c.z, c.y) ?? c.y; continue; }
+      if (c.rise > 0) { this.rising(c, dt); continue; }
       c.stagger = Math.max(0, c.stagger - dt);
       if ((c.signalLeft -= dt) <= 0) { c.signalLeft = 0; c.signal = null; }
       c.din = Math.max(0, c.din - dt);
@@ -948,6 +973,14 @@ export class Den {
     c.windup = 0;
     this.headTo(c, c.post ?? this.ground.spot(c.home, c.rng));
     out.push({ kind: 'home', who: c });
+  }
+
+  /** Coming up out of the ground where it fell (rule 11): it takes no notice of anything till it stands. */
+  private rising(c: Creature, dt: number): void {
+    c.rise = Math.max(0, c.rise - dt);
+    const floor = this.ground.floorAt(c.x, c.z, c.y + RISE_DEPTH) ?? c.y;
+    c.y = floor - RISE_DEPTH * (c.rise / RISE);
+    c.act = 'stand';
   }
 
   /** Leashed: it runs home and is whole once there, at ease again. */

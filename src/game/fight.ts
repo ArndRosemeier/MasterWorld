@@ -176,7 +176,7 @@ export class Fight implements RecipeWorld {
 
   /** What a fallen creature carries (rolled from its own seed, so a loaded game finds the same), left on its body. */
   restoreBody(c: Creature): Loot {
-    const loot = c.def.loot ? rollLoot(this.setting.items, c.def.loot, c.def.danger, new Rng(deriveSeed(this.rng.seed, 'body', c.id))) : { items: [], coins: 0 };
+    const loot = c.def.loot ? rollLoot(this.setting.items, c.def.loot, c.def.danger, new Rng(c.lives ? deriveSeed(this.rng.seed, 'body', c.id, c.lives) : deriveSeed(this.rng.seed, 'body', c.id))) : { items: [], coins: 0 };
     if (loot.items.length || loot.coins) this.bodies.set(c.id, loot);
     return loot;
   }

@@ -100,6 +100,17 @@ export function nextRegion(c: FrontierContext): RegionDecision | null {
   return null;
 }
 
+/**
+ * The region the frontier opens round `p` now, or null when `p` already lies in one (a zone laid out whole opens the rest of its square
+ * first, D69 Z3: vgm/zones.ts). Before the start's own region is open, that one.
+ */
+export function regionAt(c: FrontierContext, p: { x: number; z: number }): RegionDecision | null {
+  const done = regionDecisions(c.log);
+  if (!done.length) return nextRegion(c);
+  const map = c.map ?? regionMapOf(c.log, c.regions.country);
+  return map.at(p.x, p.z) ? null : openAt(c, map, p, done);
+}
+
 /** A region opened round a point that lies in none: a fill that fits, sized for it, its place found. */
 function openAt(c: FrontierContext, map: RegionMap<RegionData>, p: { x: number; z: number }, done: readonly RegionDecision[]): RegionDecision {
   const n = done.length + 1, s = deriveSeed(c.seed, 'vgm', 'region', n);

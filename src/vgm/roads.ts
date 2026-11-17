@@ -73,4 +73,5 @@ export function linkRoad(t: Terrain, log: DecisionLog, place: Place, way: RoadWa
   return { kind: 'road', id, way, from: place.id, to: to.id, pts, ...(at === undefined ? {} : { at }) };
 }
 
-const round = (v: number): number => Math.round(v * 100) / 100;
+/** A coordinate kept to the centimetre (what the log holds). */
+export const round = (v: number): number => Math.round(v * 100) / 100;

@@ -446,7 +446,63 @@ export interface FestivityDecision {
   readonly for?: string;
 }
 
-export type Decision = DelayDecision | FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
+/**
+ * A zone laid out (D69, Z3): the aligned square `(level, x, z)` (D16; 2 km in the classic setting) with its name, theme and level band. The
+ * VGM lays a zone out whole before the hero can see into it (its camps follow it in the log) and never moves or removes what it placed.
+ */
+export interface ZoneDecision {
+  readonly kind: 'zone';
+  readonly id: string;
+  readonly level: number;
+  readonly x: number;
+  readonly z: number;
+  /** The setting's zone theme, and the zone's name. */
+  readonly theme: string;
+  readonly name: string;
+  /** The levels of its camps, lowest and highest. */
+  readonly band: readonly [number, number];
+  readonly seed: number;
+  readonly at: number;
+}
+
+/** A post in a camp, fixed when the camp is placed (Z2): where it is (world metres), who stands there, at what level, and in which group. */
+export interface CampPost {
+  readonly x: number;
+  readonly z: number;
+  readonly creature: string;
+  readonly level: number;
+  /** The camp's post def it came from (its index in `CampDef.posts`). */
+  readonly post: number;
+  /** The leader's post (where a named one may stand instead). */
+  readonly leader?: true;
+  /** A patrol's round (x, z pairs, world metres), walked in order; none: it keeps to its post. */
+  readonly round?: readonly number[];
+}
+
+/**
+ * A fixed camp (D69, Z2): the setting's camp kind at (x, z), facing `yaw`, `r` metres round, built round its landmark, its posts fixed for good.
+ * It never moves, empties or changes hands; the dead come back at their posts (the save keeps who is dead and since when).
+ */
+export interface CampDecision {
+  readonly kind: 'camp';
+  readonly id: string;
+  /** The zone it was laid out in. */
+  readonly zone: string;
+  readonly camp: string;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  readonly r: number;
+  /** What it is built round: a structure kind of the setting (Z4), or one of the land's pieces (`CampPiece`). */
+  readonly landmark: string;
+  /** Its level (its posts lie within a level of it; the leader one above). */
+  readonly level: number;
+  readonly posts: readonly CampPost[];
+  readonly seed: number;
+  readonly at: number;
+}
+
+export type Decision = ZoneDecision | CampDecision | DelayDecision | FestivityDecision | StrayDecision | CastawayDecision | TravellerDecision | SightDecision | JourneyDecision | RetakeDecision | WildDecision | EventDecision | TownDecision | VolumeDecision | DungeonDecision | OrderDecision | KeptDecision | MoveInDecision | RoadDecision | RegionDecision | HoldDecision | RetreatDecision;
 
 export type DecisionLog = readonly Decision[];
 
@@ -457,7 +513,7 @@ const RETREAT_KEEP = 40;
 
 /**
  * Ground the log has put something on out on the land: barrows (`dungeonR` metres round each), the places
- * in opened regions (their own footprint), the peoples' holds and the teachers' towers. New places keep away from it.
+ * in opened regions (their own footprint), the peoples' holds, the teachers' towers and the camps (D69). New places keep away from it.
  */
 export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: number; r: number }[] {
   const out: { x: number; z: number; r: number }[] = [];
@@ -466,6 +522,7 @@ export function sitesIn(log: DecisionLog, dungeonR: number): { x: number; z: num
     else if (d.kind === 'region' && d.site) out.push({ x: d.site.x, z: d.site.z, r: d.site.r });
     else if (d.kind === 'hold') out.push({ x: d.x, z: d.z, r: HOLD_KEEP });
     else if (d.kind === 'retreat') out.push({ x: d.x, z: d.z, r: RETREAT_KEEP });
+    else if (d.kind === 'camp') out.push({ x: d.x, z: d.z, r: d.r });
   }
   return out;
 }

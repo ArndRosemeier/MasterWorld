@@ -67,6 +67,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'region', name: 'Open a region', writes: ['region'], need: 'discovery', asked: 'walk' },
   { id: 'road', name: 'Lay a road', writes: ['road'], need: 'discovery', asked: 'call' },
   { id: 'wild', name: 'Place the wild', writes: ['wild'], need: 'challenge', asked: 'call' },
+  { id: 'zone', name: 'Lay out a zone', writes: ['zone', 'camp'], need: 'challenge', asked: 'walk' },
   { id: 'island-place', name: 'A place on an island', writes: ['dungeon'], need: 'discovery', asked: 'turn', next: (c) => islandPlace({ ...c, dungeons: c.setting.dungeons }),
     why: (d) => (d.kind === 'dungeon' ? `a ${d.template} out on the island of ${d.town}, for its people to know of` : d.kind) },
   { id: 'promise', name: 'Promise a place', writes: ['dungeon', 'move-in'], need: 'purpose', asked: 'turn', next: (c) => nextPromise({ ...c, dungeons: c.setting.dungeons, asks: c.setting.asks, twists: c.setting.twists }),

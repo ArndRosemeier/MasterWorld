@@ -2166,6 +2166,105 @@ export interface SettingModule {
   readonly noticing?: NoticingDef;
   /** The memorable structures camps are built round (D69, Z4): who builds, who holds, which kinds. None: no camp structures. */
   readonly structures?: StructuresDef;
+  /** The fixed camps of the land, and the zones they are laid out in (D69, Z2, Z3). None: no camps, no zones. */
+  readonly camps?: CampsDef;
+}
+
+/** How big a camp is (Z5: about six in ten small, three in ten middle, one in ten big). */
+export type CampSize = 'small' | 'middle' | 'big';
+
+/**
+ * A landmark a camp is built round (Z4): a structure kind of the setting's `structures` once it is in play, else one of the pieces the
+ * land already draws (world/sites.ts): broken walls of the old realm, a ring of standing stones, a field of barrows, a cairn, tents round a fire.
+ */
+export type CampPiece = 'ruin' | 'stones' | 'barrows' | 'cairn' | 'tents' | 'none';
+
+/** A post in a camp (Z2): who can stand there, how many, how far out from the middle, and whether it is the leader's. */
+export interface CampPostDef {
+  /** Creature ids it can hold (one is picked by the seed for each body). */
+  readonly creatures: readonly string[];
+  /** How many stand there. */
+  readonly count: readonly [number, number];
+  /** Where it lies, as a share of the camp's radius from its middle (0: the middle, 1: the edge). */
+  readonly out: readonly [number, number];
+  /** The leader's post: one level above the camp, and where a named one may stand instead (Z2). */
+  readonly leader?: boolean;
+  /** A patrol (Z2): a foe that walks a fixed round about the camp instead of standing at a post. */
+  readonly patrol?: boolean;
+}
+
+/** A rare named foe (Z2, open question 7): stands at a leader's post in place of the usual one, two levels higher, with better loot. */
+export interface CampNamedDef {
+  /** The creature it is. */
+  readonly creature: string;
+  /** Names to pick from (seeded). */
+  readonly names: readonly string[];
+  /** Its treasure table (items), better than its kind's. */
+  readonly loot: string;
+}
+
+/**
+ * A kind of camp (D69, Z2, rule 10): who lives there, how they stand and what they are built round. The VGM lays camps out in zones (vgm/zones.ts),
+ * each a `camp` decision with its posts fixed; the save keeps only who is dead and when each comes back.
+ */
+export interface CampDef {
+  readonly id: string;
+  /** As people would say it ("a goblin warren"). */
+  readonly name: string;
+  readonly size: CampSize;
+  /** The footprint's radius (m): its posts lie inside it, and nothing else is placed within it. */
+  readonly r: number;
+  /** wood: under trees; open: meadows and heath; any: either. */
+  readonly habitat: 'wood' | 'open' | 'any';
+  /** Its posts, the leader's first. */
+  readonly posts: readonly CampPostDef[];
+  /** What it can be built round (Z4 kinds by id, falling back to `pieces` while a kind is not in play), weighted. */
+  readonly landmarks?: Readonly<Record<string, number>>;
+  /** The pieces it falls back to, weighted (none: a hunting ground with no landmark of its own). */
+  readonly pieces: Readonly<Partial<Record<CampPiece, number>>>;
+  /** The structure's holders (Z4: what they add to it), by the setting's `structures.holders`. */
+  readonly holder?: string;
+  /** Rare named ones (Z2) for its leader's post. */
+  readonly named?: readonly CampNamedDef[];
+  /** How a respawned one comes back (rule 11): `rise` out of the ground (the dead), `walk` in from the camp's edge (the living). */
+  readonly arrive: 'rise' | 'walk';
+}
+
+/** A zone's theme (Z3): its name's words and which camps it is mostly made of. */
+export interface ZoneThemeDef {
+  readonly id: string;
+  /** Words for its name (`{land}`: a word for the land, from `lands`): "the Goblin {land}". */
+  readonly names: readonly string[];
+  /** Camp ids and how often each is picked in this theme. */
+  readonly camps: Readonly<Record<string, number>>;
+  /** How often the theme is picked. */
+  readonly weight: number;
+}
+
+/**
+ * The camps of the land and the zones they are laid out in (D69, Z2, Z3, Z5): what kinds of camp there are, the themes of zones, their level
+ * bands, how densely camps stand and how often they come back.
+ */
+export interface CampsDef {
+  readonly camps: readonly CampDef[];
+  readonly themes: readonly ZoneThemeDef[];
+  /** Words for a zone's land by its biome (`{land}`), and one for any other. */
+  readonly lands: Readonly<Record<string, readonly string[]>> & { readonly other: readonly string[] };
+  /** A zone's square: a region level (D16: 250 m × 2^level; 3 is 2 km). */
+  readonly zoneLevel: number;
+  /** The start zone's lowest level, how much higher each ring of zones out from it starts, how wide a band is, and the highest level of any band. */
+  readonly band: { readonly first: number; readonly step: number; readonly width: number; readonly top: number };
+  /** Camps a zone holds, and the share of small, middle and big ones (at least one big). */
+  readonly density: { readonly count: readonly [number, number]; readonly small: number; readonly middle: number; readonly big: number };
+  /** Metres between two camps' edges, at least (Z5: 60 to 150). */
+  readonly apart: number;
+  /** A camp's edge keeps this far from a road beyond the widest aggro (m: Z5 roads are safe lanes), and this far from a town's edge. */
+  readonly road: number;
+  readonly town: number;
+  /** Seconds before a spawn point comes back (open question 1: 6 real minutes out, 18 below, 30 to 60 for a named one), and its spread (share). */
+  readonly respawn: { readonly out: number; readonly below: number; readonly named: readonly [number, number]; readonly spread: number };
+  /** The chance a leader's post holds its named one when it comes back. */
+  readonly namedChance: number;
 }
 
 /** An sRGB colour, 0..255 a channel (a tint multiplying a texture). */
@@ -2226,6 +2325,8 @@ export interface StructureKindDef {
   readonly builders: Readonly<Record<string, number>>;
   /** Who can hold it now, weighted. */
   readonly holders: Readonly<Record<string, number>>;
+  /** It stands in play (Z4: once Arnd has seen its gallery and it fits the real land): camps are built round it; until then they fall back to their pieces. */
+  readonly play?: boolean;
 }
 
 export interface StructuresDef {
@@ -2426,6 +2527,7 @@ export function validateSetting(m: SettingModule): string[] {
   out.push(...validatePeoples(m, where));
   out.push(...validateFactions(m, where));
   out.push(...validateAggro(m.aggro, where));
+  if (m.camps) out.push(...validateCamps(m, m.camps, where));
   out.push(...validateRoutines(m.routines, where));
   out.push(...validateAsks(m, where));
   if (m.caves) out.push(...validateCaves(m.caves, m.world.kinds?.map((k) => k.id) ?? [], where));
@@ -2529,6 +2631,35 @@ export function validateAggro(a: AggroDef, where: string): string[] {
   if (!(a.up >= 0 && a.down >= 0 && a.grey >= 1)) out.push(`${where}: aggro needs up and down of 0 or more and grey of 1 or more`);
   if (!(a.link > 0 && a.leash > a.max && a.chase > 0)) out.push(`${where}: aggro needs a link, a leash longer than the widest radius, and a chase time`);
   if (!(a.con.blue >= 1 && a.con.green > a.con.blue && a.grey > a.con.green && a.con.red >= 2)) out.push(`${where}: aggro con needs 1 <= blue < green < grey and red of 2 or more`);
+  return out;
+}
+
+/** Camps and zones (D69, Z2, Z3): every post names creatures the setting has, every theme names camps it has, the numbers run the right way. */
+export function validateCamps(m: Pick<SettingModule, 'creatures' | 'structures'>, c: CampsDef, where: string): string[] {
+  const out: string[] = [];
+  const creatures = new Set(m.creatures.map((d) => d.id)), camps = new Set(c.camps.map((d) => d.id));
+  for (const d of c.camps) {
+    if (!d.posts.length) out.push(`${where}: camp ${d.id} has no posts`);
+    if (!(d.r > 0)) out.push(`${where}: camp ${d.id} needs a radius`);
+    for (const p of d.posts) {
+      for (const k of p.creatures) if (!creatures.has(k)) out.push(`${where}: camp ${d.id} names a creature "${k}" the setting does not have`);
+      if (!(p.count[0] >= 1 && p.count[1] >= p.count[0])) out.push(`${where}: camp ${d.id} has a post with a bad count`);
+      if (!(p.out[0] >= 0 && p.out[1] >= p.out[0] && p.out[1] <= 1.2)) out.push(`${where}: camp ${d.id} has a post outside its ground`);
+    }
+    for (const n of d.named ?? []) if (!creatures.has(n.creature) || !n.names.length) out.push(`${where}: camp ${d.id} has a named one with no creature or no names`);
+    for (const k of Object.keys(d.landmarks ?? {})) if (!m.structures?.kinds.some((s) => s.id === k)) out.push(`${where}: camp ${d.id} names a structure kind "${k}" the setting does not have`);
+    if (d.holder && !m.structures?.holders.some((h) => h.id === d.holder)) out.push(`${where}: camp ${d.id} names a holder "${d.holder}" the setting does not have`);
+  }
+  for (const t of c.themes) {
+    if (!t.names.length) out.push(`${where}: zone theme ${t.id} has no names`);
+    for (const k of Object.keys(t.camps)) if (!camps.has(k)) out.push(`${where}: zone theme ${t.id} names a camp "${k}" the setting does not have`);
+    for (const z of ['small', 'big'] as const) if (!Object.keys(t.camps).some((k) => c.camps.find((d) => d.id === k)?.size === z)) out.push(`${where}: zone theme ${t.id} has no ${z} camp`);
+  }
+  const b = c.band, n = c.density;
+  if (!(b.first >= 1 && b.step >= 1 && b.width >= b.step && b.top >= b.first + b.width - 1)) out.push(`${where}: camps.band needs first >= 1, step >= 1, a width of at least the step, and a top above the first band`);
+  if (!(b.step <= 3)) out.push(`${where}: camps.band.step must be 3 or less (Z3: neighbouring zones differ by at most three levels)`);
+  if (!(n.count[0] >= 1 && n.count[1] >= n.count[0] && Math.abs(n.small + n.middle + n.big - 1) < 1e-6)) out.push(`${where}: camps.density needs a count and shares adding up to 1`);
+  if (!(c.apart > 0 && c.road >= 0 && c.town >= 0 && c.respawn.out > 0 && c.respawn.below >= c.respawn.out && c.respawn.named[1] >= c.respawn.named[0] && c.respawn.spread >= 0 && c.respawn.spread < 1)) out.push(`${where}: camps need spacing and respawn times that run the right way`);
   return out;
 }
 
