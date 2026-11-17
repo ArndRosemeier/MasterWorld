@@ -4,7 +4,7 @@
  * fills in before them. A click on the first glyph sends a beam to the floor, which glows and fades (home). Some way
  * off, the second glyph tears a portal open beyond the stone, its twin at home; the hero walks through and comes out
  * at home, looks back through; opening one by home fizzles; one opened elsewhere closes the old far one. Checks:
- * the pack card raises it, each glyph takes, the hero crosses, the counts, no shader built in play (no VIOLATION),
+ * the pack card raises it, each glyph takes, the first glyph's glow shows on the screen (pixels, glow.mjs), the hero crosses, the counts, no shader built in play (no VIOLATION),
  * no page errors, no GPU validation errors. Then two tight spots: in the capital's gate passage the portal shrinks to fit (it opens, smaller),
  * and down in a cave one opens back to home on the land. JPEGs into `<out dir>` (default `shots/stone/<date>-<commit>/`). A slow check (docs/CHECKS.md).
  */
@@ -14,8 +14,8 @@ import { join } from 'node:path';
 import { launch } from './launch.mjs';
 import { glowGain } from './glow.mjs';
 
-/** The share of the lower middle of the screen the floor's glow must brighten, frame 1 to frame 3 (tools/shot/glow.mjs). */
-const GLOW_MIN = 0;
+/** The share of the lower middle of the screen the floor's glow must brighten, frame 1 to frame 3 (tools/shot/glow.mjs; measured on WebGPU: 5 % with the glow, 0.5 % without, MW #588). */
+const GLOW_MIN = 0.02;
 
 const TIMEOUT = Number(process.env.SHOT_TIMEOUT ?? 180000);
 // On the reference machine (SHOT_GPU=1) the game's own default, WebGPU: the rifts once broke only there.
@@ -76,11 +76,23 @@ const standClear = (near, far, turn = 0) => page.evaluate(([near, far, turn]) =>
 /** Click a glyph where it is on the screen. */
 const press = async (glyph) => {
   const at = await page.evaluate((g) => window.game.stone.glyphOnScreen(g), glyph);
+  if (!(at.x > 0 && at.x < 1280 && at.y > 0 && at.y < 720)) { fail(`glyph ${glyph} is off the screen (${at.x.toFixed(0)},${at.y.toFixed(0)}): nothing was pressed`); return false; }
   const seen = () => page.evaluate(() => { const g = window.game, s = g.stone; return `${s.state} realm ${g.stone.host?.realm?.() ?? '?'} counts ${JSON.stringify(s.counts)} home ${s.stone.home ? `${s.stone.home.frame.x.toFixed(1)},${s.stone.home.frame.z.toFixed(1)}` : '-'} hero ${g.player.walker.pos.x.toFixed(1)},${g.player.walker.pos.z.toFixed(1)}`; });
   console.log(`glyph ${glyph} at ${at.x.toFixed(0)},${at.y.toFixed(0)} (reach ${at.reach.toFixed(0)} px); before: ${await seen()}`);
   await page.mouse.click(at.x, at.y);
   await page.waitForTimeout(100);
   console.log(`  after: ${await seen()}`);
+  return true;
+};
+/** Frame the held stone so both glyphs are on the screen: the camera closer behind the hero, as in a cave's passage (false: none did). */
+const frameStone = async () => {
+  for (const [zoom, pitch] of [[3.6, -0.18], [2.6, -0.1], [1.9, 0], [1.4, 0.1], [1.0, 0.2]]) {
+    await look(0, zoom, pitch);
+    await page.waitForTimeout(500);
+    const on = await page.evaluate(() => [1, 2].every((g) => { const o = window.game.stone.glyphOnScreen(g); return o.x > 20 && o.x < 1260 && o.y > 20 && o.y < 700; }));
+    if (on) return true;
+  }
+  return false;
 };
 /** Hold the stone up (by its card in the pack: I, then a click). */
 const raise = async (byPack) => {
@@ -150,9 +162,16 @@ await shoot('9-out-at-home');
 await look(Math.PI, 4.5, -0.12);
 await page.waitForTimeout(700);
 await shoot('10-looking-back-through');
-// By home a portal fizzles. Stand on home itself: walking out of the portal may have carried the hero past it.
-await page.evaluate(() => { const g = window.game, h = g.stone.stone.home.frame; g.player.teleport(h.x, undefined, h.z, h.yaw); });
+// By home a portal fizzles. Stand 4 m beside home, 4.5 m from where it would open (inside NEAR_HOME), clear of home's own arch:
+// on home itself the hero walks into home's twin and comes out at the far portal (28 m off), where a portal opens fine.
+const crossed = (await state()).passed;
+await page.evaluate(() => { const g = window.game, h = g.stone.stone.home.frame; g.player.teleport(h.x + Math.cos(h.yaw) * 4, undefined, h.z - Math.sin(h.yaw) * 4, h.yaw); });
 await page.waitForTimeout(400);
+{
+  const at = await state();
+  if (at.passed !== crossed) fail('the hero crossed a portal on the way to the fizzle spot');
+  if (at.home && Math.hypot(at.x - at.home.x, at.z - at.home.z) > 5) fail(`not beside home for the fizzle test (${Math.hypot(at.x - at.home.x, at.z - at.home.z).toFixed(1)} m off)`);
+}
 await look();
 await raise(false);
 await press(2);
@@ -173,11 +192,12 @@ if (s5.counts.opened !== 2 || !s5.far || (s2.far && Math.hypot(s5.far.x - s2.far
 if (Math.hypot(s5.home.x - s1.home.x, s5.home.z - s1.home.z) > 1e-6) fail('home moved');
 // Tight spots: the capital's gate passage (it shrinks to fit), then down in a cave (it leads back up to home).
 const go = (label) => page.evaluate((l) => Promise.resolve(window.game.go(l)).then(String, (e) => `THREW ${e}`), label);
-/** Open a portal where the hero stands; the size it opened at, or null if it fizzled. */
+/** Open a portal where the hero stands; the size it opened at, null if it fizzled, undefined if the glyph could not be pressed (already reported). */
 const openHere = async (name) => {
   const before = (await state()).counts.opened;
   await raise(false);
-  await press(2);
+  if (!(await frameStone())) { fail('no camera framing shows both glyphs'); return undefined; }
+  if (!(await press(2))) return undefined;
   await page.waitForTimeout(1900);
   await shoot(name);
   const s = await state();
@@ -187,11 +207,17 @@ console.log('gate:', await go('Capital gate'));
 await page.waitForTimeout(6000);
 // Walk the hero up the road into the gate: the first spot that only fits a smaller portal.
 const gate = await page.evaluate(() => {
-  const g = window.game, p = g.player, w = p.walker, fx = -Math.sin(w.yaw), fz = -Math.cos(w.yaw), seen = [];
-  for (let d = 0; d <= 50; d += 0.5) {
-    const x = w.pos.x + fx * d, z = w.pos.z + fz * d, y = g.terrain.height(x, z), k = g.stone.wouldOpen({ x, y, z }, w.yaw);
-    seen.push(k === null ? '-' : k.toFixed(2));
-    if (k !== null && k < 1) { p.teleport(x, undefined, z, w.yaw); return { d, k, seen: seen.join(' ') }; }
+  const g = window.game, p = g.player, w = p.walker, seen = [];
+  // Eight ways round from where the go-to puts the hero (the passage need not lie ahead of them).
+  for (let i = 0; i < 8; i++) {
+    const yaw = w.yaw + (i * Math.PI) / 4, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    let smallest = 1;
+    for (let d = 0; d <= 40; d += 0.5) {
+      const x = w.pos.x + fx * d, z = w.pos.z + fz * d, y = g.terrain.height(x, z), k = g.stone.wouldOpen({ x, y, z }, yaw);
+      if (k !== null && k < smallest) smallest = k;
+      if (k !== null && k < 1) { p.teleport(x, undefined, z, yaw); return { d, k, way: i, seen: seen.join(' ') }; }
+    }
+    seen.push(`${i}:${smallest.toFixed(2)}`);
   }
   return { d: null, k: null, seen: seen.join(' ') };
 });
@@ -202,7 +228,7 @@ else {
   const k = await openHere('13-gate-portal');
   if (k === null) fail('the portal fizzled in the gate passage');
   else if (k >= 1) fail(`the gate portal did not shrink (${k})`);
-  else console.log(`gate portal at ${k}`);
+  else if (k !== undefined) console.log(`gate portal at ${k}`);
 }
 console.log('cave:', await go('Down in: cave'));
 await page.waitForTimeout(8000);
@@ -222,7 +248,7 @@ await page.waitForTimeout(1000);
 await look();
 const k = await openHere('14-cave-portal');
 if (k === null) fail('the portal fizzled down in the cave');
-else {
+else if (k !== undefined) {
   await look(0.9, 4, -0.12);
   await page.waitForTimeout(600);
   await shoot('15-cave-portal-side');
