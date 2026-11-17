@@ -2,7 +2,7 @@
 /**
  * What a formed cave's stone looks like (D63, phase K3; docs/design/caves.md 3.3, 3.4). Procedural, no textures: the
  * rock is the beds' own colour (the mesh's tint) with, in the shader,
- *  - beds: courses of rock, each its own tone, thin dark partings between them, bent by a slow wave;
+ *  - beds: courses of rock, each its own tone, thin dark partings between them on the walls, bent by a slow wave;
  *  - smooth and rough: patches of water-polished wall (soft bump, a sheen) next to rough, scalloped, ridged wall;
  *  - 3D bump: the surface's relief from layered noise, lit by the lantern, so it reads as stone up close;
  *  - veins of white calcite along cracks, rust streaks down the walls, dark crevices;
@@ -48,7 +48,10 @@ export const FORMED_ROCK = defineKind('formed rock', ['position', 'normal', 'tin
   const thick = float(0.55).add(n3(p.mul(vec3(0.05, 0.02, 0.05))).mul(0.25).add(0.25));
   const yb = p.y.add(warp).div(thick), bed = floor(yb);
   const tone = float(0.82).add(hash1(bed).mul(0.36));
-  const parting = float(1).sub(smoothstep(0.43, 0.5, abs(fract(yb).sub(0.5))).mul(0.35));
+  // (The parting is a line where a bed meets a wall: on a roof or a floor, which cut across the beds' level, the lines would close
+  // into rings round every bump like a map's contours, so they fade out where the rock faces up or down.)
+  const across = smoothstep(0.85, 0.55, abs(n.y));
+  const parting = float(1).sub(smoothstep(0.43, 0.5, abs(fract(yb).sub(0.5))).mul(0.35).mul(across));
   // A weathered bed stands out a little: the harder beds are paler.
   const harder = hash1(bed.add(7.0));
 

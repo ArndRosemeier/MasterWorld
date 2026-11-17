@@ -13,6 +13,7 @@ import { fieldAt } from '../dungeon/rockMesh';
 import type { Dressing } from './dress';
 import { PART_MIN, readField, reachFree, type Reading } from './reader';
 import type { Skeleton } from './skeleton';
+import { findSqueezes, floorSample, sealSqueezes, type Squeeze } from './squeeze';
 
 /** A way cut by the concession: from one floor point to another. */
 export interface Opened {
@@ -23,10 +24,13 @@ export interface Opened {
 /** Pits of fewer cells than this are not worth a way out. */
 const PIT_MIN = 4;
 /** Rounds of read and open at the most. */
-const ROUNDS = 5;
+const ROUNDS = 8;
 
-/** The cells that cannot be reached or left, in lumps of cells joined by links. */
-function lumps(r: Reading): number[][] {
+/**
+ * The cells that cannot be reached or left, in lumps of cells joined by links. A part out of reach counts from `PART_MIN` cells
+ * on, or from `PIT_MIN` when one of its cells is `wanted` (it stands in a space seen through a mouth too small, see `concede`).
+ */
+function lumps(r: Reading, wanted?: (c: number) => boolean): number[][] {
   const bad = (c: number): boolean => r.depth[c] === Infinity || !r.back[c];
   const seen = new Uint8Array(r.count), out: number[][] = [];
   for (let c0 = 0; c0 < r.count; c0++) {
@@ -38,7 +42,7 @@ function lumps(r: Reading): number[][] {
       // Links into the lump from outside (one-way drops) count too: cells that only drop into it are not in it.
     }
     const unreached = r.depth[c0] === Infinity;
-    if (lump.length >= (unreached ? PART_MIN : PIT_MIN)) out.push(lump);
+    if (lump.length >= (unreached && !(wanted && lump.some(wanted)) ? PART_MIN : PIT_MIN)) out.push(lump);
   }
   return out;
 }
@@ -119,7 +123,7 @@ function ramps(f: BrickField, r: Reading, caves: CavesDef): Opened[] {
           if (edge === null) continue;
           const from: [number, number, number] = [top[0] + dir[0] * edge, top[1], top[2] + dir[1] * edge], foot = rampFoot(f, from, dir, run, sl, way);
           if (foot === null) continue;
-          stampRamp(f, from, dir, foot, sl, half);
+          stampRamp(f, from, dir, foot, sl, half, way.stand + 0.05, way.minHeight);
           out.push({ a: from, b: [from[0] + dir[0] * foot, from[1] - sl * foot, from[2] + dir[1] * foot] });
           done = true;
           break;
@@ -131,13 +135,22 @@ function ramps(f: BrickField, r: Reading, caves: CavesDef): Opened[] {
   return out;
 }
 
-/** Read the cave and open what is cut off; the field is changed. Returns the last reading and the ways cut. */
-export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?: Dressing, stopwatch: () => number = Date.now): { reading: Reading; opened: Opened[]; ms: number } {
-  const t0 = stopwatch(), way = caves.way, opened: Opened[] = [];
-  const half = way.minWidth / 2 + 0.3, height = way.minHeight + 0.4, reach = way.maxCut;
-  let reading = readField(f, sk, caves, dressing, stopwatch), prev = Infinity;
+/** What a cut way between two cells costs: its length, and steep pairs more (a way up a face is a long ramp). */
+function wayCost(r: Reading, a: number, b: number): number {
+  const h = Math.hypot(r.x[a] - r.x[b], r.z[a] - r.z[b]), dy = Math.abs(r.y[a] - r.y[b]);
+  return Math.hypot(h, dy) + 3 * Math.max(0, dy - 1.2 * h);
+}
+
+/**
+ * Rounds of cutting hero-sized ways from what cannot be reached or left to the ground that walks out (or to each other), each
+ * round on a fresh reading, until nothing is left out, no way can be cut, or two rounds running leave no less out (a way's slab
+ * may dam another way: the next round opens that). Changes the field; the ways cut go to `opened`. Returns the last reading.
+ */
+function cutWays(f: BrickField, sk: Skeleton, caves: CavesDef, dressing: Dressing | undefined, stopwatch: () => number, start: Reading, opened: Opened[], wanted?: (c: number) => boolean): Reading {
+  const way = caves.way, clear = way.minHeight, half = way.minWidth / 2 + 0.3, height = clear + 0.4, reach = way.maxCut;
+  let reading = start, prev = Infinity, stale = 0;
   for (let round = 0; round < ROUNDS && reading.entries.length; round++) {
-    const r = reading, groups = lumps(r);
+    const r = reading, groups = lumps(r, wanted);
     if (!groups.length) break;
     // Each cell's group: 0 the ground that walks out, 1.. the lumps that cannot be reached or left (smaller bits are left alone).
     const label = new Int32Array(r.count).fill(-1);
@@ -159,7 +172,7 @@ export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?:
         for (const a of l) {
           const la = label[a];
           if (la === lb || la > lb) continue;
-          const h = Math.hypot(r.x[a] - bx, r.z[a] - bz), dy = Math.abs(r.y[a] - by), d = Math.hypot(h, dy) + 3 * Math.max(0, dy - 1.2 * h);
+          const d = wayCost(r, a, b);
           if (d > reach) continue;
           const k = la * n + lb, cur = best.get(k);
           if (!cur || d < cur.d) best.set(k, { d, a, b });
@@ -175,16 +188,41 @@ export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?:
       if (ra === rb) continue;
       up[Math.max(ra, rb)] = Math.min(ra, rb);
       const pa: [number, number, number] = [r.x[v.a], r.y[v.a], r.z[v.a]], pb: [number, number, number] = [r.x[v.b], r.y[v.b], r.z[v.b]];
-      stampSlab(f, pa, pb, half, height);
+      stampSlab(f, pa, pb, half, height, clear);
+      opened.push({ a: pa, b: pb });
+      cut++;
+    }
+    // A big part out of reach (a gallery seen through a mouth too small for the hero, D63) gets a longer way, up to twice the reach.
+    for (let g = 1; g < n; g++) {
+      const cells = groups[g - 1];
+      if (cells.length < PART_MIN || r.depth[cells[0]] < Infinity || find(g) === find(0)) continue;
+      let far: { d: number; a: number; b: number } | null = null;
+      for (let b = 0; b < r.count; b++) {
+        if (label[b] < 0 || find(label[b]) !== find(0)) continue;
+        for (const a of cells) { const d = wayCost(r, a, b); if (d <= 2 * reach && (!far || d < far.d)) far = { d, a, b }; }
+      }
+      if (!far) continue;
+      up[find(g)] = find(0);
+      const pa: [number, number, number] = [r.x[far.b], r.y[far.b], r.z[far.b]], pb: [number, number, number] = [r.x[far.a], r.y[far.a], r.z[far.a]];
+      stampSlab(f, pa, pb, half, height, clear);
       opened.push({ a: pa, b: pb });
       cut++;
     }
     if (!cut) break;
-    const left = r.count - r.stats.reached + r.stats.trapped;
-    if (round > 0 && left >= prev) break;
-    prev = left;
+    // (Read again before deciding to stop, so the reading returned is the field's as cut.)
     reading = readField(f, sk, caves, dressing, stopwatch);
+    const left = reading.count - reading.stats.reached + reading.stats.trapped;
+    stale = left < prev ? 0 : stale + 1;
+    if (stale >= 2) break;
+    prev = Math.min(prev, left);
   }
+  return reading;
+}
+
+/** Read the cave and open what is cut off; the field is changed. Returns the last reading, the ways cut and the slots shut. */
+export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?: Dressing, stopwatch: () => number = Date.now): { reading: Reading; opened: Opened[]; sealed: Squeeze[]; ms: number } {
+  const t0 = stopwatch(), opened: Opened[] = [];
+  let reading = cutWays(f, sk, caves, dressing, stopwatch, readField(f, sk, caves, dressing, stopwatch), opened);
   // Tall faces the only way on climbs get a rubble ramp (read again after each round: a ramp joins what lay behind it). A ramp must never cost
   // ground: if the cave reads smaller than before the ramps (one filled a way), the field and the reading are put back as they were.
   const before = { reading, count: opened.length, bricks: f.bricks.map((b) => (b ? b.slice() : null)) };
@@ -199,7 +237,25 @@ export function concede(f: BrickField, sk: Skeleton, caves: CavesDef, dressing?:
     opened.length = before.count;
     reading = before.reading;
   }
-  return { reading, opened, ms: stopwatch() - t0 };
+  // A ramp's rubble may have dammed a way behind it: what it left out is cut to again.
+  if (lumps(reading).length) reading = cutWays(f, sk, caves, dressing, stopwatch, reading, opened);
+  // No squeezing (D63): a space with standing ground worth a way (PART_MIN cells), seen through a mouth too small for the hero, gets
+  // ways to the parts in it, however small each is (the first rounds join only parts of PART_MIN cells: cutting to every nook would
+  // widen the narrows round it, where the story's shut ways stand).
+  const beyond = findSqueezes(f, reading, sk, dressing).filter((q) => q.stands >= PART_MIN);
+  if (beyond.length) {
+    const seen = new Set<number>();
+    for (const q of beyond) for (const s of q.samples) seen.add(s);
+    reading = cutWays(f, sk, caves, dressing, stopwatch, reading, opened, (c) => seen.has(floorSample(f, reading.x[c], reading.y[c], reading.z[c])));
+  }
+  // The last word: a slot the hero sees and cannot get into, left by what was cut, piled or fallen, or a nook too small to be worth a
+  // way (under PART_MIN cells), is shut with rock.
+  const sealed = findSqueezes(f, reading, sk, dressing).filter((q) => q.stands < PART_MIN);
+  if (sealed.length) {
+    sealSqueezes(f, sealed);
+    reading = readField(f, sk, caves, dressing, stopwatch);
+  }
+  return { reading, opened, sealed, ms: stopwatch() - t0 };
 }
 
 /** A dressing without what the opened ways cut through (loose things within 1.8 m of a way's line). */

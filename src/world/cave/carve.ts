@@ -131,41 +131,64 @@ export function stampTube(f: BrickField, a: CondPoint, b: CondPoint, rough = 0, 
 /**
  * A slope of fallen rock (the rubble ramp, K5): from `top` it runs `run` metres along the unit heading `dir` (x, z), falling `slope` per metre, `half`
  * wide either side; the air under the line is filled with rock (to the sides' edge columns, so no sliver of rock stands at its rim), the air over it is left as it is.
+ * No squeezing (D63): rubble never rises to under `stand` metres of a roof (that column is left as it was), and never stops short of a floor
+ * with less than `clear` metres of air under it (it fills down to that floor): a ramp leaves no low slot over or under it.
  */
-export function stampRamp(f: BrickField, top: readonly [number, number, number], dir: readonly [number, number], run: number, slope: number, half: number): void {
+export function stampRamp(f: BrickField, top: readonly [number, number, number], dir: readonly [number, number], run: number, slope: number, half: number, stand = 2.15, clear = 2.8): void {
   const { step } = f, ex = top[0] + dir[0] * run, ez = top[2] + dir[1] * run;
   const [i0, i1] = sampleRange(f, Math.min(top[0], ex) - half - 1, Math.max(top[0], ex) + half + 1, 'x'), [k0, k1] = sampleRange(f, Math.min(top[2], ez) - half - 1, Math.max(top[2], ez) + half + 1, 'z'), [j0, j1] = sampleRange(f, top[1] - slope * run - 8, top[1] + 0.5, 'y');
+  const [, jTop] = sampleRange(f, top[1], top[1] + stand + 1, 'y'), [jLow] = sampleRange(f, top[1] - slope * run - 8 - clear - 1, top[1], 'y');
   for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
     const x = f.ox + i * step, z = f.oz + k * step, t = (x - top[0]) * dir[0] + (z - top[2]) * dir[1], hh = Math.abs(-(x - top[0]) * dir[1] + (z - top[2]) * dir[0]);
     if (t < -0.4 || t > run + 0.4 || hh > half) continue;
     const yf = top[1] - slope * Math.max(0, Math.min(run, t));
-    // Fill the air straight under the line down to the old floor (and no other air under it: a passage on a lower level stays).
-    let air = true;
+    // The roof over the line: rubble under a low roof would leave a slot, so that column keeps its old floor.
+    let roof = Infinity;
+    for (let j = Math.max(0, Math.ceil((yf - f.oy) / step)); j <= jTop; j++) if (sampleOf(f, i, j, k) <= 0) { roof = f.oy + j * step; break; }
+    if (roof - yf < stand) continue;
+    // Fill the air straight under the line down to the old floor (and no other air under it: a passage on a lower level stays, if the hero fits in it).
+    let air = true, bottom = j0;
     for (let j = j1; j >= j0; j--) {
       const y = f.oy + j * step;
       if (y >= yf) continue;
-      if (air && sampleOf(f, i, j, k) <= 0) air = false;
+      if (air && sampleOf(f, i, j, k) <= 0) { air = false; bottom = j + 1; }
       if (air) putSample(f, i, j, k, -Math.min(half + 0.35 - hh, yf - y, 1), true);
     }
+    if (!air) continue;
+    // Still air at the fill's foot: down to the floor under it if that gap is lower than a way.
+    let floor = -1;
+    for (let j = bottom - 1; j >= jLow; j--) if (sampleOf(f, i, j, k) <= 0) { floor = j; break; }
+    if (floor >= 0 && (bottom - floor) * step < clear) for (let j = bottom - 1; j > floor; j--) putSample(f, i, j, k, -Math.min(half + 0.35 - hh, 1), true);
   }
 }
+
+/** How thick the rock under a cut way is where its line crosses open air (m): a fallen slab across a gap. */
+const SLAB = 2.5;
+/** The thinnest slab left over a way below (m): a thinner one fills the gap to its floor instead. */
+const SLAB_THIN = 0.4;
 
 /**
  * Cut a hero-sized way between two floor points (the concession, K4): air `height` high over a floor that runs straight from
  * one point to the other, `half` wide either side of the line seen from above; the walls are smooth, the floor level across.
- * Where the line crosses open air the floor is a slab of rock 2.5 m thick (a ramp of fallen rock, a fallen slab across a gap).
+ * Where the line crosses open air the floor is a slab of rock up to 2.5 m thick (a ramp of fallen rock, a fallen slab across a gap).
+ * No squeezing (D63): under the slab at least `clear` metres of the old air stay (a way below keeps the hero's height), or none
+ * (the gap is filled down to its floor); a low slot under a slab is never left.
  */
-export function stampSlab(f: BrickField, a: readonly [number, number, number], b: readonly [number, number, number], half: number, height: number): void {
-  const { step } = f, hx = b[0] - a[0], hz = b[2] - a[2], len2 = hx * hx + hz * hz || 1;
-  const [i0, i1] = sampleRange(f, Math.min(a[0], b[0]) - half - 1, Math.max(a[0], b[0]) + half + 1, 'x'), [j0, j1] = sampleRange(f, Math.min(a[1], b[1]) - 2.6, Math.max(a[1], b[1]) + height + 1, 'y'), [k0, k1] = sampleRange(f, Math.min(a[2], b[2]) - half - 1, Math.max(a[2], b[2]) + half + 1, 'z');
+export function stampSlab(f: BrickField, a: readonly [number, number, number], b: readonly [number, number, number], half: number, height: number, clear = 2.8): void {
+  const { step } = f, hx = b[0] - a[0], hz = b[2] - a[2], len2 = hx * hx + hz * hz || 1, below = SLAB + clear + SLAB_THIN;
+  const [i0, i1] = sampleRange(f, Math.min(a[0], b[0]) - half - 1, Math.max(a[0], b[0]) + half + 1, 'x'), [j0, j1] = sampleRange(f, Math.min(a[1], b[1]) - below - step, Math.max(a[1], b[1]) + height + 1, 'y'), [k0, k1] = sampleRange(f, Math.min(a[2], b[2]) - half - 1, Math.max(a[2], b[2]) + half + 1, 'z');
   for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
     const x = f.ox + i * step, z = f.oz + k * step, t = Math.max(0, Math.min(1, ((x - a[0]) * hx + (z - a[2]) * hz) / len2));
     const hh = Math.hypot(x - (a[0] + hx * t), z - (a[2] + hz * t));
     if (hh > half + 1) continue;
     const yf = a[1] + (b[1] - a[1]) * t;
+    // The air straight under the floor line, down to the first rock (`low`): the slab's underside stays `clear` over that, or there is no gap.
+    let low = -Infinity;
+    for (let j = Math.min(j1, Math.floor((yf - f.oy) / step)); j >= j0; j--) if (sampleOf(f, i, j, k) <= 0) { low = f.oy + j * step; break; }
+    const gap = yf - low, thick = gap - clear >= SLAB_THIN ? Math.min(SLAB, gap - clear) : gap + step;
     for (let j = j0; j <= j1; j++) {
       const y = f.oy + j * step;
-      if (y < yf) { if (y > yf - 2.5) putSample(f, i, j, k, -Math.min(half + 0.4 - hh, yf - y, 1), true); continue; }
+      if (y < yf) { if (y > yf - thick) putSample(f, i, j, k, -Math.min(half + 0.4 - hh, yf - y, 1), true); continue; }
       putSample(f, i, j, k, Math.min(half - hh, y - yf, yf + height - y, 1.5));
     }
   }

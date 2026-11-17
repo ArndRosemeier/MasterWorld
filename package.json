@@ -44,6 +44,7 @@
     "zfight": "node --import tsx tools/zfight/scan.ts",
     "ground:scan": "node --import tsx tools/ground/scan.ts",
     "loop:caves": "node --import tsx tools/loop/caves.ts",
+    "caves:squeeze": "node --import tsx tools/caves/squeeze.ts",
     "loop:locks": "node --import tsx tools/loop/locks.ts",
     "loop": "npm run loop:evening && npm run loop:voyage && npm run loop:fray",
     "loop:evening": "node --import tsx tools/loop/evening.ts",
