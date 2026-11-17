@@ -12,6 +12,8 @@ import type { Reading } from '../../src/world/cave/reader';
 
 /** Seconds of play a climb up a face may take. */
 const CLIMB_TIME = 20;
+/** Seconds of play without getting higher after which a climb counts as stuck (working along a face round a shelf takes about two). */
+const STALL = 5;
 /** Faces up to this high (m) need no climb: the walker hops or steps them. */
 const NO_CLIMB = 1.3;
 /** Links between two patches tried at the most (lowest first, spread over the rest). */
@@ -33,9 +35,11 @@ export interface PitReport {
 export function climbsUp(world: WalkWorld, g: Reading, a: number, b: number, steer: boolean): boolean {
   const w = new Walker(world);
   w.place(g.x[a], g.z[a], g.y[a] + 0.02);
+  let best = w.pos.y, since = 0;
   for (let t = 0; t < 60 * CLIMB_TIME; t++) {
     const dx = g.x[b] - w.pos.x, dz = g.z[b] - w.pos.z;
     if (w.mode !== 'climb' && w.mode !== 'pull' && w.pos.y > g.y[b] - 0.5) return true;
+    if (w.pos.y > best + 0.05) { best = w.pos.y; since = 0; } else if (++since > 60 * STALL) return false;
     // (Along the face: right of one facing it is (-nz, nx).)
     const side = steer && w.mode === 'climb' ? Math.max(-1, Math.min(1, (dx * -w.face.nz + dz * w.face.nx) * 3)) : 0;
     w.step({ forward: 1, strafe: side, heading: Math.atan2(-dx, -dz), walk: false, up: false, down: false }, 1 / 60);

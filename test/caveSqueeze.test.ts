@@ -6,7 +6,9 @@ import { BRICK, fieldAt, type BrickField } from '../src/world/dungeon/rockMesh';
 
 test('cave squeezes (D63): no formed cave leaves a mouth too small for the hero with air going on behind it', () => {
   for (const [seed, rock] of [[5, 'jointed'], [6, 'massive'], [7, 'thin-bedded'], [2, 'basalt']] as const) {
-    const t0 = Date.now(), r = formedCave(seed, rock), left = findSqueezes(r.c.field as BrickField, r.reading, r.c.skeleton, r.dressing);
+    // (The sweep is timed, not the forming before it: that is cached for a process, so whether it fell to this test depended on which test
+    // files a process happened to take first; caveRead bounds the forming.)
+    const r = formedCave(seed, rock), t0 = Date.now(), left = findSqueezes(r.c.field as BrickField, r.reading, r.c.skeleton, r.dressing);
     assert.deepEqual(left.map((q) => `${q.kind} ${q.volume.toFixed(0)} m3 at ${q.x.toFixed(0)},${q.y.toFixed(0)},${q.z.toFixed(0)}`), [], `${rock} ${seed}`);
     // What the concession shut lies in rock now, and nothing loose was left in it.
     for (const q of r.sealed) assert.ok(fieldAt(r.c.field as BrickField, q.x, q.y, q.z, -1) <= 0.5, `${rock} ${seed}: shut`);
