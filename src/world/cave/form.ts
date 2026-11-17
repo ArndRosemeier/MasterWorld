@@ -16,6 +16,7 @@ import { formLava } from './lava';
 import { formMine } from './mine';
 import { formSolution } from './solution';
 import { stampThroat, throatFrame } from './throat';
+import { clearSealed, type Squeeze } from './squeeze';
 
 export interface FormedCave {
   readonly block: RockBlock;
@@ -44,6 +45,8 @@ export const dressFormed = (c: FormedCave, caves: CavesDef): Dressing => dressCa
 export interface FormedRead {
   readonly reading: Reading;
   readonly opened: readonly Opened[];
+  /** The slots too small for the hero that were shut with rock (squeeze.ts). */
+  readonly sealed: readonly Squeeze[];
   readonly dressing: Dressing;
   /** Milliseconds the reading and concession took. */
   readonly ms: number;
@@ -52,5 +55,5 @@ export interface FormedRead {
 /** Read a dressed cave and open what is cut off (K4): edits its field, so mesh it after. */
 export function readFormed(c: FormedCave, caves: CavesDef, dressing: Dressing): FormedRead {
   const done = concede(c.field as BrickField, c.skeleton, caves, dressing);
-  return { reading: done.reading, opened: done.opened, dressing: clearOpened(dressing, done.opened), ms: done.ms };
+  return { reading: done.reading, opened: done.opened, sealed: done.sealed, dressing: clearSealed(clearOpened(dressing, done.opened), c.field as BrickField, done.sealed), ms: done.ms };
 }

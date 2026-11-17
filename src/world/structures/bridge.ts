@@ -19,7 +19,7 @@
 import { Rng, deriveSeed, type Ground } from '@futuremagic/core';
 import type { StructureArch, StructureTower, StructuresDef, StructureAddition } from '../../setting/contract';
 import { BuildingMat, CellarMat, MeshKit, scaleTint, type PlacedMesh, type Tint } from '../dungeon/meshKit';
-import { archRise, beam, roundPts, floorOf, gable, prism, rect, wallRing, rubble, spire, wall, type Opening, type P2, type Site } from './masonry';
+import { archRise, grimed, beam, roundPts, floorOf, gable, prism, rect, wallRing, rubble, spire, wall, type Opening, type P2, type Site } from './masonry';
 import { banner, barricade, bones, cage, cart, coffin, grave, pelt, lookout, onLand, palisade, rope, room, skull, stakeRow, statue, tent, totem, type Floor } from './props';
 import { tower, type TowerTop } from './tower';
 import { apart, fallen, pickStructure, styleOf, type Picks, type Signature, type Style } from './style';
@@ -201,12 +201,20 @@ export function planBridge(defs: StructuresDef, seed: number, ground: Ground): B
   // History: spans that fell and how they were crossed again; a drawbridge before a gate.
   const gaps: Gap[] = [];
   const nearTower = (s: Span) => towers.some((t) => t.role === 'gate' && Math.min(Math.abs(s.x0 - (t.cx + t.hx)), Math.abs(s.x1 - (t.cx - t.hx))) < 1);
-  const falls = fall === 0 ? 0 : fall < 0.5 ? (rng.chance(0.2) ? 1 : 0) : fall < 0.9 ? (rng.chance(0.7) ? 1 : 0) : rng.int(1, 2);
-  const free = spans.filter((s) => !nearTower(s) && s.x1 - s.x0 < 48);
-  for (const s of rng.sample(free, Math.min(falls, Math.max(0, free.length - 1)))) {
-    const high = deck((s.x0 + s.x1) / 2) - lowY;
-    const patch: Patch = high > 18 && rng.chance(0.6) ? 'rope' : s.x1 - s.x0 < 12 && rng.chance(0.6) ? 'planks' : high > 26 ? 'rope' : 'trestle';
-    gaps.push({ x0: s.x0, x1: s.x1, patch, fallen: true });
+  // A broken bridge has lost a span (so it reads broken from afar), a ruinous one one or two, a weathered one now and then.
+  const falls = fall === 0 ? 0 : fall < 0.5 ? (rng.chance(0.2) ? 1 : 0) : fall < 0.9 ? 1 : rng.int(1, 2);
+  const under = (x0: number, x1: number) => towers.some((t) => t.cx + t.hx > x0 + 0.3 && t.cx - t.hx < x1 - 0.3);
+  const free = spans.filter((s) => !nearTower(s) && !under(s.x0, s.x1) && s.x1 - s.x0 < 48);
+  for (const s of rng.sample(free, Math.min(falls, free.length, Math.max(0, spans.length - 2)))) {
+    // A short span falls with its neighbour and the pier between (its stump left standing), so the gap reads from afar.
+    const i = spans.indexOf(s), next = spans[i + 1];
+    const wide = s.x1 - s.x0 < 12 && next && free.includes(next) && !gaps.some((g) => g.x0 <= next.x1 && g.x1 >= next.x0) && !towers.some((t) => t.cx > s.x1 && t.cx < next.x0);
+    const x0 = s.x0, x1 = wide ? next.x1 : s.x1;
+    // (Never under a tower: a tower stands on its pier or its bank.)
+    if (gaps.some((g) => g.x0 <= x1 && g.x1 >= x0) || under(x0, x1)) continue;
+    const high = deck((x0 + x1) / 2) - lowY;
+    const patch: Patch = high > 18 && rng.chance(0.6) ? 'rope' : x1 - x0 < 12 && rng.chance(0.6) ? 'planks' : high > 26 ? 'rope' : 'trestle';
+    gaps.push({ x0, x1, patch, fallen: true });
   }
   for (const t of towers) {
     if (t.role !== 'gate' || !rng.chance(0.35)) continue;
@@ -246,8 +254,9 @@ export const bridgesApart = (a: BridgePlan, b: BridgePlan): number => apart(brid
 /** The bridge as one mesh in the building format, in its own frame (the road along x). */
 export function fortifiedBridgeMesh(p: BridgePlan, ground: Ground): PlacedMesh {
   const k = new MeshKit(), rng = new Rng(deriveSeed(p.seed, 'bridge-mesh'));
-  const site: Site = { k, rng, ground, moss: p.picks.moss };
-  const style = styleOf(p.picks.builder), fall = fallen(p.picks.state), hw = p.hw;
+  // Kept up, its stone is clean; the further it has fallen, the older and dirtier it looks.
+  const site: Site = { k, rng, ground, moss: p.picks.moss, wear: fallen(p.picks.state) * 0.85 };
+  const base = styleOf(p.picks.builder), style: Style = { ...base, floorTint: grimed(base.floorTint, site.wear!) }, fall = fallen(p.picks.state), hw = p.hw;
   const deck = (x: number) => deckAt(p, x);
   const towerX = p.towers.map((t) => [t.cx - t.hx, t.cx + t.hx] as const);
   // Masonry runs: from end to end, less the towers and the gaps.
@@ -298,6 +307,18 @@ export function fortifiedBridgeMesh(p: BridgePlan, ground: Ground): PlacedMesh {
       if (p.cutwaters === 'refuge') wallRing(pts, 0.4, () => ({ base: top, top: () => top + 1, mat: style.wall, tint: style.trim })).slice(0, 2).forEach((w) => wall(site, w));
     }
   }
+  // Tall piers step out at their feet, a set-back or two each under its course, so a deep gorge's piers are no flat slabs.
+  for (const pr of p.piers) {
+    const near = p.spans.filter((q) => Math.abs(q.x1 - (pr.x - pr.w / 2)) < 0.5 || Math.abs(q.x0 - (pr.x + pr.w / 2)) < 0.5);
+    if (!near.length) continue;
+    const g = Math.min(lowAlong(ground, pr.x - pr.w / 2, hw), lowAlong(ground, pr.x, hw), lowAlong(ground, pr.x + pr.w / 2, hw));
+    const H = Math.min(...near.map((q) => q.spring)) - g, n = H > 22 ? 2 : H > 9 ? 1 : 0;
+    for (let i = 0; i < n; i++) {
+      // (Odd heights: a course never lies in one plane with a sill or a band.)
+      const d = (n - i) * 0.55 * style.builder.thick, y = g + H * (i + 1) * (n === 2 ? 0.27 : 0.38) + 0.013 * (i + 1);
+      prism(site, rect(pr.x, 0, pr.w / 2 + d, hw + d), null, y, style.wall, style.tint, { topMat: style.trimMat, topTint: style.trim });
+    }
+  }
   // Towers.
   for (const t of p.towers) {
     const floor = deck(t.cx), pts = rect(t.cx, 0, t.hx, t.hz), ways = { sides: [1, 3], half: Math.min(hw - 0.6, 2.2), spring: floor + 4.4 - archRise(p.spans[0]?.arch === 'flat' ? 'segmental' : style.builder.arches[0], 2 * Math.min(hw - 0.6, 2.2)), arch: style.builder.arches[0] === 'flat' ? 'segmental' as const : style.builder.arches[0] };
@@ -316,6 +337,13 @@ export function fortifiedBridgeMesh(p: BridgePlan, ground: Ground): PlacedMesh {
   }
   for (const g of p.gaps) patch(site, style, p, g, deck, stubs.get(g));
   if (p.covered) for (const [x0, x1] of runs) coveredWalk(site, style, p, x0, x1, deck);
+  // The stump of a pier that fell with its spans.
+  for (const g of p.gaps) for (const pr of p.piers) {
+    if (!g.fallen || pr.x <= g.x0 || pr.x >= g.x1) continue;
+    const foot = lowAlong(ground, pr.x, hw), y = foot + Math.max(1.5, (deck(pr.x) - foot) * rng.range(0.2, 0.5));
+    prism(site, rect(pr.x, 0, pr.w / 2, hw), null, y, style.wall, style.tint);
+    rubble(site, pr.x + rng.range(-1, 1), rng.range(-hw, hw), 2.5, 6, style.wall, style.tint, 1);
+  }
   if (fall > 0) for (const g of p.gaps.filter((q) => q.fallen)) rubble(site, (g.x0 + g.x1) / 2, rng.range(-hw, hw), (g.x1 - g.x0) * 0.45, 18, style.wall, style.tint, 1.4);
   additions(site, style, p, deck, runs);
   return k.mesh();
