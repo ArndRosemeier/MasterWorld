@@ -13,6 +13,8 @@ import type { RegionsDef, SightDef } from '../setting/contract';
 import { settlementOf, type DecisionLog, type RegionDecision, type SightDecision } from '../world/decisions';
 import { SIGHT_R, hitsSolid, layOut, type SiteJob, type SiteLayout } from '../world/sites';
 import { sightsOf } from '../vgm/answers';
+import { campsOf } from '../vgm/zones';
+import { CAMP_PIECE_R, campPiece } from '../world/sites';
 import type { RegionMap } from '../world/regions';
 import { fillOf, keyOf, nextRegion, regionDecisions, regionLine, regionMapOf, wantsRegion, type FrontierAsk, type FrontierContext, type RegionData } from '../vgm/frontier';
 import { buildingMeshAt } from '../render/materials/building';
@@ -68,6 +70,7 @@ export class RegionSites {
   private map: RegionMap<RegionData>;
   private seen = 0;
   private sightsSeen = 0;
+  private campsSeen = 0;
   private readonly sites: Site[] = [];
   private clock = 0;
   private last: { x: number; z: number } | null = null;
@@ -106,6 +109,12 @@ export class RegionSites {
       this.sites.push({ at: { x: d.x, z: d.z, r: SIGHT_R }, label: `${d.sight} ${d.id}`, job: { sight: d, shape: def.shape }, layout: undefined, laying: false, mesh: null, sight: this.synced ? def : null, decision: d, found: !this.synced });
     }
     this.sightsSeen = sights.length;
+    // The camps' landmarks (D69, Z2): the pieces of the land they are built round (a hunting ground with none draws nothing). Never "come upon" as a place.
+    const camps = campsOf(log);
+    for (const d of camps.slice(this.campsSeen)) {
+      if (campPiece(d)) this.sites.push({ at: { x: d.x, z: d.z, r: Math.min(d.r, CAMP_PIECE_R) }, label: `${d.landmark} ${d.id}`, job: { camp: d }, layout: undefined, laying: false, mesh: null, sight: null, found: true });
+    }
+    this.campsSeen = camps.length;
     this.synced = true;
   }
 

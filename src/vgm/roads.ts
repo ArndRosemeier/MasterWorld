@@ -17,6 +17,9 @@ export interface Place {
   readonly r: number;
 }
 
+/** How far beyond a camp's edge a road keeps (m): the widest aggro and a margin (Z5). */
+const CAMP_REACH = 30;
+
 /** A point where a new road may join the network, and what it joins (a town or a road). */
 interface Join { x: number; z: number; id: string }
 
@@ -59,13 +62,17 @@ export function linkRoad(t: Terrain, log: DecisionLog, place: Place, way: RoadWa
   }
   const w = emptyWater();
   const id = `road-${log.filter((d) => d.kind === 'road').length + 1}`;
-  const route = routeRoad({
+  // Roads are the safe lanes (D69, Z5): a road keeps out of every camp's reach near its way (if it can: else it goes as it must).
+  const span = Math.hypot(to.x - from[0], to.z - from[1]) / 2 + 400, mx = (to.x + from[0]) / 2, mz = (to.z + from[1]) / 2;
+  const camps = [...t.camps].filter((c) => Math.hypot(c.x - mx, c.z - mz) < span).map((c) => ({ x: c.x, z: c.z, r: c.r + CAMP_REACH }));
+  const routed = (avoid: boolean) => routeRoad({
     seed: deriveSeed(t.seed, 'road', id),
     height: t.height.bind(t),
     // The banks of a brook count as wet: a road crosses it once, it does not run along it in its channel.
     water: (x, z) => Math.max(t.waterDepth(x, z), inChannel(t.hydro.query(x, z, w), 8) && w.brook ? 0.05 : 0),
-    blocked: (x, z) => t.towns.some((town) => town.solid(x, z, 2)),
+    blocked: (x, z) => t.towns.some((town) => town.solid(x, z, 2)) || (avoid && camps.some((c) => Math.abs(c.x - x) < c.r && Math.abs(c.z - z) < c.r && Math.hypot(c.x - x, c.z - z) < c.r)),
   }, from, [to.x, to.z]);
+  const route = (camps.length ? routed(true) : null) ?? routed(false);
   if (!route) return null;
   const ys = roadProfile(route.pts, t.height.bind(t));
   const pts: number[] = [];
@@ -73,4 +80,5 @@ export function linkRoad(t: Terrain, log: DecisionLog, place: Place, way: RoadWa
   return { kind: 'road', id, way, from: place.id, to: to.id, pts, ...(at === undefined ? {} : { at }) };
 }
 
-const round = (v: number): number => Math.round(v * 100) / 100;
+/** A coordinate kept to the centimetre (what the log holds). */
+export const round = (v: number): number => Math.round(v * 100) / 100;

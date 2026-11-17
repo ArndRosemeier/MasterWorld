@@ -36,6 +36,8 @@ test('vgm log: every decision a tool writes has a line, with that tool and its n
     { kind: 'castaway', id: 'castaway-1', town: home.id, x: 90, z: 10, yaw: 0, seed: 9, at: 12.65, until: 14, situation: 'castaway' },
     { kind: 'festivity', id: 'festivity-1', festivity: 'feast', town: home.id, at: 12.7, from: 18, to: 22, for: promise.id },
     { kind: 'traveller', id: 'traveller-1', town: home.id, x: 20, z: 10, yaw: 0, seed: 7, at: 12.5, until: 14.5 },
+    { kind: 'zone', id: 'zone:0:0', level: 3, x: 0, z: 0, theme: 'goblin-hills', name: 'the Goblin Downs', band: [1, 5], seed: 10, at: 12.8 },
+    { kind: 'camp', id: 'camp:0:0:1', zone: 'zone:0:0', camp: 'goblin-den', x: 300, z: 300, yaw: 0, r: 14, landmark: 'ruin', level: 2, posts: [{ x: 300, z: 300, creature: 'goblin', level: 3, post: 0, leader: true }], seed: 11, at: 12.8 },
   ];
   const log = [road('road-1'), ...walked, ...turn.map((m) => m.decision), ...asked];
   const lines = vgmLines(log, turn);

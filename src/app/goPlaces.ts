@@ -216,6 +216,15 @@ export function goSpots(h: GoHost): GoSpot[] {
     });
   }
 
+  // The camps (D69, Z2): the nearest of each kind laid out so far, seen from just outside its foes' reach (zones are laid out as
+  // the hero nears them, so a kind not yet in a zone round the hero says so).
+  for (const c of h.setting.camps?.camps ?? []) {
+    add(L, `Camp: ${c.name}`, async () => {
+      const d = nearestTo(decisionsOf(h.log(), 'camp').filter((x) => x.camp === c.id), h.heroPos());
+      return at(d && beside(d, h.heroPos(), d.r * 1.1 + 24), `${c.name} (only in zones laid out round the hero)`);
+    });
+  }
+
   // The kinds of country, the biomes, the coast and the volcanoes (Arnd 2026-11-02): the nearest of each in this seed's land,
   // found in the height field itself (the land opens round the hero as they arrive).
   const R = 'Go to: terrain';

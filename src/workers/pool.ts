@@ -234,6 +234,11 @@ export class WorldJobs {
     return this.job({ kind: 'link', roads, place, way, at });
   }
 
+  /** A zone laid out whole (vgm/zones.ts layOutZone: its regions, the zone and its camps), in the world worker. */
+  zoneJob(ask: import('../vgm/zones').ZoneAsk): Promise<import('../world/decisions').Decision[]> {
+    return this.job({ kind: 'zone', ask });
+  }
+
   /** The next region the frontier opens (vgm/frontier.ts nextRegion), looked for in the world worker. */
   frontier(ask: import('../vgm/frontier').FrontierAsk): Promise<import('../world/decisions').RegionDecision | null> {
     return this.job({ kind: 'frontier', ask });

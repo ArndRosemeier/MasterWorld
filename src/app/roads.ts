@@ -6,7 +6,7 @@
  * founded while playing calms its ground and opens its fields so too.
  */
 import type { Vector3 } from 'three/webgpu';
-import { settlementOf, type Decision, type DungeonDecision, type RegionDecision, type RoadDecision, type SightDecision } from '../world/decisions';
+import { settlementOf, type CampDecision, type Decision, type DungeonDecision, type RegionDecision, type RoadDecision, type SightDecision } from '../world/decisions';
 import type { TownPlan } from '@futuremagic/settlement';
 import type { Terrain } from '../world/terrain';
 import type { Trunks } from '../world/trunks';
@@ -81,12 +81,13 @@ export class RoadWork {
   }
 
   /** A place out on the land (already in the log): the trees go from its clearing, and the plants and trunks near it are placed anew. */
-  async clear(d: DungeonDecision | RegionDecision | SightDecision): Promise<void> {
+  async clear(d: DungeonDecision | RegionDecision | SightDecision | CampDecision): Promise<void> {
     if (this.sent.has(d.id) || (d.kind === 'region' && settlementOf(d, this.terrain.setting.regions?.fills ?? []))) return;
     this.sent.add(d.id);
     this.terrain.settleMore([d]);
     const c = this.terrain.clearings.get(d.id);
-    if (!c) return;
+    // A camp goes to the workers with or without a clearing: the roads they route keep out of its reach (D69, Z5).
+    if (!c) { if (d.kind === 'camp') await this.world.decisions([d]); return; }
     await Promise.all([this.world.decisions([d]), this.land.decisions([d])]);
     // Squares that reach the clearing or the edge where the trees come back.
     const reach = c.r + 10;

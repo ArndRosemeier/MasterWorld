@@ -37,6 +37,8 @@ export interface Territory {
   readonly seed: number;
   /** Stable id (saves name the dead by it). */
   readonly id: string;
+  /** A fixed camp's (D69, Z2): each body's own post (its home), its kind as it stands there, and a patrol's round; none: the group roams its territory together. */
+  readonly posts?: readonly { readonly x: number; readonly z: number; readonly def?: CreatureDef; readonly round?: readonly number[] }[];
 }
 
 /** How far a group's members spread around where they are gathered, metres. */
@@ -77,6 +79,8 @@ export function bedOf(members: readonly string[], defs: readonly CreatureDef[]):
 export class OpenGround implements DenGround {
   /** Where each group is gathered now: it drifts about its territory as they move on, together. */
   private readonly at: { x: number; z: number }[];
+  /** Where each patrol is on its round. */
+  private readonly step: number[] = [];
   /** Its home lies out in deep water: it is swum, not walked (S9). */
   readonly sea: boolean;
   get afloat(): boolean { return this.sea; }
@@ -90,7 +94,11 @@ export class OpenGround implements DenGround {
   }
 
   /** `prey`: the height (y) of the hero's feet while the hero swims, else null (a sea ground's bodies come to it). */
-  constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null, private readonly bed = 0) {
+  /**
+   * `gather`: how far a body spreads round where its group is (m; a camp's post keeps close); `rounds`: a patrol's round per home (x, z pairs,
+   * walked in order: `spot` gives the next point of it each time).
+   */
+  constructor(private readonly land: Land, private readonly homes: readonly { x: number; z: number; r: number }[], private readonly prey: () => number | null = () => null, private readonly bed = 0, private readonly gather = GATHER, private readonly rounds: readonly (readonly number[] | undefined)[] = []) {
     this.at = homes.map((h) => ({ x: h.x, z: h.z }));
     this.sea = !bed && homes.length > 0 && land.waterDepth(homes[0].x, homes[0].z) >= SEA.home;
   }
@@ -106,6 +114,13 @@ export class OpenGround implements DenGround {
 
   /** A point near where the group is gathered (a herd grazes together, a pack keeps close). */
   spot(home: number, rng: { range(a: number, b: number): number }): P3 {
+    const round = this.rounds[home];
+    if (round && round.length >= 2) {
+      // A patrol walks its round point by point (learnable, D69).
+      const i = (this.step[home] = ((this.step[home] ?? -1) + 1) % (round.length / 2));
+      const x = round[i * 2], z = round[i * 2 + 1];
+      return { x, y: this.floorAt(x, z), z };
+    }
     const h = this.homes[home], c = this.at[home];
     // The group moves on a little: towards somewhere else in its territory.
     const a0 = rng.range(0, Math.PI * 2), d0 = Math.sqrt(rng.range(0, 1)) * h.r;
@@ -113,7 +128,7 @@ export class OpenGround implements DenGround {
     const step = Math.min(1, 4 / Math.max(1, Math.hypot(tx - c.x, tz - c.z)));
     if (this.open(c.x + (tx - c.x) * step, c.z + (tz - c.z) * step, 0.5)) { c.x += (tx - c.x) * step; c.z += (tz - c.z) * step; }
     for (let i = 0; i < 10; i++) {
-      const a = rng.range(0, Math.PI * 2), d = Math.sqrt(rng.range(0, 1)) * GATHER;
+      const a = rng.range(0, Math.PI * 2), d = Math.sqrt(rng.range(0, 1)) * this.gather;
       const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d;
       if (this.open(x, z, 0.5)) return { x, y: this.floorAt(x, z), z };
     }
@@ -227,7 +242,12 @@ export class OpenGround implements DenGround {
 
 /** How a group's danger compares with the place's (D29): within reach of the start about 18, more farther out. */
 export function groupDanger(members: readonly string[], defs: readonly CreatureDef[]): number {
-  const ds = members.map((m) => defs.find((d) => d.id === m)?.danger ?? 0).sort((a, b) => b - a);
+  return dangerOfAll(members.map((m) => defs.find((d) => d.id === m)?.danger ?? 0));
+}
+
+/** A group's danger from its members' own (the strongest, and a quarter of each of the others). */
+export function dangerOfAll(dangers: readonly number[]): number {
+  const ds = [...dangers].sort((a, b) => b - a);
   return ds.length ? ds[0] + ds.slice(1).reduce((a, d) => a + d * 0.25, 0) : 0;
 }
 

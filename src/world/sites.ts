@@ -7,7 +7,7 @@
 import { Rng, deriveSeed, type Ground } from '@futuremagic/core';
 import { distToPoly, ensureCCW, planShip, pointInPoly, rect, type BuildingMesh, type Poly } from '@futuremagic/settlement';
 import type { RegionFillDef, SightShape } from '../setting/contract';
-import { settles, type RegionDecision, type SightDecision } from './decisions';
+import { settles, type CampDecision, type RegionDecision, type SightDecision } from './decisions';
 import { MOUND, sealedBarrowMesh } from './dungeon/barrowMesh';
 import { onLand } from './dungeon/site';
 import { BuildingMat, CellarMat, MeshKit, WildMat, varyTint, type PlacedMesh, type Tint } from './dungeon/meshKit';
@@ -45,12 +45,27 @@ export function layOutSight(d: SightDecision, shape: SightShape, height: (x: num
   return laidOut({ ...d, r: SIGHT_R }, 'sight', height, shape === 'stones' ? stoneRing : shape === 'waystone' ? waystone : shape === 'stash' ? stash : shape === 'wreck' ? wreckage : shape === 'washed-up' ? washedUp : cairn);
 }
 
-/** What to lay out (a region's place or a sight), for a terrain worker: laying out a barrow takes tens of milliseconds. */
-export type SiteJob = { readonly region: RegionDecision; readonly place: Place } | { readonly sight: SightDecision; readonly shape: SightShape };
+/** How far a camp's landmark piece reaches from its middle at most (m): the pieces are drawn at their own size, the camp's posts round them. */
+export const CAMP_PIECE_R = 20;
 
-/** A region's place or a sight laid out (null: nothing stands there). */
+/** The land's pieces a camp can be built round (D69, Z2) while no structure kind of Z4 is in play for it. */
+const CAMP_PIECES: Readonly<Record<string, (at: At, k: MeshKit, solids: Solid[]) => void>> = { ruin: (at, k, s) => ruin(at, k, s), stones: (at, k, s) => stoneRing(at, k, s), barrows: (at, k, s) => barrows(at, k, s), cairn: (at, k, s) => cairn(at, k, s), tents: (at, k, s) => camp(at, k, s) };
+
+/** The landmark piece of a camp, as the land draws it (null: a hunting ground with none, or a structure kind drawn elsewhere). */
+export function layOutCamp(d: CampDecision, height: (x: number, z: number) => number): SiteLayout | null {
+  const draw = CAMP_PIECES[d.landmark];
+  return draw ? laidOut({ x: d.x, z: d.z, yaw: d.yaw, r: Math.min(d.r, CAMP_PIECE_R), seed: d.seed }, 'camp', height, draw) : null;
+}
+
+/** Does a camp have a piece of the land's drawn round its middle? */
+export const campPiece = (d: CampDecision): boolean => d.landmark in CAMP_PIECES;
+
+/** What to lay out (a region's place, a sight or a camp's landmark), for a terrain worker: laying out a barrow takes tens of milliseconds. */
+export type SiteJob = { readonly region: RegionDecision; readonly place: Place } | { readonly sight: SightDecision; readonly shape: SightShape } | { readonly camp: CampDecision };
+
+/** A region's place, a sight or a camp's landmark laid out (null: nothing stands there). */
 export function layOut(job: SiteJob, height: (x: number, z: number) => number): SiteLayout | null {
-  return 'region' in job ? layOutSite(job.region, job.place, height) : layOutSight(job.sight, job.shape, height);
+  return 'region' in job ? layOutSite(job.region, job.place, height) : 'camp' in job ? layOutCamp(job.camp, height) : layOutSight(job.sight, job.shape, height);
 }
 
 /** A place's pieces drawn round its middle (`draw`), seeded from it, on the land's heights. */

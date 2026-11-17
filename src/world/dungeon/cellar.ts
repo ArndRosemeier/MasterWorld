@@ -13,7 +13,7 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { cyclicGraph, layoutDungeon, pace, PATTERNS, DIRS, LayoutGrid, type DungeonGraph, type DungeonLayout, type Pace, type Room } from '@futuremagic/dungeon';
-import type { CellarLore, DungeonForm, DungeonProp, DungeonScale, DungeonSpace as SpaceDef, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
+import type { CellarLore, CreatureDef, DungeonForm, DungeonProp, DungeonScale, DungeonSpace as SpaceDef, DwellerDef, HistoryDef, RoomUseDef } from '../../setting/contract';
 import type { DungeonDecision, MoveInDecision, RetakeDecision } from '../decisions';
 import { depthOf, entranceOf } from './kinds';
 import { setPieceById, type SetPieceDef } from './setPieces';
@@ -177,6 +177,8 @@ export interface Spawn {
   readonly room: number;
   /** The one who breaks expectations (plan 8.1), if any. */
   readonly surprise?: string;
+  /** Its kind as it stands here, when not the setting's own (a camp's foe scaled to its level, a named one: sim/camps.ts). */
+  readonly def?: CreatureDef;
 }
 
 export interface Cellar extends CellarSketch {

@@ -241,6 +241,12 @@ export class Delve {
   /** Has this hoard been opened? */
   hasOpened(h: Hoard): boolean { return this.opened.has(h.id); }
 
+  /** A dead one of the den came back (a camp's post, D69 Z2): its old body is gone, searched or not. */
+  revived(id: number): void {
+    this.searched.delete(id);
+    this.fight.bodies.delete(id);
+  }
+
   tally(): DelveSave {
     return {
       dead: this.den.dead,

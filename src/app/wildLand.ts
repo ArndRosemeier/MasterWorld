@@ -16,7 +16,9 @@ import { Delve, type DelveSave } from '../game/delve';
 import { CreatureView } from '../render/dungeon/CreatureView';
 import type { SettingModule } from '../setting/contract';
 import { Den } from '../sim/creatures';
-import { OpenGround, awake, bedOf, extraOf, groupDanger, type Land, type Territory } from '../sim/wild';
+import { OpenGround, awake, bedOf, dangerOfAll, extraOf, groupDanger, type Land, type Territory } from '../sim/wild';
+import { POST_GATHER, POST_R, RETURN_SEEN, campTerritory, died, postDef, returned, returnsDue, type CampSave, type CampsSave } from '../sim/camps';
+import type { CampDecision } from '../world/decisions';
 import type { Journal } from '../talk/journal';
 import type { Director } from '../vgm/director';
 import type { WildGroup } from '../vgm/events';
@@ -51,9 +53,15 @@ export interface WildHost {
 
 /** A group is built (its bodies made and warmed) once the hero is this near its territory, metres. */
 const BUILD = 420;
+/** A camp is built this near (m): there are many of them (D69, Z5), and its landmark shows from far before its foes do. */
+const CAMP_BUILD = 320;
 
 interface Group {
   readonly territory: Territory;
+  /** A fixed camp's decision (D69, Z2): its dead come back. */
+  readonly camp?: CampDecision;
+  /** The ground its den walks on, once built (what the hero sees of it). */
+  ground?: OpenGround;
   awake: boolean;
   /** How much farther off than the usual it is built and awake (extraOf), once known. */
   extra?: number;
@@ -70,10 +78,16 @@ export class WildLand {
   private readonly events = new Set<string>();
 
   private readonly town: string;
+  /** Seconds of play (the camps' respawn clock, kept in the save), each camp's dead, and when the returns were last looked at. */
+  private clock: number;
+  private readonly campState = new Map<string, CampSave>();
+  private looked = 0;
 
   /** `wild`: the town's wild groups (vgm/wild.ts, from the log); `bands`: the open story events' bands (vgm/events.ts openBands). */
-  constructor(private readonly host: WildHost, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, wild: readonly Territory[] = [], bands: readonly Territory[] = []) {
+  constructor(private readonly host: WildHost, town: Town, private readonly land: Land, private readonly saved: Readonly<Record<string, DelveSave>> = {}, wild: readonly Territory[] = [], bands: readonly Territory[] = [], camps?: CampsSave) {
     this.town = town.decision.id;
+    this.clock = camps?.clock ?? 0;
+    for (const [id, c] of Object.entries(camps?.camps ?? {})) this.campState.set(id, c);
     this.territories = [...wild];
     this.groups = this.territories.map((territory) => ({ territory, awake: false, built: null, encounter: null, delve: null }));
     for (const b of bands) this.add(b);
@@ -85,6 +99,54 @@ export class WildLand {
     this.events.add(t.id);
     this.territories.push(t);
     this.groups.push({ territory: t, awake: false, built: null, encounter: null, delve: null });
+  }
+
+  /**
+   * A fixed camp (D69, Z2), built as the hero comes near like the wild's groups; its posts' kinds as they stand now. Its dead come back at
+   * their posts (`tick`).
+   */
+  addCamp(d: CampDecision): void {
+    if (this.groups.some((g) => g.territory.id === d.id)) return;
+    const h = this.host, rules = h.setting.camps, def = rules?.camps.find((c) => c.id === d.camp);
+    if (!rules || !def) return;
+    const territory = campTerritory(d, def, rules, h.setting.creatures, h.setting.growth, this.campState.get(d.id));
+    this.territories.push(territory);
+    this.groups.push({ territory, camp: d, awake: false, built: null, encounter: null, delve: null });
+  }
+
+  /** The camps' state for the save (D69, Z2): the play clock and who of each camp is dead since when. */
+  campsSave(): CampsSave {
+    return { clock: this.clock, camps: Object.fromEntries(this.campState) };
+  }
+
+  /**
+   * Every frame (`dt` of play), the hero at `q`: the camps' clock runs, the fallen of a built camp are noted, and those whose time has come
+   * come back (looked at once a second): the dead rise where they fell, the living walk in from the edge of their ground where the hero
+   * does not see (sim/camps.ts returnsDue; rule 11).
+   */
+  keepCamps(dt: number, q: { readonly x: number; readonly y: number; readonly z: number }): void {
+    this.clock += dt;
+    if (this.clock - this.looked < 1) return;
+    this.looked = this.clock;
+    const h = this.host, rules = h.setting.camps;
+    if (!rules) return;
+    for (const g of this.groups) {
+      const d = g.camp, den = g.delve?.den, ground = g.ground;
+      if (!d || !den || !ground) continue;
+      const def = rules.camps.find((c) => c.id === d.camp)!;
+      let s = this.campState.get(d.id) ?? { dead: {}, rounds: {} };
+      for (const c of den.creatures) if (c.state === 'dead' && !(c.id in s.dead)) s = died(s, c.id, this.clock);
+      const seen = (x: number, z: number): boolean => Math.hypot(x - q.x, z - q.z) <= RETURN_SEEN && ground.sees(q.x, q.y, q.z, x, ground.floorAt(x, z), z, 1.6);
+      const body = (post: number) => { const c = den.creatures[post]; return c?.state === 'dead' ? { x: c.x, z: c.z } : null; };
+      for (const r of returnsDue(d, def, rules, s, this.clock, seen, body)) {
+        const next = returned(s, r.post);
+        const back = den.revive(r.post, postDef(d, def, rules, h.setting.creatures, h.setting.growth, r.post, next.rounds[r.post] ?? 0), r.from, def.arrive);
+        if (!back) continue;
+        g.delve!.revived(r.post);
+        s = next;
+      }
+      this.campState.set(d.id, s);
+    }
   }
 
   /** An event's band moves on (its event ran its course unseen, vgm/events.ts fadedFor): it is gone from the land. */
@@ -101,7 +163,7 @@ export class WildLand {
     const light = this.host.light();
     for (const g of this.groups) {
       const d = this.away(g, x, z);
-      if (!g.built && d < BUILD) g.built = this.raise(g);
+      if (!g.built && d < (g.camp ? CAMP_BUILD : BUILD)) g.built = this.raise(g);
       g.awake = awake(g.awake, d);
       if (g.delve) g.delve.fight.light = light;
     }
@@ -121,7 +183,7 @@ export class WildLand {
 
   /** The wild's own groups (not the events' bands) and how many of each still live (raiders come from these). */
   groupsLeft(): WildGroup[] {
-    return this.groups.filter((g) => !this.events.has(g.territory.id)).map((g) => {
+    return this.groups.filter((g) => !this.events.has(g.territory.id) && !g.camp).map((g) => {
       const dead = g.delve ? g.delve.den.dead : this.saved[g.territory.id]?.dead ?? [];
       return { town: this.town, territory: g.territory, left: g.territory.members.length - dead.length };
     });
@@ -161,8 +223,23 @@ export class WildLand {
     const h = this.host, t = g.territory, saved = this.saved[t.id];
     // Out at sea (S9) its swimmers come to the depth of a hero who swims.
     const w = h.player.walker, prey = () => (w.mode === 'swim' && !h.player.offFoot ? w.pos.y : null);
-    const den = new Den(new OpenGround(this.land, [t], prey, bedOf(t.members, h.setting.creatures)), t.members.map((creature) => ({ creature, room: 0 })), h.setting.creatures, deriveSeed(t.seed, 'den'), saved?.dead ?? []);
-    const delve = new Delve(null, den, h.setting, h.character, h.seed, saved);
+    const posts = t.posts, bed = bedOf(t.members, h.setting.creatures);
+    // A camp's bodies each keep to their post (a patrol to its round); a wild group roams its territory together.
+    const ground = posts ? new OpenGround(this.land, posts.map((p) => ({ x: p.x, z: p.z, r: POST_R })), prey, bed, POST_GATHER, posts.map((p) => p.round)) : new OpenGround(this.land, [t], prey, bed);
+    g.ground = ground;
+    // A camp's dead whose time came while nobody was near are back at their posts (unseen: the hero was far off).
+    const camp = g.camp, rules = h.setting.camps, cdef = camp && rules?.camps.find((c) => c.id === camp.camp);
+    let dead = saved?.dead ?? [];
+    if (camp && rules && cdef) {
+      let s = this.campState.get(camp.id) ?? { dead: {}, rounds: {} };
+      for (const id of dead) if (!(id in s.dead)) s = died(s, id, this.clock);
+      for (const r of returnsDue(camp, cdef, rules, s, this.clock, () => false, () => null)) s = returned(s, r.post);
+      this.campState.set(camp.id, s);
+      dead = dead.filter((id) => id in s.dead);
+    }
+    const spawns = posts ? t.members.map((creature, i) => ({ creature, room: i, def: camp && rules && cdef ? postDef(camp, cdef, rules, h.setting.creatures, h.setting.growth, i, this.campState.get(camp.id)?.rounds[i] ?? 0) : posts[i].def })) : t.members.map((creature) => ({ creature, room: 0 }));
+    const den = new Den(ground, spawns, h.setting.creatures, deriveSeed(t.seed, 'den'), dead);
+    const delve = new Delve(null, den, h.setting, h.character, h.seed, saved ? { ...saved, dead, searched: saved.searched.filter((i) => dead.includes(i)) } : saved);
     delve.fight.standing = h.standing;
     const creatures = await CreatureView.build(den, deriveSeed(h.seed, 'wild'), { x: 0, y: 0, z: 0 }, h.renderer);
     creatures.group.visible = false;
@@ -174,8 +251,8 @@ export class WildLand {
       get shown() { return g.awake; },
       enclosed: false,
       id: t.id,
-      place: `the ${def?.plural ?? 'creatures'} about here`,
-      danger: groupDanger(t.members, h.setting.creatures),
+      place: cdef ? `${cdef.name}` : `the ${def?.plural ?? 'creatures'} about here`,
+      danger: posts ? dangerOfAll(den.creatures.map((c) => c.def.danger)) : groupDanger(t.members, h.setting.creatures),
       // An event's band is a lead: once it is beaten and the hero moves on, the game takes it in. A foray the town fights off itself is none.
       promise: this.events.has(t.id) && h.setting.events?.find((x) => x.id === t.kind)?.kind !== 'foray' ? t.id : null,
       quietLine: null,

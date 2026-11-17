@@ -268,10 +268,6 @@
     "reason": "Only the name matches: the spell drawing's own spot (app/spellFx, spell lab) and an unrelated system's."
   },
   {
-    "key": "same name: masterworld/app/spellFx/particles.ts#spot + masterworld/sim/wild.ts#spot",
-    "reason": "Only the name matches: the spell drawing's own spot (app/spellFx, spell lab) and an unrelated system's."
-  },
-  {
     "key": "same name: masterworld/app/spellFx/particles.ts#step + masterworld/lab/spellLab.ts#step",
     "reason": "Only the name matches: the spell drawing's own step (app/spellFx, spell lab) and an unrelated system's."
   },
@@ -408,10 +404,6 @@
     "reason": "Unrelated: the camera holds a scene's shot; a townsperson is held for a talk (and comes round their work first). Only the name matches."
   },
   {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/volcano/VolcanoView.ts + masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/world/rocks.ts + masterworld/world/sites.ts + masterworld/world/volcano.ts",
-    "reason": "A point at an angle and a distance from a middle (x + cos a * r, z + sin a * r): plain trigonometry, each placing its own things; rocks.ts added a fifth use (rocks round a tor's crown), volcano.ts a sixth (the crater rim's crests)."
-  },
-  {
     "key": "same name: masterworld/render/flora/FloraView.ts#placeStart + masterworld/render/rocks/RockView.ts#placeStart",
     "reason": "Both views placed before the first frame (main.ts): the same step of the load on purpose; the cell keeping they share is render/cameraCells.ts."
   },
@@ -484,10 +476,6 @@
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
   {
-    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/creatures.ts#step",
-    "reason": "step(dt, ...) is a tick: the den's world-simulation step and a visitor's walk share only the name (paired anew when D69 shortened the den's step)."
-  },
-  {
     "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
@@ -554,10 +542,6 @@
   {
     "key": "same name: masterworld/sim/livestock.ts#step + masterworld/sim/townLife.ts#step",
     "reason": "step(dt, ...) is a per-frame tick of different things (a town's people; the spell lab's particles, the creatures, the herds): only the name and the loop over members match (the finder paired them anew when the town's step learned to skip time)."
-  },
-  {
-    "key": "idiom: [.d .sort] in masterworld/sim/smallLife.ts + masterworld/vgm/hints.ts + masterworld/world/coast.ts",
-    "reason": "Sorting found candidates nearest first by a distance field is a language idiom; the candidates (small life spots, hints, river mouths) and what follows differ."
   },
   {
     "key": "idiom: [.atan2 .cos .sin Math] in masterworld/app/encounter.ts + masterworld/sim/livestock.ts + masterworld/sim/poultry.ts",
@@ -720,10 +704,6 @@
     "reason": "Shared idiom, not a copy."
   },
   {
-    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts + masterworld/talk/townTalk.ts",
-    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
-  },
-  {
     "key": "same name: masterworld/game/character.ts#save + masterworld/talk/townTalk.ts#save",
     "reason": "Each class writes its own save (the hero, the town talk); same word, different things."
   },
@@ -746,10 +726,6 @@
   {
     "key": "clone: masterworld/world/cave/parts.ts#build + masterworld/world/dungeon/meshKit.ts#mesh",
     "reason": "Both turn builder arrays into typed arrays, but in different formats (the cave parts carry per-vertex tint and material bytes, the building mesh its own layout); a shared helper would only hide that."
-  },
-  {
-    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/render/volcano/VolcanoView.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/watch.ts + masterworld/world/cave/formations.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
-    "reason": "Placing a point on a ring round (x, z): a trigonometric pair each, in different frames (a formation's saucer layers here)."
   },
   {
     "key": "idiom: [.cos .sin .yaw Math] in masterworld/world/cave/carve.ts + masterworld/world/cave/dress.ts + masterworld/world/cave/loose.ts + masterworld/world/dungeon/caveFeatures.ts + masterworld/world/dungeon/propModels.ts + masterworld/world/dungeon/site.ts",
@@ -846,10 +822,6 @@
   {
     "key": "same name: masterworld/sim/formedSpace.ts#sdf + masterworld/world/dungeon/space.ts#sdf",
     "reason": "Both implement the rock-distance seam of DungeonSpace; the formed cave reads its carved brick field, the built dungeon its walls."
-  },
-  {
-    "key": "same name: masterworld/sim/formedGround.ts#spot + masterworld/sim/wild.ts#spot",
-    "reason": "FormedGround.spot implements the DenGround seam (sim/dungeonNav.ts) as the wild ground's does; each picks a spot on its own ground."
   },
   {
     "key": "idiom: [.PI .float Math] in masterworld/render/volcano/VolcanoView.ts + masterworld/world/landforms.ts + masterworld/world/rocks.ts",
@@ -1002,5 +974,145 @@
   {
     "key": "same name: masterworld/world/structures/ruin.ts#top + masterworld/world/structures/tower.ts#top",
     "reason": "A local closure with a short common name, a different thing in each file (a column's height, a point in a part's own frame, a level at a point, a piece's tint by height); the names only match."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/caveWater.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/building.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/caveWater.ts + masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/outline.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/outline.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/formedCave.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/flame.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/formedCave.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/formedCave.ts + masterworld/render/materials/water.ts + masterworld/render/underwater.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/lab.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/grass.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/waterSurface.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/portal.ts + masterworld/render/materials/portalStone.ts + masterworld/render/materials/volcano.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/volcano.ts + masterworld/render/materials/water.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.add .mul] in masterworld/render/materials/spellFx.ts + masterworld/render/materials/water.ts + masterworld/render/materials/weather.ts",
+    "reason": "TSL shader nodes chain .add/.mul (three.js node language): every material's maths reads this way; not a copied helper."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/app/title/Toys.ts + masterworld/render/volcano/VolcanoView.ts + masterworld/sim/camps.ts + masterworld/sim/livestock.ts + masterworld/sim/smallLife.ts + masterworld/sim/wild.ts + masterworld/vgm/watch.ts + masterworld/world/cave/formations.ts + masterworld/world/hold.ts + masterworld/world/volumes.ts",
+    "reason": "A point at an angle and a distance from a middle (x + cos a * r, z + sin a * r): plain trigonometry, each placing its own things; rocks.ts added a fifth use (rocks round a tor's crown), volcano.ts a sixth (the crater rim's crests)."
+  },
+  {
+    "key": "idiom: [.cos .sin .x .z Math] in masterworld/render/volcano/VolcanoView.ts + masterworld/render/weather/WeatherView.ts + masterworld/sim/spots.ts + masterworld/sim/townLife.ts + masterworld/vgm/zones.ts + masterworld/world/rocks.ts + masterworld/world/sites.ts + masterworld/world/volcano.ts",
+    "reason": "A point at an angle and a distance from a middle (x + cos a * r, z + sin a * r): plain trigonometry, each placing its own things; rocks.ts added a fifth use (rocks round a tor's crown), volcano.ts a sixth (the crater rim's crests)."
+  },
+  {
+    "key": "idiom: [.count .int] in masterworld/game/items.ts + masterworld/sim/smallLife.ts + masterworld/vgm/zones.ts",
+    "reason": "Drawing a seeded count (rng.int over a [lo, hi] range from setting data) is the setting idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.d .sort] in masterworld/sim/smallLife.ts + masterworld/vgm/hints.ts + masterworld/vgm/zones.ts + masterworld/world/coast.ts",
+    "reason": "Sorting found candidates nearest first by a distance field is a language idiom; the candidates (small life spots, hints, river mouths) and what follows differ."
+  },
+  {
+    "key": "idiom: [.entries Object] in masterworld/app/soundDirector.ts + masterworld/game/character.ts + masterworld/game/items.ts + masterworld/game/soundscape.ts + masterworld/game/upkeep.ts + masterworld/setting/contract.ts + masterworld/sim/camps.ts + masterworld/talk/townTalk.ts",
+    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
+  },
+  {
+    "key": "idiom: [.entries Object] in masterworld/app/wildLand.ts + masterworld/game/standing.ts + masterworld/talk/townTalk.ts",
+    "reason": "Object.entries over a record is a language idiom (walking a table of settings), not a copied helper; it crossed the info floor when backgrounds added a fourth use."
+  },
+  {
+    "key": "idiom: [.fill .id .open] in masterworld/app/regionSites.ts + masterworld/vgm/frontier.ts + masterworld/vgm/zones.ts",
+    "reason": "Opening the uncovered regions round a spot (frontier.regionAt, then fill) is the one frontier seam called from each place that opens land."
+  },
+  {
+    "key": "idiom: [.height .waterDepth] in masterworld/vgm/frontier.ts + masterworld/vgm/zones.ts + masterworld/world/hold.ts",
+    "reason": "Asking the terrain whether a spot is dry land (height above sea, no water depth) is the terrain query idiom, not a copy."
+  },
+  {
+    "key": "idiom: [.log .some] in masterworld/vgm/caves.ts + masterworld/vgm/festivities.ts + masterworld/vgm/zones.ts",
+    "reason": "Asking the decision log whether a thing was already decided (log.some by kind and id) is the VGM tools' idiom."
+  },
+  {
+    "key": "idiom: [.sees .x .y .z] in masterworld/app/wildLand.ts + masterworld/game/fight.ts + masterworld/sim/creatures.ts",
+    "reason": "Line of sight from a point to a creature through the ground's sees() seam; each caller asks for its own reason."
+  },
+  {
+    "key": "same name: masterworld/main.ts#blocked + masterworld/vgm/roads.ts#blocked",
+    "reason": "Only the name matches: main.ts passes the open land a blocked() test (towns, bridges, sites, trunks); vgm/roads.ts gives the road router its own (towns, camps)."
+  },
+  {
+    "key": "same name: masterworld/world/dungeon/cellar.ts#settle + masterworld/world/terrain.ts#settle",
+    "reason": "Only the name matches: Terrain.settle lays the decision log's towns and sites on the land; the cellar's settle puts dwellers in rooms."
   }
 ]
