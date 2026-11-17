@@ -6,11 +6,11 @@
  * test/cavePits.test.ts holds three caves to no trap at all in `npm test`.
  *
  * Measured 2026-11-17 on seeds 1-8 of every rock (40 caves) after the climb and the concession were made generous: no trap in
- * the lava tubes and mines; of the 24 solution caves 15 have none, six only nooks of 1-3 cells (under 1.5 m², smaller than the
- * concession opens), and three more: jointed 4 (a 28-cell pit only drops of 6-10 m lead into, which the concession finds no way
+ * the lava tubes and mines; of the 24 solution caves 14 have none, seven only nooks of 1-3 cells (under 1.5 m², smaller than the
+ * concession opens), and three more: jointed 4 (a 29-cell pit only drops of 6-10 m lead into, which the concession finds no way
  * to open), jointed 6 (6 cells) and jointed 7 (pits of 4-13 cells whose few ways out the walker misses). Before: up to 1700
  * cells of a cave trapped, and climbs over 3 m failed four times in five. `loop:caves` went from 2, 2 and 4 of 6 solution
- * caves walked in and out to 5, 5 and 5.
+ * caves walked in and out to 5, 4 and 5.
  */
 import { classic } from '../../src/setting/classic/index';
 import { caveWater } from '../../src/world/cave/water';
