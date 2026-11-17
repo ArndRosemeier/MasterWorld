@@ -98,6 +98,13 @@ function speciesFor(def: CreatureDef, seed: number) {
   return { ...sp, colors: { ...sp.colors, base: tone, secondary: tone.map((v) => v * 0.75) as typeof tone, belly: tone.map((v) => Math.min(1, v * 1.5)) as typeof tone } };
 }
 
+/** The hidden character every den's people share their pack and worker with (never shown, never freed). */
+let lead: Promise<Character> | null = null;
+function packLead(renderer: WebGPURenderer): Promise<Character> {
+  lead ??= Character.load({ pack: PACK, renderer, materials: nodeMaterials, clipLibraries: false, worker: new HumanWorker() });
+  return lead;
+}
+
 export class CreatureView {
   readonly group = new Group();
   private readonly shown: Shown[] = [];
@@ -116,13 +123,9 @@ export class CreatureView {
     const v = new CreatureView(den, origin);
     const models = new Map<string, CritterModel>();
     let rat: { model: ModelledCreature; length: number } | null = null;
-    // The cellar's people: the first loads the pack (in its own worker), the others share it.
-    let lead: Character | null = null;
-    const person = async () => {
-      const ch = await Character.load({ pack: PACK, renderer, materials: nodeMaterials, clipLibraries: false, ...(lead ? { shareWith: lead } : { worker: new HumanWorker() }) });
-      lead ??= ch;
-      return ch;
-    };
+    // The people of every den share one loaded pack in one worker (a camp is raised for every few hundred metres walked, D69: a
+    // worker and a pack each would pile up until the page stalls).
+    const person = async () => Character.load({ pack: PACK, renderer, materials: nodeMaterials, clipLibraries: false, shareWith: await packLead(renderer) });
     // The rig plants feet in the world: the cellar's floor under them (near the storey the creature is on).
     const ground = renderGround((x, z, y) => den.ground.floorAt(x, z, y), v.group.position, ORIGIN.at, () => v.near + 0.8, () => v.near);
     for (const c of den.creatures) {
@@ -177,6 +180,17 @@ export class CreatureView {
   }
 
   /** `who` says `text`: their lips move with it (Actors' lip-sync; nothing for a beast or a skeleton's jaw). */
+  /** Off the stage for good (a camp the hero left far behind): its people and animals freed (shared packs stay loaded). */
+  dispose(): void {
+    this.group.removeFromParent();
+    for (const s of this.shown) {
+      const b = s.body;
+      if (b.kind === 'person') b.ch.dispose();
+      else if (b.kind === 'animal') { b.actor?.dispose(); b.lib?.dispose(); }
+    }
+    this.shown.length = 0;
+  }
+
   speak(who: Creature, text: string): void {
     const b = this.shown.find((x) => x.c === who)?.body;
     if (b?.kind === 'person') b.ch.say(text);
