@@ -17,7 +17,7 @@ import { WATER, waterAt } from './materials/waterInputs';
 import { ROAD } from './materials/roads';
 import { inside, sampleMask } from './materials/masks';
 import { WEATHER, rainRings } from './materials/weather';
-import type { StageKind } from '@futuremagic/stage';
+import { Kinds, type Kind } from '@futuremagic/stage';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { woodsFromAfar } from '@futuremagic/vegetation/node';
 import { ORIGIN, WORLD } from './origin';
@@ -26,33 +26,17 @@ import { inRenderGroup } from './renderGroup';
 
 export type Attribute = 'position' | 'normal' | 'color' | 'uv' | 'surface' | 'level' | 'canopy' | 'ground' | 'mat' | 'tint' | 'look' | 'fx';
 
-export interface MaterialKind extends StageKind {
-  readonly attributes: readonly Attribute[];
-  /**
-   * Not needed in the first seconds of play (spells, the bird form's feathers): left out of the warm-up behind the
-   * loading screen, so it does not lengthen the load (F4); built under the shader cap when first added (Stage.add).
-   */
-  readonly late: boolean;
-}
+/**
+ * A kind (@futuremagic/stage `Kind`): its name, attributes and one material; `late` ones (spells, the bird form's
+ * feathers) are not needed in the first seconds of play, so the warm-up behind the loading screen leaves them out
+ * (F4) and they are built under the shader cap when first added (Stage.add).
+ */
+export type MaterialKind = Kind<Attribute>;
 
-const kinds = new Map<string, MaterialKind>();
+const kinds = new Kinds<Attribute>();
 
-export function defineKind(name: string, attributes: readonly Attribute[], build: () => Material, shadow = { cast: true, receive: true }, late = false): MaterialKind {
-  if (kinds.has(name)) throw new Error(`material kind "${name}" defined twice`);
-  let made: Material | null = null;
-  const kind: MaterialKind = {
-    name,
-    attributes,
-    shadow,
-    late,
-    make() {
-      made ??= Object.assign(build(), { name });
-      return made;
-    },
-  };
-  kinds.set(name, kind);
-  return kind;
-}
+/** Defines a kind: its name (once), the attributes its meshes carry, its one material (built on first use), shadow flags, and whether it is late. */
+export const defineKind = kinds.define.bind(kinds);
 
 /** A mesh drawn with a kind's material and its shadow flags, placed once (matrix not updated per frame). */
 export function kindMesh(g: BufferGeometry, kind: MaterialKind, x = 0, y = 0, z = 0): Mesh {
@@ -78,14 +62,10 @@ export function freeMesh(mesh: Mesh): void {
 }
 
 /** Every kind. */
-export function allKinds(): readonly MaterialKind[] {
-  return [...kinds.values()];
-}
+export const allKinds = (): readonly MaterialKind[] => kinds.all();
 
 /** The kinds the warm-up builds behind the loading screen: all but the late ones. */
-export function warmKinds(): readonly MaterialKind[] {
-  return allKinds().filter((k) => !k.late);
-}
+export const warmKinds = (): readonly MaterialKind[] => kinds.warm();
 
 /** The ground's texture arrays; set once at load, before the warm-up builds the terrain material. */
 let ground: GroundTextures | null = null;
@@ -476,14 +456,6 @@ export const CAVE_ROCK = defineKind('cave rock', ['position', 'normal', 'tint'],
 /** Which texgen layer draws each biome surface. */
 const SURFACE_LAYER: Record<Surface, string> = { grass: 'wildGrass', forest: 'forestFloor', sand: 'sand', scree: 'scree' };
 
-/** The sky dome (a unit box on the camera, drawn at the far plane). Its uniforms: `skyUniforms`. */
+/** The sky dome (a unit box on the camera, drawn at the far plane). Its uniforms: `skyUniforms` (@futuremagic/sky/rig). */
 export const SKY = defineKind('sky', ['position', 'normal', 'uv'], () => makeSkyNode({ reversed: true, origin: ORIGIN.node }).material as Material, { cast: false, receive: false });
 
-/** The sky as the environment map sees it (rendered only into the PMREM, never into the view). */
-export function makeEnvSky(): Mesh {
-  return makeSkyNode({ reversed: false, env: true });
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type SkyUniforms = Record<string, { value: any }>;
-export const skyUniforms = (m: Material): SkyUniforms => (m as unknown as { uniforms: SkyUniforms }).uniforms;
