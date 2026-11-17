@@ -40,7 +40,7 @@
 /* The target plate: drops in on a hinge; its ward shows the creature's threat. */
 #fight .target { position: absolute; left: 50%; top: 128px; width: 260px; margin-left: -130px; padding: 8px 14px 10px; transform-origin: top center; transform: rotateX(-90deg); opacity: 0; transition: transform .45s cubic-bezier(.3, 1.6, .5, 1), opacity .2s; }
 #fight .target.shown { transform: none; opacity: 1; }
-#fight .target .name { font-size: 16px; text-align: center; }
+#fight .target .name { font-size: 16px; text-align: center; color: var(--con, inherit); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); }
 /* The foe's level on a small seal at the plate's left (D58). */
 #fight .target .lvl { position: absolute; left: 10px; top: 8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 13px 'Marcellus SC', Georgia, serif; color: #2a1c0c; background: radial-gradient(circle at 35% 30%, var(--brass-hi), var(--brass) 60%, var(--brass-dark)); box-shadow: 0 0 6px var(--threat, var(--ward)); }
 #fight .target .state { font-size: 12px; text-align: center; color: var(--ink-dim); font-style: italic; height: 15px; }
@@ -73,7 +73,7 @@
 #fight .foe { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: baseline; padding: 3px 6px 5px; border-radius: 5px; border: 1px solid transparent; cursor: pointer; }
 #fight .foe:hover { background: #ffffff12; }
 #fight .foe.aimed { border-color: var(--brass-hi); background: #ffffff1a; box-shadow: 0 0 8px var(--ward); }
-#fight .foe .name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#fight .foe .name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--con, inherit); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); }
 #fight .foe .dist { font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 #fight .foe .bar { grid-column: 1 / 3; height: 7px; margin-top: 3px; border-radius: 4px; background: #0b0807; box-shadow: inset 0 1px 3px #000, 0 0 0 1px var(--brass-dark); overflow: hidden; }
 #fight .foe .fill { height: 100%; border-radius: 4px; transition: width .3s ease-out; }

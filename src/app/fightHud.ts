@@ -17,13 +17,16 @@ import { cap } from '../talk/townTalk';
 import { levelOfDanger } from '../game/growth';
 import { foeGroup } from '../game/foeGroup';
 import { healthCss } from '../sim/aura';
+import type { Con } from '../sim/aggro';
 import { el } from './dom';
 import { itemCard, plainCard } from './itemCard';
 import { replay } from './ward';
 
 const THREAT: Record<Threat, string> = { trivial: '#9c9a94', easy: '#6fdc7a', even: '#f2d65c', hard: '#ff9a3c', deadly: '#ff4a3a' };
 const THREAT_WORD: Record<Threat, string> = { trivial: 'no match for you', easy: 'weaker than you', even: 'a fair fight', hard: 'stronger than you', deadly: 'far beyond you' };
-const STATE: Partial<Record<Creature['state'], string>> = { alert: 'wary', fight: 'fighting', flee: 'fleeing', beg: 'begging', meek: 'cowed', dead: 'dead' };
+const STATE: Partial<Record<Creature['state'], string>> = { alert: 'wary', fight: 'fighting', home: 'going home', flee: 'fleeing', beg: 'begging', meek: 'cowed', dead: 'dead' };
+/** The name's colour for a foe's level against the hero's (D69 con, sim/aggro.ts), as the old games had it; bright enough on the dark brass. */
+export const CON_CSS: Readonly<Record<Con, string>> = { grey: '#a3a19b', green: '#5fd46a', blue: '#62a8ff', white: '#f4f1ea', yellow: '#f5d84a', red: '#ff4a3a' };
 
 /** How long (ms) the gauges stay shown after a level gained out of a fight, its seal engraved. */
 const CHEER_SHOWN = 4500;
@@ -46,7 +49,7 @@ export class FightHud {
   private shownFor: Creature | null = null;
   /** The group panel: a row for each foe of the fight, with its health and its distance; a click on a row targets it. */
   private readonly group = el('div', { className: 'foes plate' });
-  private readonly rows = new Map<number, { row: HTMLElement; bar: HTMLElement; dist: HTMLElement; who: Creature }>();
+  private readonly rows = new Map<number, { row: HTMLElement; name: HTMLElement; bar: HTMLElement; dist: HTMLElement; who: Creature }>();
   private readonly more = el('div', { className: 'more' });
   /** The fight the panel's clicks go to (the one followed last). */
   private fight: Fight | null = null;
@@ -104,6 +107,7 @@ export class FightHud {
       }
     }
     if (t) {
+      conColour(this.tName, fight.con(t));
       const { threat, together } = fight.threat(t);
       if (this.target.style.getPropertyValue('--threat') !== THREAT[threat]) this.target.style.setProperty('--threat', THREAT[threat]);
       // Several at once: the ward and the words are for all of them ("the pack" when it hunts as one).
@@ -127,13 +131,14 @@ export class FightHud {
       live.add(id);
       let row = this.rows.get(id);
       if (!row) {
-        const bar = el('div', { className: 'fill' }), dist = el('div', { className: 'dist' });
-        const box = el('div', { className: 'foe' }, el('div', { className: 'name' }, cap(r.creature.def.name)), dist, el('div', { className: 'bar' }, bar));
-        row = { row: box, bar, dist, who: r.creature };
+        const bar = el('div', { className: 'fill' }), dist = el('div', { className: 'dist' }), name = el('div', { className: 'name' }, cap(r.creature.def.name));
+        const box = el('div', { className: 'foe' }, name, dist, el('div', { className: 'bar' }, bar));
+        row = { row: box, name, bar, dist, who: r.creature };
         this.rows.set(id, row);
         this.group.insertBefore(box, this.more);
       }
       row.row.classList.toggle('aimed', r.target);
+      conColour(row.name, fight.con(r.creature));
       const w = `${(r.frac * 100).toFixed(0)}%`;
       if (row.bar.style.width !== w) { row.bar.style.width = w; row.bar.style.background = healthCss(r.frac); }
       const d = `${Math.round(r.dist)} m`;
@@ -199,4 +204,10 @@ export class FightHud {
     if (g.text.textContent !== text) g.text.textContent = text;
     g.box.classList.toggle('low', f < 0.3);
   }
+}
+
+/** A foe's name in the colour of its con (only when it changed: the HUD is read every frame). */
+function conColour(name: HTMLElement, con: Con): void {
+  const c = CON_CSS[con];
+  if (name.style.getPropertyValue('--con') !== c) name.style.setProperty('--con', c);
 }

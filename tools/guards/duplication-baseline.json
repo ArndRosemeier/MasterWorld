@@ -484,6 +484,10 @@
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },
   {
+    "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/creatures.ts#step",
+    "reason": "step(dt, ...) is a tick: the den's world-simulation step and a visitor's walk share only the name (paired anew when D69 shortened the den's step)."
+  },
+  {
     "key": "same name: masterworld/game/visitor.ts#step + masterworld/sim/livestock.ts#step",
     "reason": "Per-frame step methods of unrelated things (the household coming to the hero: app/ownerComes.ts drives its climb and walk, game/visitor.ts walks the place); only the name matches."
   },

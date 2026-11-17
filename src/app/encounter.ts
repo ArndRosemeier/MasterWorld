@@ -26,7 +26,7 @@ import { joltOf } from '../render/jolt';
 import { warning, type Director } from '../vgm/director';
 import { cap } from '../talk/townTalk';
 import { fill } from '../talk/folk';
-import { foeLine } from '../game/foeSpeech';
+import { foeCry } from '../game/foeSpeech';
 import type { FightHud } from './fightHud';
 import { OVER_HEAD } from './speech';
 import type { Notes } from './notes';
@@ -61,8 +61,6 @@ export interface FightHost {
   failed(id: string): boolean;
   /** The hero killed one of this faction (D65): standing with it and with its foes moves. */
   slain(faction: string): void;
-  /** The hero struck a band of this faction first, while it was talking or after its word (R7): a deed, once per band (`key`), kept in the log. */
-  struckFirst(faction: string, key: string): void;
   /** Someone down there speaks (a parley's leader): a bubble over them while `at` gives where (null: gone). */
   say(text: string, at: () => { x: number; y: number; z: number } | null): void;
 }
@@ -244,11 +242,10 @@ export class Encounter {
     this.host.say(text, () => (who.state === 'dead' ? null : { x: O.x + who.x, y: O.y + who.y + head, z: O.z + who.z }));
   }
 
-  /** What a band says and why it fights (D64), by whoever speaks for it: a bubble over their head, a line picked by who they are and how often they have spoken. */
+  /** A humanoid foe's one cry as it attacks (D69): a bubble over its head, a line picked by who it is and how often its camp has cried. */
   private said = 0;
-  private foeSays(who: Creature, e: FightEvent & { readonly kind: 'warn' | 'break' }): void {
-    const n = this.said++;
-    const text = foeLine(this.setting, who.def, e.kind === 'warn' ? e.turn : e.cause, who.id, n);
+  private foeCries(who: Creature): void {
+    const text = foeCry(this.setting, who.def, who.id, this.said++);
     if (text) this.bubble(who, text);
   }
 
@@ -403,10 +400,7 @@ export class Encounter {
         break;
       case 'heal': this.hud.healed(); this.act('drink', 1.1); break;
       // Noticed, fleeing, slinking off spared: all seen on the creature, so nothing is said.
-      case 'warn': case 'break':
-        this.foeSays(e.who, e);
-        if (e.kind === 'break' && e.cause === 'struck') this.host.struckFirst(e.who.def.faction, this.arena.id ?? this.arena.place);
-        break;
+      case 'cry': this.foeCries(e.who); break;
       case 'plea': this.notes.say(`“${e.text}”`, 7); break;
       case 'spared': this.director.met('people', 0.5); break;
       case 'killed':
