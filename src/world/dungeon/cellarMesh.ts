@@ -590,7 +590,8 @@ function dress(k: MeshKit, c: Cellar, models: PropModels): void {
 /**
  * One prop from the kit of simple pieces; `n`, its number among the cellar's props. Heaps of straw and nests lie
  * across each other: their tops step by a few millimetres per prop (and per box of a nest), so no two lie in one
- * plane and flicker (z-fighting, `npm run zfight`).
+ * plane and flicker (z-fighting, `npm run zfight`). A nest's boxes rest a millimetre or so apart too: one by the
+ * stairwell hangs over it, and their undersides show from below.
  */
 function prop(k: MeshKit, p: Prop, n = 0): void {
   const { x, y, z, yaw } = p;
@@ -615,7 +616,7 @@ function prop(k: MeshKit, p: Prop, n = 0): void {
     case 'stool': k.cylinder(x, y, z, 0.18, 0.45, 8, M.Oak, t(OAK)); break;
     case 'cot': k.box(x, y, z, 1.9, 0.35, 0.8, yaw + Math.PI / 2, M.Oak, t(DARK_OAK)); k.box(x, y + 0.35, z, 1.8, 0.1, 0.7, yaw + Math.PI / 2, M.Thatch, t([180, 160, 110])); break;
     case 'straw': k.box(x, y, z, 1.2, 0.18 + (n % 37) * 0.0011, 0.9, yaw + rng.range(-0.5, 0.5), M.Thatch, t([190, 165, 100], 0.2)); break;
-    case 'nest': for (const s of rng.shuffle([0, 1, 2, 3, 4])) k.box(x + rng.range(-0.4, 0.4), y, z + rng.range(-0.4, 0.4), rng.range(0.4, 0.8), 0.15 + s * 0.04 + (n % 37) * 0.0011, rng.range(0.4, 0.8), rng.range(0, 3), M.Thatch, t([120, 100, 70], 0.25)); break;
+    case 'nest': for (const s of rng.shuffle([0, 1, 2, 3, 4])) k.box(x + rng.range(-0.4, 0.4), y + s * 0.0015, z + rng.range(-0.4, 0.4), rng.range(0.4, 0.8), 0.15 + s * 0.04 + (n % 37) * 0.0011, rng.range(0.4, 0.8), rng.range(0, 3), M.Thatch, t([120, 100, 70], 0.25)); break;
     case 'rubble': for (let n = 0; n < 7; n++) k.box(x + rng.range(-0.5, 0.5), y, z + rng.range(-0.5, 0.5), rng.range(0.2, 0.5), rng.range(0.15, 0.35), rng.range(0.2, 0.5), rng.range(0, 3), M.Rubble, t(STONE, 0.2)); break;
     case 'bones': for (let n = 0; n < 6; n++) k.box(x + rng.range(-0.4, 0.4), y, z + rng.range(-0.4, 0.4), 0.05, 0.05, rng.range(0.2, 0.45), rng.range(0, 3), M.Plaster, t([225, 215, 190])); k.cylinder(x + 0.2, y, z - 0.1, 0.1, 0.16, 8, M.Plaster, [225, 215, 190], 0.5); break;
     case 'candle': k.cylinder(x, y, z, 0.04, 0.25, 6, M.Plaster, [240, 230, 200]); break;
