@@ -89,6 +89,17 @@ export const PULL_UP = 1.5;
 const PULL_RISE = 0.5;
 /** The body hangs this far off the face (m). */
 const OFF_FACE = 0.35;
+/**
+ * In a cave the body leans out from the face around a bulge or a lip over its head, up to this far off it (m), and looks for the
+ * face this far in front of where it hangs (m): broken rock is climbed by whatever stands out of it (D56), not only a clean wall.
+ */
+const LEAN_MOST = 0.95, ROCK_REACH = 1.6;
+/** How far along a cave's face (m), either way, a climber under a roof or a shelf looks for where the way up is free. */
+const ASIDE_MOST = 1.2;
+/** How far off a cave's face (m) a climber hangs by the hands from a ledge's lip that juts out over it. */
+const HANG_MOST = 1.6;
+/** In a cave the pull-up looks for the top up to this far in past the face (m). */
+const PULL_REACH = 1.4;
 /** Pushing into a climbable face this long starts a climb (s): no climb by brushing past. */
 const GRIP_ON = 0.25;
 /** The highest ledge in a cave the body hops up on (m): a jump rises about a metre, and the feet go over an edge within a step of its top. */
@@ -132,8 +143,8 @@ export class Walker {
   height: number;
   /** How long (s) the body has been asked to walk on the ground and has not got anywhere. */
   stuckFor = 0;
-  /** Climbing: the way into the face (unit), the feet's height where the climb began, and the pull-up's way. */
-  readonly face = { nx: 0, nz: 0, from: 0 };
+  /** Climbing: the way into the face (unit), the feet's height where the climb began, how far off it the body hangs (m), and the pull-up's way. */
+  readonly face = { nx: 0, nz: 0, from: 0, off: OFF_FACE };
   readonly pull = { t: 0, x0: 0, y0: 0, z0: 0, x1: 0, y1: 0, z1: 0 };
   /** Climbing costs strength: asked each climbing frame with the effort (0..1); false: spent, the body lets go. */
   tire: ((dt: number, effort: number) => boolean) | null = null;
@@ -143,6 +154,8 @@ export class Walker {
   private airTop = -Infinity;
   /** How long it has pushed into a climbable face. */
   private pushing = 0;
+  /** On a cave's face under rock it cannot climb past: the way along the face (1 right, -1 left) it works round it, 0 none. */
+  private aside = 0;
 
   constructor(private readonly world: WalkWorld, readonly spec: WalkSpec = WALK) {
     this.height = spec.height;
@@ -397,21 +410,87 @@ export class Walker {
 
   /** Onto the climbable face ahead (dx, dz: the way the body pushes), if it is one; whether it got on. */
   private gripFace(dx: number, dz: number): boolean {
+    if (this.inRock()) return this.gripRock(dx, dz);
     const p = this.pos, r = this.spec.radius + 0.3, fx = p.x + dx * r, fz = p.z + dz * r;
     const c = this.holds(fx, fz, p.y);
     if (!c || c.nx * dx + c.nz * dz < 0.5) return false;
-    // A face, not a step or a bank one walks up: out of doors too steep a slope; in a cave rock up past the chest.
-    if (this.inRock() ? (this.world.rockSurface(fx, p.y + 1.3, fz) ?? -1) > 0.3 : this.groundSlope(fx, fz) <= this.spec.maxSlope) return false;
+    // A face, not a step or a bank one walks up: too steep a slope.
+    if (this.groundSlope(fx, fz) <= this.spec.maxSlope) return false;
     const at = this.faceAt(p.x, p.z, p.y + 0.4, c.nx, c.nz);
     if (!at) return false;
     this.mode = 'climb';
-    this.face.nx = c.nx; this.face.nz = c.nz; this.face.from = p.y;
+    this.face.nx = c.nx; this.face.nz = c.nz; this.face.from = p.y; this.face.off = OFF_FACE;
     p.y += 0.4;
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = Math.atan2(-c.nx, -c.nz);
     this.pushing = 0;
     return true;
+  }
+
+  /**
+   * In a cave, onto the rock ahead (dx, dz): wherever it stands as a wall up past the chest, at whatever angle the body
+   * meets it (D56: a cave's broken rock is climbable). The holds are asked on the face itself, not a body's width on
+   * (which lies inside the rock when the body stands at the wall). Whether it got on.
+   */
+  private gripRock(dx: number, dz: number): boolean {
+    const p = this.pos, y = p.y + 0.4;
+    const hit = this.rockAhead(p.x, p.z, y, dx, dz, [0.5, 1.1], this.spec.radius + 0.6);
+    if (!hit) return false;
+    const fx = p.x + dx * hit.t, fz = p.z + dz * hit.t;
+    const c = this.holds(fx - dx * 0.2, fz - dz * 0.2, y) ?? (hit.t < this.spec.radius + 0.6 ? { nx: dx, nz: dz } : null);
+    if (!c || c.nx * dx + c.nz * dz < 0.3) return false;
+    // A face, not a step: rock up past the chest, near the face.
+    if (!this.rockAhead(p.x, p.z, p.y, dx, dz, [1.3], hit.t + 0.5)) return false;
+    const off = this.leanOff(fx, fz, y, c.nx, c.nz);
+    if (off === null) return false;
+    this.mode = 'climb';
+    this.face.nx = c.nx; this.face.nz = c.nz; this.face.from = p.y; this.face.off = off;
+    p.y = y;
+    p.x = fx - c.nx * off; p.z = fz - c.nz * off;
+    this.vel.x = this.vel.y = this.vel.z = 0;
+    this.yaw = Math.atan2(-c.nx, -c.nz);
+    this.pushing = 0;
+    return true;
+  }
+
+  /**
+   * The rock in front of (x, z) along (nx, nz), feet at y: the nearest of the heights `at` (over the feet) where rock begins,
+   * from a little behind the body up to `reach` metres on, and its distance `t`. Null where there is none within reach.
+   */
+  private rockAhead(x: number, z: number, y: number, nx: number, nz: number, at: readonly number[], reach: number): { t: number } | null {
+    let best = Infinity;
+    for (const h of at) {
+      // (From where the body is clear of it: a bulge already at the body is passed over, not taken for the face.)
+      let t0 = -0.4;
+      while (t0 < reach && this.rockOn(x, y + h, z, nx, nz, t0) < 0) t0 += 0.1;
+      for (let t = t0; t <= reach && t < best; t += 0.1) {
+        if (this.rockOn(x, y + h, z, nx, nz, t) >= 0) continue;
+        let lo = t - 0.1, hi = t;
+        for (let i = 0; i < 6; i++) { const m = (lo + hi) / 2; if (this.rockOn(x, y + h, z, nx, nz, m) < 0) hi = m; else lo = m; }
+        best = Math.min(best, lo);
+        break;
+      }
+    }
+    return best < Infinity ? { t: best } : null;
+  }
+
+  /** The rock's surface distance `t` metres along (nx, nz) from (x, y, z) (negative: in rock; outside the world's rock: rock). */
+  private rockOn(x: number, y: number, z: number, nx: number, nz: number, t: number): number {
+    return this.world.rockSurface(x + nx * t, y, z + nz * t) ?? -1;
+  }
+
+  /**
+   * How far off a cave's face at (fx, fz) the body hangs, feet at y, facing in along (nx, nz): close in where it fits, leaning
+   * out round a bulge or under a lip where the head or the chest would be in the rock. Null where it does not fit even leaning out.
+   */
+  private leanOff(fx: number, fz: number, y: number, nx: number, nz: number, most = LEAN_MOST): number | null {
+    for (let off = OFF_FACE; off <= most + 1e-6; off += 0.1) {
+      const x = fx - nx * off, z = fz - nz * off;
+      const head = this.world.rockSurface(x, y + this.height + 0.05, z) ?? 1;
+      if (head >= 0.1 && this.clearance(x, y, z) >= this.spec.radius * 0.6) return off;
+    }
+    return null;
   }
 
   /**
@@ -471,25 +550,25 @@ export class Walker {
     const ladder = this.world.ladderAt?.(p.x, p.y, p.z) ?? null;
     if (intent.up || (!ladder && this.tire && !this.tire(dt, moving ? 1 : 0.35))) { this.letGo(); return; }
     const v = ladder ? Math.max(1.1, this.spec.climb ?? 0.8) : (this.spec.climb ?? 0.8);
+    const rock = this.inRock() && !ladder;
+    if (rock) { this.climbRock(intent, v, dt); return; }
     // The feet on the face again after the move: up or down, and along it (right of one facing it: (-nz, nx)).
     const y = p.y + intent.forward * v * dt;
     const ax = p.x + F.nx * OFF_FACE - F.nz * intent.strafe * v * 0.7 * dt, az = p.z + F.nz * OFF_FACE + F.nx * intent.strafe * v * 0.7 * dt;
     // Over the top: the ground just in from the face is up at the waist (where the hands go flat on it and
     // the body pushes up: @futuremagic/figure's ledge, so the pull-up starts where the climb left the feet)
     // and walkable.
-    const rock = this.inRock(), tx = ax + F.nx * 0.9, tz = az + F.nz * 0.9;
-    const top = rock ? this.support(tx, tz, y + PULL_RISE * this.height) : this.world.height(tx, tz);
+    const inCave = this.inRock(), tx = ax + F.nx * 0.9, tz = az + F.nz * 0.9;
+    const top = inCave ? this.support(tx, tz, y + PULL_RISE * this.height) : this.world.height(tx, tz);
     // In a cave the ledge's top is where the body fits (stood up on it, clear of the roof).
-    const over = rock ? top > y && !this.bodyInRock(tx, top, tz) : this.groundSlope(tx, tz) <= this.spec.maxSlope;
+    const over = inCave ? top > y && !this.bodyInRock(tx, top, tz) : this.groundSlope(tx, tz) <= this.spec.maxSlope;
     if (intent.forward > 0 && (!ladder || ladder.head) && top - y < PULL_RISE * this.height && over) {
-      const q = this.pull;
-      this.mode = 'pull';
-      q.t = 0; q.x0 = p.x; q.y0 = p.y; q.z0 = p.z; q.x1 = tx; q.z1 = tz; q.y1 = top;
+      this.pullOver(tx, top, tz);
       return;
     }
     // Down to the foot: off onto the ground.
     const back = this.support(p.x - F.nx * 0.3, p.z - F.nz * 0.3, y);
-    if (intent.forward < 0 && back >= y - 0.25 && (rock || this.groundSlope(p.x, p.z) <= this.spec.maxSlope * 1.5)) {
+    if (intent.forward < 0 && back >= y - 0.25 && (inCave || this.groundSlope(p.x, p.z) <= this.spec.maxSlope * 1.5)) {
       this.mode = 'ground';
       p.y = this.support(p.x, p.z, y);
       return;
@@ -497,24 +576,132 @@ export class Walker {
     // On a ladder the rails carry the climber, whatever the rock beside them is like (a thin wall, a niche): along its line.
     const rung = ladder && this.world.ladderAt?.(p.x, y, p.z);
     if (rung) {
-      F.nx = rung.nx; F.nz = rung.nz;
+      F.nx = rung.nx; F.nz = rung.nz; F.off = OFF_FACE;
       const k = damp(14, dt);
       p.x += (rung.x - rung.nx * OFF_FACE - p.x) * k; p.z += (rung.z - rung.nz * OFF_FACE - p.z) * k; p.y = y;
       this.yaw = Math.atan2(-rung.nx, -rung.nz);
       return;
     }
     const at = this.faceAt(ax, az, y, F.nx, F.nz);
-    const c = at && (rock ? this.holds(at[0] - F.nx * 0.2, at[1] - F.nz * 0.2, y) : this.holds(at[0] + F.nx * 0.2, at[1] + F.nz * 0.2, y));
-    // No holds at the chest, but a ledge above within the arms' reach (an opening in a cave's wall, a bench, the top):
-    // the hands are on its lip, and the body goes on up by them to where it pulls itself over. Without this the
-    // climber hung below the lip for good (the holds end at the chest, the pull-up starts at the waist).
+    const c = at && (inCave ? this.holds(at[0] - F.nx * 0.2, at[1] - F.nz * 0.2, y) : this.holds(at[0] + F.nx * 0.2, at[1] + F.nz * 0.2, y));
+    // No holds at the chest, but a ledge above within the arms' reach (the top): the hands are on its lip, and the body goes on
+    // up by them to where it pulls itself over. Without this the climber hung below the lip for good (the holds end at the
+    // chest, the pull-up starts at the waist).
     if ((!at || !c) && intent.forward > 0 && this.lipAbove(tx, tz, y)) { p.y = y; return; }
-    // No holds there (the broken rock ends), or the head at the roof: the body stays where it is.
+    // No holds there, or the head at the roof: the body stays where it is.
     if (!at || !c) return;
-    if (rock && intent.forward > 0 && (this.world.rockSurface(at[0] - c.nx * OFF_FACE, y + this.height + 0.05, at[1] - c.nz * OFF_FACE) ?? 1) < 0.1) return;
+    if (inCave && intent.forward > 0 && (this.world.rockSurface(at[0] - c.nx * OFF_FACE, y + this.height + 0.05, at[1] - c.nz * OFF_FACE) ?? 1) < 0.1) return;
     F.nx = c.nx; F.nz = c.nz;
     p.x = at[0] - c.nx * OFF_FACE; p.z = at[1] - c.nz * OFF_FACE; p.y = y;
     this.yaw = Math.atan2(-c.nx, -c.nz);
+  }
+
+  /** From the face up over its top onto (x, top, z): the pull-up. */
+  private pullOver(x: number, top: number, z: number): void {
+    const p = this.pos, q = this.pull;
+    this.mode = 'pull';
+    q.t = 0; q.x0 = p.x; q.y0 = p.y; q.z0 = p.z; q.x1 = x; q.z1 = z; q.y1 = top;
+  }
+
+  /**
+   * On a cave's rock (D56: its broken rock is climbable wherever it stands as a wall). Generous, so no hollow of the cave
+   * holds the hero (Arnd 2026-11-17: in a hole, and could not climb out in any direction): the face is whatever rock is
+   * nearest in front at the knee, the chest or the head, within reach; the body leans out round a bulge or under a lip
+   * rather than stopping at it; the top is looked for a hand's breadth either side of an arm's length in from the face; and
+   * a face that leans back (a slab) is climbed on as long as there is rock in reach.
+   */
+  private climbRock(intent: WalkIntent, v: number, dt: number): void {
+    const p = this.pos, F = this.face;
+    const y = p.y + intent.forward * v * dt;
+    // Along the face (right of one facing it: (-nz, nx)).
+    const bx = p.x - F.nz * intent.strafe * v * 0.7 * dt, bz = p.z + F.nx * intent.strafe * v * 0.7 * dt;
+    // Over the top: a floor in front, its top up at the waist or under, where the body fits stood up on it (the nearest such,
+    // from just past the face to an arm's length and more beyond it: a ledge is seldom square, nor as deep as a step).
+    if (intent.forward > 0) {
+      const top = this.topAhead(bx, bz, y, PULL_RISE * this.height);
+      if (top) { this.pullOver(top[0], top[1], top[2]); return; }
+    }
+    // Down to the foot: off onto the ground.
+    const back = this.support(p.x - F.nx * 0.3, p.z - F.nz * 0.3, y);
+    if (intent.forward < 0 && back >= y - 0.25) {
+      this.mode = 'ground';
+      p.y = this.support(p.x, p.z, y);
+      return;
+    }
+    // The face in front at the new height: the nearest rock at the knee, the chest or the head.
+    const hit = this.rockAhead(bx, bz, y, F.nx, F.nz, [0.5, 1.1, this.height - 0.2], F.off + ROCK_REACH);
+    if (!hit) {
+      // None in reach: a ledge above within the arms' reach (its lip in the hands, the body goes on up to pull over it), else it stays.
+      if (intent.forward > 0 && this.topAhead(bx, bz, y, this.height)) p.y = y;
+      return;
+    }
+    const ax = bx + F.nx * hit.t, az = bz + F.nz * hit.t;
+    // The way into the face where the hands are; where the rock does not stand as a wall there (a slab, a bulge's top) the way stays.
+    const c = this.holds(ax - F.nx * 0.2, az - F.nz * 0.2, y) ?? { nx: F.nx, nz: F.nz };
+    // (Turning with the face, but never round past a quarter turn in one step: a corner is gone round, not jumped.)
+    const turn = c.nx * F.nx + c.nz * F.nz > 0.2 ? c : { nx: F.nx, nz: F.nz };
+    let off = this.leanOff(ax, az, y, turn.nx, turn.nz);
+    // Under the lip of a ledge whose top is within the arms' reach: the body hangs out from the face by the hands on the lip, out
+    // as far as it must to be clear of it (eased out, not jumped), and goes on up by them to where it pulls itself over.
+    if (off === null && intent.forward > 0 && this.topAhead(bx, bz, y, this.height)) {
+      off = this.leanOff(ax, az, y, turn.nx, turn.nz, HANG_MOST);
+      if (off !== null && off > F.off + 1e-3) {
+        const out = Math.min(off - F.off, v * dt);
+        F.off += out; p.x -= F.nx * out; p.z -= F.nz * out;
+        return;
+      }
+    }
+    // The head or the body would be in the rock even leaning out (a roof, a shelf over the face): climbing on up, the body works
+    // along the face to where the way up is free (as far as a body's width either way, the side it chose kept until it is up), and
+    // stays where it is if it is free nowhere near.
+    if (off === null) {
+      // (Or, with a ledge's top in the hands and room straight up, the body hauls itself over it from here: a chimney's mouth.)
+      const top = intent.forward > 0 ? this.topAhead(bx, bz, y, this.height) : null;
+      if (top && this.clearUp(p.x, p.y, top[1], p.z)) { this.pullOver(top[0], top[1], top[2]); return; }
+      if (intent.forward > 0 && Math.abs(intent.strafe) < 0.1) this.sidestep(v, dt);
+      return;
+    }
+    this.aside = 0;
+    F.nx = turn.nx; F.nz = turn.nz; F.off = off;
+    p.x = ax - turn.nx * off; p.z = az - turn.nz * off; p.y = y;
+    this.yaw = Math.atan2(-turn.nx, -turn.nz);
+  }
+
+  /**
+   * A floor in front of a climber hanging at (x, z) on a cave's face, feet at y, its top over the feet by less than `rise`, where the
+   * body fits stood up on it: the nearest such from just past the face to past an arm's length beyond it (a ledge is seldom square,
+   * nor as deep as a step). Null where there is none.
+   */
+  private topAhead(x: number, z: number, y: number, rise: number): [number, number, number] | null {
+    const F = this.face;
+    for (let d = F.off + 0.2; d <= F.off + PULL_REACH + 1e-6; d += 0.15) {
+      const tx = x + F.nx * d, tz = z + F.nz * d, top = this.support(tx, tz, y + rise);
+      if (top > y - 0.1 && top - y < rise && !this.bodyInRock(tx, top, tz)) return [tx, top, tz];
+    }
+    return null;
+  }
+
+  /** Whether the body at (x, z) has room to rise from feet at y0 to feet at y1 (its radius clear of rock at its knee, waist and head all the way, a little leeway at the start). */
+  private clearUp(x: number, y0: number, y1: number, z: number): boolean {
+    for (let y = y0 + 0.2; y < y1; y += 0.2) if (this.clearance(x, y, z) < this.spec.radius * 0.6) return false;
+    return this.clearance(x, y1, z) >= this.spec.radius * 0.6;
+  }
+
+  /** Along a cave's face towards where the body fits a hand higher than now (`climbRock`), a step of the climb's sideways pace; whether there is such a place. */
+  private sidestep(v: number, dt: number): boolean {
+    const p = this.pos, F = this.face, y = p.y + 0.15, rx = -F.nz, rz = F.nx;
+    const fits = (s: number): boolean => {
+      const bx = p.x + rx * s, bz = p.z + rz * s, hit = this.rockAhead(bx, bz, y, F.nx, F.nz, [0.5, 1.1, this.height - 0.2], F.off + ROCK_REACH);
+      return !!hit && this.leanOff(bx + F.nx * hit.t, bz + F.nz * hit.t, y, F.nx, F.nz) !== null;
+    };
+    if (!this.aside) for (let s = 0.15; s <= ASIDE_MOST + 1e-6 && !this.aside; s += 0.15) this.aside = fits(s) ? 1 : fits(-s) ? -1 : 0;
+    if (!this.aside) return false;
+    const step = this.aside * v * 0.7 * dt, bx = p.x + rx * step, bz = p.z + rz * step;
+    // (Still on the face there: else the way is given up.)
+    const hit = this.rockAhead(bx, bz, p.y, F.nx, F.nz, [0.5, 1.1, this.height - 0.2], F.off + ROCK_REACH);
+    if (!hit) { this.aside = 0; return false; }
+    p.x = bx; p.z = bz;
+    return true;
   }
 
   /** A ledge to pull up onto at (x, z), in from the face, with its top above the feet `y` and within the arms' reach. */

@@ -18,6 +18,9 @@ import { brickColumns, fieldAt, type BrickField } from '../dungeon/rockMesh';
 import { columnSpans, type Dressing, type Pool } from './dress';
 import type { Skeleton } from './skeleton';
 
+/** Air (the field's own measure) in the columns under an upper floor, between it and the lower floor, that makes the floor a shelf not climbed up to. */
+const OVERHANG = 0.3;
+
 export type LinkKind = 'walk' | 'climb' | 'drop' | 'swim' | 'ladder';
 const KIND: readonly LinkKind[] = ['walk', 'climb', 'drop', 'swim', 'ladder'];
 
@@ -127,6 +130,14 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
   first[nx * nz] = cx.length;
   const count = cx.length;
 
+  // A face is climbed by the rock that stands under its top (D56): where the upper floor is a shelf with air under it (a bed jutting
+  // out over the lower floor), the climber below meets no rock to climb, so it is dropped off, never climbed (Arnd 2026-11-17: the
+  // hero stuck in a hole under such shelves). The concession then opens a way out of what only such shelves lead out of.
+  const overhung = (lo: number, up: number): boolean => {
+    for (let h = cy[lo] + 0.5; h < cy[up] - 0.4; h += 0.3) if (fieldAt(f, cx[up], h, cz[up]) >= OVERHANG) return true;
+    return false;
+  };
+
   // Links: each cell with its neighbours to the east and south (and the diagonals), both ways at once.
   const eFrom: number[] = [], eTo: number[] = [], eKind: number[] = [];
   const link = (a: number, b: number, kind: number, two: boolean): void => { eFrom.push(a); eTo.push(b); eKind.push(kind); if (two) { eFrom.push(b); eTo.push(a); eKind.push(kind); } };
@@ -145,7 +156,7 @@ export function readField(f: BrickField, sk: Skeleton, caves: CavesDef, dressing
         // A face: the lower cell's air must reach over the upper floor, so the hero can stand up it onto the ledge (or step off it).
         const lo = dy > 0 ? a : b, up = dy > 0 ? b : a, rise = Math.abs(dy);
         if (cc[lo] < cy[up] + 1) continue;
-        if (rise <= way.climb) link(a, b, 1, true);
+        if (rise <= way.climb && !overhung(lo, up)) link(a, b, 1, true);
         else if (rise <= way.drop) link(up, lo, 2, false);
       }
     }

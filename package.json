@@ -45,6 +45,7 @@
     "ground:scan": "node --import tsx tools/ground/scan.ts",
     "loop:caves": "node --import tsx tools/loop/caves.ts",
     "loop:locks": "node --import tsx tools/loop/locks.ts",
+    "loop:pits": "node --import tsx tools/loop/pits.ts",
     "loop": "npm run loop:evening && npm run loop:voyage && npm run loop:fray",
     "loop:evening": "node --import tsx tools/loop/evening.ts",
     "loop:voyage": "node --import tsx tools/loop/voyage.ts",

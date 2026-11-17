@@ -42,10 +42,10 @@ test('formed ground: floors are found under a body, and a way over the network e
 
 test('formed ground: a goblin wakes in its place and walks the cave to the hero, never through rock', () => {
   // (Whether it notices the hero depends on the line of sight between two rooms, so a few pairs of places are tried: it
-  // reaches the hero from at least one, and none of them takes it into the rock.)
+  // reaches the hero from at least one, and none of them takes it into the rock. Eight since the 2026-11-17 concession reshaped this cave.)
   let reached = 0, tried = 0, worstClear = Infinity;
   const notes: string[] = [];
-  for (let k = 0; k < 4; k++) {
+  for (let k = 0; k < 8; k++) {
     let pair: [number, number, FormedGround];
     try { pair = twoPlaces(8, k); } catch { break; }
     const [home, there, ground] = pair, hero = { x: g.x[there], y: g.y[there], z: g.z[there] };
