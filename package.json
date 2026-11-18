@@ -84,6 +84,7 @@
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/creatures": "file:vendor/assetgenerator/packages/creatures",
+    "@futuremagic/deck": "file:vendor/assetgenerator/packages/deck",
     "@futuremagic/dungeon": "file:vendor/assetgenerator/packages/dungeon",
     "@futuremagic/figure": "file:vendor/assetgenerator/packages/figure",
     "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
