@@ -2,8 +2,11 @@
  * The decks of the ships afloat near the hero, as the walker meets them (S3): each ship's pose on the waves (set by
  * the view that draws it, every frame), its decks as floors, its rail, masts and hull as walls, the gangplank from
  * the quay up to its gangway; and a body standing on a deck goes with it as it rises, pitches, rolls and sails (it
- * neither slides off nor sinks through). Pure: the ship's own shape comes from @futuremagic/settlement.
+ * neither slides off nor sinks through). Pure: the ship's own shape comes from @futuremagic/settlement; a body on a
+ * moving deck (her frame, the floor under the feet on a tilted deck, the rider carried with her) from @futuremagic/deck,
+ * shared with Nauta.
  */
+import { Rider, floorUnder, frameToLocal, frameToWorld, vertical as crossing, type Frame } from '@futuremagic/deck';
 import type { VesselState } from '../sim/shipFolk';
 import { PLANK, hullHalf, shipFixtures, shipFloors, shipHold, shipInside, shipLadders, shipRoom, shipWall, type Mooring, type ShipLadder, type ShipPlan } from '@futuremagic/settlement';
 
@@ -25,22 +28,28 @@ export interface At {
   z: number;
 }
 
+/**
+ * The ship's frame at `p` (@futuremagic/deck): its axes are a along it, h up from the waterline, b across to port.
+ * Rolled (about the keel), pitched (about the beam), then turned to the heading: the drawn mesh's rotation (render/ships.ts).
+ */
+export function poseFrame(p: Pose, out: { origin: At; rotation: number[] } = { origin: { x: 0, y: 0, z: 0 }, rotation: new Array<number>(9).fill(0) }): Frame {
+  const cr = Math.cos(p.roll), sr = Math.sin(p.roll), cp = Math.cos(p.pitch), sp = Math.sin(p.pitch), r = out.rotation;
+  r[0] = p.ux * cp; r[1] = -p.ux * cr * sp + p.uz * sr; r[2] = -p.ux * sr * sp - p.uz * cr;
+  r[3] = sp; r[4] = cr * cp; r[5] = sr * cp;
+  r[6] = p.uz * cp; r[7] = -p.uz * cr * sp - p.ux * sr; r[8] = -p.uz * sr * sp + p.ux * cr;
+  out.origin.x = p.x; out.origin.y = p.y; out.origin.z = p.z;
+  return out;
+}
+
 /** The ship frame's point (a along it, h up from the waterline, b across to port) in the world, at `p`. */
 export function toWorld(p: Pose, a: number, h: number, b: number): At {
-  // Rolled (about the keel), pitched (about the beam), then turned to the heading: the drawn mesh's rotation (render/ships.ts).
-  const cr = Math.cos(p.roll), sr = Math.sin(p.roll), cp = Math.cos(p.pitch), sp = Math.sin(p.pitch);
-  const y1 = h * cr + b * sr, z1 = -h * sr + b * cr;
-  const x2 = a * cp - y1 * sp, y2 = a * sp + y1 * cp;
-  return { x: p.x + x2 * p.ux - z1 * p.uz, y: p.y + y2, z: p.z + x2 * p.uz + z1 * p.ux };
+  return frameToWorld(poseFrame(p), a, h, b);
 }
 
 /** A world point in the ship's frame at `p` (a, h, b). */
 export function toShip(p: Pose, x: number, y: number, z: number): { a: number; h: number; b: number } {
-  const dx = x - p.x, dy = y - p.y, dz = z - p.z;
-  const x2 = dx * p.ux + dz * p.uz, z1 = -dx * p.uz + dz * p.ux;
-  const cr = Math.cos(p.roll), sr = Math.sin(p.roll), cp = Math.cos(p.pitch), sp = Math.sin(p.pitch);
-  const a = x2 * cp + dy * sp, y1 = -x2 * sp + dy * cp;
-  return { a, h: y1 * cr - z1 * sr, b: y1 * sr + z1 * cr };
+  const l = frameToLocal(poseFrame(p), x, y, z);
+  return { a: l.x, h: l.y, b: l.z };
 }
 
 /** A ship afloat: its plan, its pose now, and where its gangplank's foot rests on the land (none: no plank out). */
@@ -59,12 +68,14 @@ const ONTO = 0.9, STEP = 0.45;
 
 export class Decks {
   private readonly ships = new Map<string, Afloat>();
-  /** The ship the rider stands on (its id), and where on it, in its frame. */
-  private aboard: { id: string; a: number; h: number; b: number; x: number; y: number; z: number } | null = null;
+  /** The ship the rider stands on (its id), and where on it, in its frame (@futuremagic/deck). */
+  private readonly rider: Rider<string>;
 
   /** `rider`: the body carried along by a deck it stands on (the hero's walker's position). */
   /** `radius`: the rider's body (game/walker.ts WALK.radius), kept out of the hulls. */
-  constructor(private readonly riding: () => At | null = () => null, private readonly radius = 0.32) {}
+  constructor(private readonly riding: () => At | null = () => null, private readonly radius = 0.32) {
+    this.rider = new Rider(riding);
+  }
 
   /**
    * A ship at its new pose this frame; a body standing on it goes with it. `moored`: lying at its mooring, its
@@ -75,18 +86,16 @@ export class Decks {
     let s = this.ships.get(id);
     if (!s) { s = { plan, pose: { ...pose }, plank: null, state: 'moored', sunk }; this.ships.set(id, s); }
     s.state = moored ? 'moored' : sailing ? 'sailing' : 'lying';
-    const r = this.riding(), was = r && this.aboard?.id === id ? this.aboard : null;
-    // Put somewhere else since it last stood here (a teleport, a cut scene): not carried back.
-    const on = was && r && Math.abs(r.x - was.x) + Math.abs(r.y - was.y) + Math.abs(r.z - was.z) < 1e-6 ? was : null;
     Object.assign(s.pose, pose);
     s.plank = moored && plan.gangway ? s.plank ?? plankFoot(moored) : null;
-    if (r && on) { const w = toWorld(s.pose, on.a, on.h, on.b); r.x = on.x = w.x; r.y = on.y = w.y; r.z = on.z = w.z; }
+    // A body standing on it goes with it; one put somewhere else since it last stood here (a teleport, a cut scene) is not carried back.
+    this.rider.carry(id, poseFrame(s.pose));
   }
 
   /** The ship is gone from near the hero. */
   drop(id: string): void {
     this.ships.delete(id);
-    if (this.aboard?.id === id) this.aboard = null;
+    this.rider.drop(id);
   }
 
   /**
@@ -95,13 +104,13 @@ export class Decks {
    */
   boarded(): void {
     const r = this.riding();
-    this.aboard = null;
+    this.rider.leave();
     if (!r) return;
     this.outOfHulls(r);
     for (const [id, s] of this.ships) {
       const f = this.deckFloor(s, r.x, r.z, r.y);
       // Over the deck, on it or jumping (a jump goes with the ship's way), not fallen below it.
-      if (f !== null && r.y > f - 0.3 && r.y < f + 2.5) { const l = toShip(s.pose, r.x, r.y, r.z); this.aboard = { id, ...l, x: r.x, y: r.y, z: r.z }; return; }
+      if (f !== null && r.y > f - 0.3 && r.y < f + 2.5) { this.rider.board(id, poseFrame(s.pose)); return; }
     }
   }
 
@@ -121,7 +130,7 @@ export class Decks {
 
   /** The id of the ship the rider stands on (null: none). */
   get ship(): string | null {
-    return this.aboard?.id ?? null;
+    return this.rider.on;
   }
 
   /**
@@ -153,12 +162,7 @@ export class Decks {
     if (Math.hypot(x - p.x, z - p.z) > s.plan.length / 2 + 1) return null;
     // The floors where the vertical through (x, z) meets the main deck, highest first: the first within a step of the
     // feet (on a castle's deck, in its cabin under it, on the main deck, on the lower deck under that).
-    const m = vertical(p, x, z, s.plan.deckY), floors = shipFloors(s.plan, m.a, m.b), reach = y === undefined ? Infinity : y + STEP;
-    for (let i = floors.length - 1; i >= 0; i--) {
-      const f = floors[i], c = f === s.plan.deckY ? m : vertical(p, x, z, f);
-      if (c.y <= reach && (c === m || shipFloors(s.plan, c.a, c.b).includes(f))) return c.y;
-    }
-    return null;
+    return floorUnder(poseFrame(p), (a, b) => shipFloors(s.plan, a, b), x, z, s.plan.deckY, y, STEP);
   }
 
   /**
@@ -167,7 +171,7 @@ export class Decks {
    * hull below the deck and out of the castles.
    */
   sight(x: number, y: number, z: number): number | null {
-    const r = this.riding(), on = r && this.aboard ? this.ships.get(this.aboard.id) : null;
+    const r = this.riding(), aboard = this.rider.on, on = r && aboard ? this.ships.get(aboard) : null;
     const lr = on && r ? toShip(on.pose, r.x, r.y, r.z) : null, room = on && lr ? shipRoom(on.plan, lr.a, lr.b, lr.h + 0.5) : null;
     for (const s of this.ships.values()) {
       const p = s.plan, pose = s.pose;
@@ -204,7 +208,7 @@ export class Decks {
 
   /** Where the rider stands on the ship it is aboard, in that ship's frame now (null: not aboard). */
   riderOn(): { readonly id: string; readonly a: number; readonly h: number; readonly b: number } | null {
-    const r = this.riding(), id = this.aboard?.id, s = id && this.ships.get(id);
+    const r = this.riding(), id = this.rider.on, s = id && this.ships.get(id);
     return r && id && s ? { id, ...toShip(s.pose, r.x, r.y, r.z) } : null;
   }
 
@@ -218,15 +222,15 @@ export class Decks {
    * at its top (a way down). Null: none.
    */
   ladderNear(): { id: string; ladder: ShipLadder; way: 'up' | 'down' } | null {
-    const r = this.riding(), on = this.aboard, s = on && this.ships.get(on.id);
-    if (!r || !s) return null;
+    const r = this.riding(), on = this.rider.on, s = on && this.ships.get(on);
+    if (!r || !on || !s) return null;
     const l = toShip(s.pose, r.x, r.y, r.z);
     for (const ladder of shipLadders(s.plan)) {
       const out = (l.a - ladder.a) * ladder.dir, across = Math.abs(l.b - ladder.b);
       if (across > 0.7) continue;
-      if (Math.abs(l.h - ladder.y0) < 0.3 && out > -0.3 && out < 1.4) return { id: on.id, ladder, way: 'up' };
+      if (Math.abs(l.h - ladder.y0) < 0.3 && out > -0.3 && out < 1.4) return { id: on, ladder, way: 'up' };
       // On the castle, within a step or two of its front (the ladder's top stands a little out from it).
-      if (Math.abs(l.h - ladder.y1) < 0.3 && out < -ladder.lean - 0.45 && out > -ladder.lean - 2.2) return { id: on.id, ladder, way: 'down' };
+      if (Math.abs(l.h - ladder.y1) < 0.3 && out < -ladder.lean - 0.45 && out > -ladder.lean - 2.2) return { id: on, ladder, way: 'down' };
     }
     return null;
   }
@@ -267,10 +271,8 @@ function plankHead(s: Afloat, side: 1 | -1): At {
 
 /** Where the vertical through (x, z) meets the ship's level `h` (in its frame) at `p`: its a and b there, and world y. */
 function vertical(p: Pose, x: number, z: number, h: number): { a: number; b: number; y: number } {
-  // The ship frame's point moves linearly with the height along the vertical: solve for the level.
-  const l0 = toShip(p, x, p.y, z), l1 = toShip(p, x, p.y + 1, z), dh = l1.h - l0.h;
-  const k = Math.abs(dh) > 1e-6 ? (h - l0.h) / dh : 0;
-  return { a: l0.a + (l1.a - l0.a) * k, b: l0.b + (l1.b - l0.b) * k, y: p.y + k };
+  const c = crossing(poseFrame(p), x, z, h);
+  return { a: c.x, b: c.z, y: c.y };
 }
 
 /** A bunk is lain in from this near its middle (m, in the ship's frame). */
